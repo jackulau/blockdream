@@ -66,27 +66,28 @@ class DemoEncoder(nn.Module):
         return self.base(b, camera) + skill
 
 
-def demo_config(spec: DemoSpec, image_size: int = 32) -> Config:
+def demo_config(spec: DemoSpec, image_size: int = 32, kind: str | None = None) -> Config:
+    k = kind or spec.kind
     cfg = Config()
-    cfg.tokenizer = TokenizerConfig(image_size=image_size, base_channels=16, latent_channels=4, downsample=4,
-                                    vq_codebook_size=64 if spec.kind == "ar" else 0)
-    cfg.action = ActionConfig(embed_dim=32)
-    cfg.dynamics = DynamicsConfig(kind=spec.kind, dim=64 if spec.kind == "ar" else 32, depth=2, heads=4, diffusion_steps=6)
+    cfg.tokenizer = TokenizerConfig(image_size=image_size, base_channels=24, latent_channels=4, downsample=4,
+                                    vq_codebook_size=128 if k == "ar" else 0)
+    cfg.action = ActionConfig(embed_dim=64)
+    cfg.dynamics = DynamicsConfig(kind=k, dim=96 if k == "ar" else 48, depth=3, heads=4, diffusion_steps=8)
     cfg.demo.name = spec.name
     cfg.demo.active_buttons = list(spec.active_buttons)
     return cfg
 
 
-def build_demo_session(name: str, seed: int = 0) -> tuple[WorldModelSession, DemoSpec]:
+def build_demo_session(name: str, seed: int = 0, kind: str | None = None) -> tuple[WorldModelSession, DemoSpec]:
     if name not in DEMOS:
         raise KeyError(f"unknown demo {name!r}; choices: {list(DEMOS)}")
     spec = DEMOS[name]
     torch.manual_seed(seed)
-    cfg = demo_config(spec)
+    cfg = demo_config(spec, kind=kind)
     tok = Tokenizer(cfg.tokenizer)
     enc = DemoEncoder(ActionEncoder(cfg.action), cfg.action.embed_dim, spec)
     n = cfg.latent_size**2
-    if spec.kind == "ar":
+    if cfg.dynamics.kind == "ar":  # resolved kind (honors the `kind` override)
         trans: nn.Module = ARTransition(cfg.dynamics, n_tokens=n, codebook_size=cfg.tokenizer.vq_codebook_size, action_dim=cfg.action.embed_dim)
     else:
         trans = LatentDiffusionTransition(cfg.dynamics, latent_channels=cfg.tokenizer.latent_channels, action_dim=cfg.action.embed_dim)

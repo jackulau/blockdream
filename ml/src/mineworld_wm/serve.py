@@ -111,6 +111,7 @@ class RolloutServer:
 
 async def run_ws(server: RolloutServer, host: str = "127.0.0.1", port: int = 8765) -> None:  # pragma: no cover
     """Serve over a real WebSocket (requires `pip install websockets`)."""
+    import asyncio
     import json
 
     try:
@@ -122,7 +123,44 @@ async def run_ws(server: RolloutServer, host: str = "127.0.0.1", port: int = 876
         async for raw in ws:
             await ws.send(json.dumps(server.handle(json.loads(raw))))
 
+    print(f"[serve] mineworld world-model on ws://{host}:{port}  (demo={server.session.cfg.demo.name})")
     async with websockets.serve(handler, host, port):
-        import asyncio
-
         await asyncio.Future()
+
+
+def load_demo_session(demo: str, checkpoint: str | None = None, seed: int = 0, kind: str | None = None) -> WorldModelSession:
+    """Build a demo session and optionally load a trained checkpoint into it."""
+    from .demos import build_demo_session  # lazy: demos imports serve
+
+    session, _ = build_demo_session(demo, seed=seed, kind=kind)
+    if checkpoint:
+        ckpt = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        session.tok.load_state_dict(ckpt["tokenizer"])
+        session.enc.load_state_dict(ckpt["action"])
+        session.trans.load_state_dict(ckpt["transition"])
+    return session
+
+
+def main(argv: list[str] | None = None) -> int:  # pragma: no cover
+    import argparse
+    import asyncio
+
+    ap = argparse.ArgumentParser("mineworld_wm.serve")
+    ap.add_argument("--demo", default="walking")
+    ap.add_argument("--checkpoint", default=None)
+    ap.add_argument("--kind", default="ar", choices=["ar", "diffusion"])
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8765)
+    args = ap.parse_args(argv)
+
+    session = load_demo_session(args.demo, args.checkpoint, kind=args.kind)
+    server = RolloutServer(session)
+    try:
+        asyncio.run(run_ws(server, args.host, args.port))
+    except KeyboardInterrupt:
+        print("\n[serve] stopped")
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

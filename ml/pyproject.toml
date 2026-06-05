@@ -15,7 +15,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "onnx>=1.16"]
+dev = ["pytest>=8.0", "onnx>=1.16", "websockets>=12.0"]
+serve = ["websockets>=12.0"]
 export = ["onnx>=1.16"]
 
 [tool.hatch.build.targets.wheel]
