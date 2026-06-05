@@ -53,6 +53,40 @@ VPT video + jsonl are 20 Hz. We sample frames at `--fps` (stride `20/fps`) and t
 each sampled frame's action from the matching jsonl line; training pairs are
 `(frame_t tokens, action_t) → frame_{t+1} tokens`.
 
+## Training on an Apple Silicon Mac (M4 Pro, MPS) — measured
+
+The trainer auto-detects **MPS** (Apple GPU). Benchmarked on an **M4 Pro / 24 GB**:
+
+| config | params | tokens/frame | throughput | fits 24 GB? |
+|---|---|---|---|---|
+| 64px (256 tok) | 2M | 256 | 144 frames/s | yes |
+| **128px @ ds8 (256 tok) — `--preset m4`** | 12M | 256 | **52 frames/s (~3 steps/s)** | yes |
+| 96px (576 tok) | 12M | 576 | 14 frames/s | tight |
+| 128px @ ds4 (1024 tok) | 12M | 1024 | — | **OOM** |
+| 256px (4096 tok) | 100M | 4096 | — | **OOM** |
+
+MPS is **~5–6× faster than CPU** here. The 24 GB cap matters: our AR builds a
+~2·tokens-length attention sequence, so **keep tokens ≈256** (the `m4` preset uses
+128px at downsample-8). Bigger (256px / 100M+) needs an M4 Max (more unified RAM)
+or a cloud GPU.
+
+### One command
+```bash
+bash ml/scripts/train_real.sh --m4 [segments] [steps]
+# e.g. an overnight run for a recognizable, drivable model:
+bash ml/scripts/train_real.sh --m4 80 80000
+```
+**Rough M4 Pro wall-clock** (at ~3 AR steps/s):
+
+| Result | Data | Steps | Time (prep + train) |
+|---|---|---|---|
+| quick/rough drivable | ~15 min footage (30 seg) | ~30k | **~3–5 hrs** |
+| recognizable + drivable | ~40 min footage (80 seg) | ~80k | **~overnight (8–14 hrs)** |
+
+(data prep = ~172 MB/segment download + ffmpeg extract; tokenizer trains first,
+then the AR transition — the AR steps dominate). Serve when done:
+`python -m mineworld_wm.serve --real ml/checkpoints/vpt.pt`.
+
 ## Honest limits
 - CPU-only here → small data + few steps → blurry. The pipeline is real and
   automatic; **fidelity scales with data + GPU** (`--full`).
