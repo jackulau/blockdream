@@ -29,21 +29,32 @@ def prepare_pool(segments: int, seconds: float, fps: int, size: int, out: str, i
     manifest = out_dir / "manifest.json"
     done = set(json.loads(manifest.read_text())) if manifest.exists() else set()
 
+    failed = 0
     for i, rel in enumerate(relpaths[:segments]):
         seg = out_dir / f"seg_{i:05d}.npz"
-        if seg.exists():
-            done.add(rel)
+        skip = out_dir / f"seg_{i:05d}.skip"
+        if seg.exists() or skip.exists():
+            if seg.exists():
+                done.add(rel)
             continue
-        frames = stream_frames(base + rel, seconds, fps, size)
-        actions_raw = fetch_jsonl(base + rel[: -len(".mp4")] + ".jsonl")
-        acts = np.zeros((frames.shape[0], 11), dtype=np.float32)
-        for j in range(frames.shape[0]):
-            btn, cam = parse_vpt_action(actions_raw[min(j * step, len(actions_raw) - 1)])
-            acts[j] = btn + cam  # 9 buttons + 2 camera
-        np.savez_compressed(seg, frames=frames, actions=acts)
-        done.add(rel)
-        manifest.write_text(json.dumps(sorted(done)))
-        print(f"[pool] {i + 1}/{segments} {rel.split('/')[-1]}: {frames.shape[0]} frames @ {size}px (cached)")
+        try:  # robust: a missing/404/corrupt segment must not kill a 300-segment build
+            frames = stream_frames(base + rel, seconds, fps, size)
+            actions_raw = fetch_jsonl(base + rel[: -len(".mp4")] + ".jsonl")
+            acts = np.zeros((frames.shape[0], 11), dtype=np.float32)
+            for j in range(frames.shape[0]):
+                btn, cam = parse_vpt_action(actions_raw[min(j * step, len(actions_raw) - 1)])
+                acts[j] = btn + cam  # 9 buttons + 2 camera
+            np.savez_compressed(seg, frames=frames, actions=acts)
+            done.add(rel)
+            manifest.write_text(json.dumps(sorted(done)))
+            print(f"[pool] {i + 1}/{segments} {rel.split('/')[-1]}: {frames.shape[0]} frames @ {size}px (cached)")
+        except Exception as e:  # noqa: BLE001 — skip + mark so re-runs don't retry
+            skip.write_text(str(e)[:200])
+            failed += 1
+            print(f"[pool] {i + 1}/{segments} SKIP {rel.split('/')[-1]}: {str(e)[:80]}")
+
+    if failed:
+        print(f"[pool] skipped {failed} unavailable segment(s)")
 
     n_cached = len(list(out_dir.glob("seg_*.npz")))
     print(f"[pool] {n_cached} segments cached in {out_dir}")
