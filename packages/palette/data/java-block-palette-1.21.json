@@ -1,0 +1,3875 @@
+{
+ "edition": "java",
+ "version": "1.21.x (block IDs from mapartcraft 1.20 snapshot, stable through 1.21)",
+ "source": "rebane2001/mapartcraft coloursJSON.json",
+ "baseCount": 61,
+ "note": "baseId = cerus map baseId (1..61) = mapartKey+1. RGB is the full (x255) base shade. A placed block renders its base map color; pair with the 4 shade multipliers for full block-build mapart.",
+ "bases": [
+  {
+   "baseId": 1,
+   "mapartKey": 0,
+   "rgb": {
+    "r": 127,
+    "g": 178,
+    "b": 56
+   },
+   "representative": {
+    "displayName": "Slime Block",
+    "id": "minecraft:slime_block",
+    "args": {},
+    "supportRequired": true,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 2,
+   "blocks": [
+    {
+     "displayName": "Grass Block",
+     "id": "minecraft:grass_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": true
+    },
+    {
+     "displayName": "Slime Block",
+     "id": "minecraft:slime_block",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 2,
+   "mapartKey": 1,
+   "rgb": {
+    "r": 247,
+    "g": 233,
+    "b": 163
+   },
+   "representative": {
+    "displayName": "Birch Planks",
+    "id": "minecraft:birch_planks",
+    "args": {},
+    "supportRequired": false,
+    "flammable": true,
+    "biomeDependent": false
+   },
+   "blockCount": 13,
+   "blocks": [
+    {
+     "displayName": "Sand",
+     "id": "minecraft:sand",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Sandstone",
+     "id": "minecraft:sandstone",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Sandstone Slab",
+     "id": "minecraft:sandstone_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Birch Log (vertical)",
+     "id": "minecraft:birch_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Birch Planks",
+     "id": "minecraft:birch_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Birch Slab",
+     "id": "minecraft:birch_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Glowstone",
+     "id": "minecraft:glowstone",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "End Stone",
+     "id": "minecraft:end_stone",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "End Stone Bricks",
+     "id": "minecraft:end_stone_bricks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "End Stone Brick Slab",
+     "id": "minecraft:end_stone_brick_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bone Block",
+     "id": "minecraft:bone_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Birch Pressure Plate",
+     "id": "minecraft:birch_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Ochre Froglight",
+     "id": "minecraft:ochre_froglight",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 3,
+   "mapartKey": 2,
+   "rgb": {
+    "r": 199,
+    "g": 199,
+    "b": 199
+   },
+   "representative": {
+    "displayName": "Mushroom Stem",
+    "id": "minecraft:mushroom_stem",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 3,
+   "blocks": [
+    {
+     "displayName": "Cobweb",
+     "id": "minecraft:cobweb",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mushroom Stem",
+     "id": "minecraft:mushroom_stem",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "White Candle",
+     "id": "minecraft:white_candle",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 4,
+   "mapartKey": 3,
+   "rgb": {
+    "r": 255,
+    "g": 0,
+    "b": 0
+   },
+   "representative": {
+    "displayName": "TNT",
+    "id": "minecraft:tnt",
+    "args": {},
+    "supportRequired": false,
+    "flammable": true,
+    "biomeDependent": false
+   },
+   "blockCount": 2,
+   "blocks": [
+    {
+     "displayName": "TNT",
+     "id": "minecraft:tnt",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Block of Redstone",
+     "id": "minecraft:redstone_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 5,
+   "mapartKey": 4,
+   "rgb": {
+    "r": 160,
+    "g": 160,
+    "b": 255
+   },
+   "representative": {
+    "displayName": "Ice",
+    "id": "minecraft:ice",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 3,
+   "blocks": [
+    {
+     "displayName": "Ice",
+     "id": "minecraft:ice",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Packed Ice",
+     "id": "minecraft:packed_ice",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Blue Ice",
+     "id": "minecraft:blue_ice",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 6,
+   "mapartKey": 5,
+   "rgb": {
+    "r": 167,
+    "g": 167,
+    "b": 167
+   },
+   "representative": {
+    "displayName": "Block of Iron",
+    "id": "minecraft:iron_block",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 4,
+   "blocks": [
+    {
+     "displayName": "Block of Iron",
+     "id": "minecraft:iron_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Iron Trapdoor",
+     "id": "minecraft:iron_trapdoor",
+     "args": {
+      "half": "bottom"
+     },
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Weighted Pressure Plate (Heavy)",
+     "id": "minecraft:heavy_weighted_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Brewing Stand",
+     "id": "minecraft:brewing_stand",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 7,
+   "mapartKey": 6,
+   "rgb": {
+    "r": 0,
+    "g": 124,
+    "b": 0
+   },
+   "representative": {
+    "displayName": "Block of Bamboo (horizontal)",
+    "id": "minecraft:bamboo_block",
+    "args": {
+     "axis": "x"
+    },
+    "supportRequired": false,
+    "flammable": true,
+    "biomeDependent": false
+   },
+   "blockCount": 8,
+   "blocks": [
+    {
+     "displayName": "Leaves (Oak)",
+     "id": "minecraft:oak_leaves",
+     "args": {
+      "persistent": "true"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    },
+    {
+     "displayName": "Leaves (Spruce)",
+     "id": "minecraft:spruce_leaves",
+     "args": {
+      "persistent": "true"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    },
+    {
+     "displayName": "Leaves (Birch)",
+     "id": "minecraft:birch_leaves",
+     "args": {
+      "persistent": "true"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    },
+    {
+     "displayName": "Leaves (Jungle)",
+     "id": "minecraft:jungle_leaves",
+     "args": {
+      "persistent": "true"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    },
+    {
+     "displayName": "Leaves (Acacia)",
+     "id": "minecraft:acacia_leaves",
+     "args": {
+      "persistent": "true"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    },
+    {
+     "displayName": "Leaves (Dark Oak)",
+     "id": "minecraft:dark_oak_leaves",
+     "args": {
+      "persistent": "true"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    },
+    {
+     "displayName": "Leaves (Azalea)",
+     "id": "minecraft:azalea_leaves",
+     "args": {
+      "persistent": "true"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    },
+    {
+     "displayName": "Block of Bamboo (horizontal)",
+     "id": "minecraft:bamboo_block",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 8,
+   "mapartKey": 7,
+   "rgb": {
+    "r": 164,
+    "g": 168,
+    "b": 184
+   },
+   "representative": {
+    "displayName": "Clay",
+    "id": "minecraft:clay",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Clay",
+     "id": "minecraft:clay",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 9,
+   "mapartKey": 8,
+   "rgb": {
+    "r": 151,
+    "g": 109,
+    "b": 77
+   },
+   "representative": {
+    "displayName": "Jungle Planks",
+    "id": "minecraft:jungle_planks",
+    "args": {},
+    "supportRequired": false,
+    "flammable": true,
+    "biomeDependent": false
+   },
+   "blockCount": 11,
+   "blocks": [
+    {
+     "displayName": "Jungle Log (vertical)",
+     "id": "minecraft:jungle_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Jungle Planks",
+     "id": "minecraft:jungle_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Jungle Slab",
+     "id": "minecraft:jungle_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dirt",
+     "id": "minecraft:dirt",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Coarse Dirt",
+     "id": "minecraft:coarse_dirt",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Rooted Dirt",
+     "id": "minecraft:rooted_dirt",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Jukebox",
+     "id": "minecraft:jukebox",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Granite",
+     "id": "minecraft:granite",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Granite Slab",
+     "id": "minecraft:granite_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Jungle Pressure Plate",
+     "id": "minecraft:jungle_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Packed Mud",
+     "id": "minecraft:packed_mud",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 10,
+   "mapartKey": 9,
+   "rgb": {
+    "r": 112,
+    "g": 112,
+    "b": 112
+   },
+   "representative": {
+    "displayName": "Cobblestone",
+    "id": "minecraft:cobblestone",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 15,
+   "blocks": [
+    {
+     "displayName": "Cobblestone",
+     "id": "minecraft:cobblestone",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cobblestone Slab",
+     "id": "minecraft:cobblestone_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mossy Cobblestone",
+     "id": "minecraft:mossy_cobblestone",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mossy Cobblestone Slab",
+     "id": "minecraft:mossy_cobblestone_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stone",
+     "id": "minecraft:stone",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stone Slab",
+     "id": "minecraft:stone_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Smooth Stone Slab",
+     "id": "minecraft:smooth_stone_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stone Bricks",
+     "id": "minecraft:stone_bricks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stone Brick Slab",
+     "id": "minecraft:stone_brick_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Andesite",
+     "id": "minecraft:andesite",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Andesite Slab",
+     "id": "minecraft:andesite_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bedrock",
+     "id": "minecraft:bedrock",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Acacia Log (horizontal)",
+     "id": "minecraft:acacia_log",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Gravel",
+     "id": "minecraft:gravel",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stone Pressure Plate",
+     "id": "minecraft:stone_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 11,
+   "mapartKey": 10,
+   "rgb": {
+    "r": 64,
+    "g": 64,
+    "b": 255
+   },
+   "representative": {
+    "displayName": "Water (Unsupported!)",
+    "id": "minecraft:water",
+    "args": {},
+    "supportRequired": true,
+    "flammable": false,
+    "biomeDependent": true
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Water (Unsupported!)",
+     "id": "minecraft:water",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": true
+    }
+   ]
+  },
+  {
+   "baseId": 12,
+   "mapartKey": 11,
+   "rgb": {
+    "r": 143,
+    "g": 119,
+    "b": 72
+   },
+   "representative": {
+    "displayName": "Oak Planks",
+    "id": "minecraft:oak_planks",
+    "args": {},
+    "supportRequired": false,
+    "flammable": true,
+    "biomeDependent": false
+   },
+   "blockCount": 5,
+   "blocks": [
+    {
+     "displayName": "Oak Log (vertical)",
+     "id": "minecraft:oak_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Oak Planks",
+     "id": "minecraft:oak_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Oak Slab",
+     "id": "minecraft:oak_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Crafting Table",
+     "id": "minecraft:crafting_table",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Oak Pressure Plate",
+     "id": "minecraft:oak_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 13,
+   "mapartKey": 12,
+   "rgb": {
+    "r": 255,
+    "g": 252,
+    "b": 245
+   },
+   "representative": {
+    "displayName": "Birch Log (horizontal)",
+    "id": "minecraft:birch_log",
+    "args": {
+     "axis": "x"
+    },
+    "supportRequired": false,
+    "flammable": true,
+    "biomeDependent": false
+   },
+   "blockCount": 6,
+   "blocks": [
+    {
+     "displayName": "Birch Log (horizontal)",
+     "id": "minecraft:birch_log",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Diorite",
+     "id": "minecraft:diorite",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Diorite Slab",
+     "id": "minecraft:diorite_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Quartz Block",
+     "id": "minecraft:quartz_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Quartz Slab",
+     "id": "minecraft:quartz_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Sea Lantern",
+     "id": "minecraft:sea_lantern",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 14,
+   "mapartKey": 13,
+   "rgb": {
+    "r": 255,
+    "g": 255,
+    "b": 255
+   },
+   "representative": {
+    "displayName": "White Concrete",
+    "id": "minecraft:white_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 8,
+   "blocks": [
+    {
+     "displayName": "White Wool",
+     "id": "minecraft:white_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "White Carpet",
+     "id": "minecraft:white_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "White Stained Glass",
+     "id": "minecraft:white_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "White Concrete",
+     "id": "minecraft:white_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "White Concrete Powder",
+     "id": "minecraft:white_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "White Glazed Terracotta",
+     "id": "minecraft:white_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Snow Block",
+     "id": "minecraft:snow_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Snow Layer",
+     "id": "minecraft:snow",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 15,
+   "mapartKey": 14,
+   "rgb": {
+    "r": 216,
+    "g": 127,
+    "b": 51
+   },
+   "representative": {
+    "displayName": "Orange Concrete",
+    "id": "minecraft:orange_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 20,
+   "blocks": [
+    {
+     "displayName": "Orange Wool",
+     "id": "minecraft:orange_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Orange Carpet",
+     "id": "minecraft:orange_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Orange Stained Glass",
+     "id": "minecraft:orange_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Orange Concrete",
+     "id": "minecraft:orange_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Orange Concrete Powder",
+     "id": "minecraft:orange_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Orange Glazed Terracotta",
+     "id": "minecraft:orange_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Pumpkin",
+     "id": "minecraft:pumpkin",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Acacia Log (vertical)",
+     "id": "minecraft:acacia_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Acacia Planks",
+     "id": "minecraft:acacia_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Acacia Slab",
+     "id": "minecraft:acacia_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Sand",
+     "id": "minecraft:red_sand",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Sandstone",
+     "id": "minecraft:red_sandstone",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Sandstone Slab",
+     "id": "minecraft:red_sandstone_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Terracotta",
+     "id": "minecraft:terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Honey Block",
+     "id": "minecraft:honey_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Honeycomb Block",
+     "id": "minecraft:honeycomb_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Block Of Raw Copper",
+     "id": "minecraft:raw_copper_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Waxed Block Of Copper",
+     "id": "minecraft:waxed_copper_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Waxed Cut Copper Slab",
+     "id": "minecraft:waxed_cut_copper_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Acacia Pressure Plate",
+     "id": "minecraft:acacia_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 16,
+   "mapartKey": 15,
+   "rgb": {
+    "r": 178,
+    "g": 76,
+    "b": 216
+   },
+   "representative": {
+    "displayName": "Magenta Concrete",
+    "id": "minecraft:magenta_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 8,
+   "blocks": [
+    {
+     "displayName": "Magenta Wool",
+     "id": "minecraft:magenta_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Magenta Carpet",
+     "id": "minecraft:magenta_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Magenta Stained Glass",
+     "id": "minecraft:magenta_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Magenta Concrete",
+     "id": "minecraft:magenta_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Magenta Concrete Powder",
+     "id": "minecraft:magenta_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Magenta Glazed Terracotta",
+     "id": "minecraft:magenta_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Purpur Block",
+     "id": "minecraft:purpur_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Purpur Slab",
+     "id": "minecraft:purpur_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 17,
+   "mapartKey": 16,
+   "rgb": {
+    "r": 102,
+    "g": 153,
+    "b": 216
+   },
+   "representative": {
+    "displayName": "Light Blue Concrete",
+    "id": "minecraft:light_blue_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 6,
+   "blocks": [
+    {
+     "displayName": "Light Blue Wool",
+     "id": "minecraft:light_blue_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Blue Carpet",
+     "id": "minecraft:light_blue_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Blue Stained Glass",
+     "id": "minecraft:light_blue_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Blue Concrete",
+     "id": "minecraft:light_blue_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Blue Concrete Powder",
+     "id": "minecraft:light_blue_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Blue Glazed Terracotta",
+     "id": "minecraft:light_blue_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 18,
+   "mapartKey": 17,
+   "rgb": {
+    "r": 229,
+    "g": 229,
+    "b": 51
+   },
+   "representative": {
+    "displayName": "Yellow Concrete",
+    "id": "minecraft:yellow_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 14,
+   "blocks": [
+    {
+     "displayName": "Yellow Wool",
+     "id": "minecraft:yellow_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Yellow Carpet",
+     "id": "minecraft:yellow_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Yellow Stained Glass",
+     "id": "minecraft:yellow_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Yellow Concrete",
+     "id": "minecraft:yellow_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Yellow Concrete Powder",
+     "id": "minecraft:yellow_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Yellow Glazed Terracotta",
+     "id": "minecraft:yellow_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Hay Bale",
+     "id": "minecraft:hay_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Sponge (any)",
+     "id": "minecraft:sponge",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Block of Bamboo (vertical)",
+     "id": "minecraft:bamboo_block",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bamboo Planks",
+     "id": "minecraft:bamboo_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bamboo Slab",
+     "id": "minecraft:bamboo_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bamboo Mosaic",
+     "id": "minecraft:bamboo_mosaic",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bamboo Mosaic Slab",
+     "id": "minecraft:bamboo_mosaic_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bamboo Pressure Plate",
+     "id": "minecraft:bamboo_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 19,
+   "mapartKey": 18,
+   "rgb": {
+    "r": 127,
+    "g": 204,
+    "b": 25
+   },
+   "representative": {
+    "displayName": "Lime Concrete",
+    "id": "minecraft:lime_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 7,
+   "blocks": [
+    {
+     "displayName": "Lime Wool",
+     "id": "minecraft:lime_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Lime Carpet",
+     "id": "minecraft:lime_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Lime Stained Glass",
+     "id": "minecraft:lime_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Lime Concrete",
+     "id": "minecraft:lime_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Lime Concrete Powder",
+     "id": "minecraft:lime_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Lime Glazed Terracotta",
+     "id": "minecraft:lime_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Melon",
+     "id": "minecraft:melon",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 20,
+   "mapartKey": 19,
+   "rgb": {
+    "r": 242,
+    "g": 127,
+    "b": 165
+   },
+   "representative": {
+    "displayName": "Pink Concrete",
+    "id": "minecraft:pink_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 8,
+   "blocks": [
+    {
+     "displayName": "Pink Wool",
+     "id": "minecraft:pink_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Pink Carpet",
+     "id": "minecraft:pink_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Pink Stained Glass",
+     "id": "minecraft:pink_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Pink Concrete",
+     "id": "minecraft:pink_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Pink Concrete Powder",
+     "id": "minecraft:pink_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Pink Glazed Terracotta",
+     "id": "minecraft:pink_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Pearlescent Froglight",
+     "id": "minecraft:pearlescent_froglight",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cherry Leaves",
+     "id": "minecraft:cherry_leaves",
+     "args": {
+      "persistent": "true"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    }
+   ]
+  },
+  {
+   "baseId": 21,
+   "mapartKey": 20,
+   "rgb": {
+    "r": 76,
+    "g": 76,
+    "b": 76
+   },
+   "representative": {
+    "displayName": "Gray Concrete",
+    "id": "minecraft:gray_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 12,
+   "blocks": [
+    {
+     "displayName": "Gray Wool",
+     "id": "minecraft:gray_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Gray Carpet",
+     "id": "minecraft:gray_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Gray Stained Glass",
+     "id": "minecraft:gray_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Gray Concrete",
+     "id": "minecraft:gray_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Gray Concrete Powder",
+     "id": "minecraft:gray_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Gray Glazed Terracotta",
+     "id": "minecraft:gray_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dead Tube Coral Block",
+     "id": "minecraft:dead_tube_coral_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dead Brain Coral Block",
+     "id": "minecraft:dead_brain_coral_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dead Bubble Coral Block",
+     "id": "minecraft:dead_bubble_coral_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dead Fire Coral Block",
+     "id": "minecraft:dead_fire_coral_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dead Horn Coral Block",
+     "id": "minecraft:dead_horn_coral_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Tinted Glass",
+     "id": "minecraft:tinted_glass",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 22,
+   "mapartKey": 21,
+   "rgb": {
+    "r": 153,
+    "g": 153,
+    "b": 153
+   },
+   "representative": {
+    "displayName": "Light Gray Concrete",
+    "id": "minecraft:light_gray_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 6,
+   "blocks": [
+    {
+     "displayName": "Light Gray Wool",
+     "id": "minecraft:light_gray_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Gray Carpet",
+     "id": "minecraft:light_gray_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Gray Stained Glass",
+     "id": "minecraft:light_gray_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Gray Concrete",
+     "id": "minecraft:light_gray_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Gray Concrete Powder",
+     "id": "minecraft:light_gray_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Light Gray Glazed Terracotta",
+     "id": "minecraft:light_gray_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 23,
+   "mapartKey": 22,
+   "rgb": {
+    "r": 76,
+    "g": 127,
+    "b": 153
+   },
+   "representative": {
+    "displayName": "Cyan Concrete",
+    "id": "minecraft:cyan_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 8,
+   "blocks": [
+    {
+     "displayName": "Cyan Wool",
+     "id": "minecraft:cyan_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cyan Carpet",
+     "id": "minecraft:cyan_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cyan Stained Glass",
+     "id": "minecraft:cyan_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cyan Concrete",
+     "id": "minecraft:cyan_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cyan Concrete Powder",
+     "id": "minecraft:cyan_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cyan Glazed Terracotta",
+     "id": "minecraft:cyan_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Prismarine",
+     "id": "minecraft:prismarine",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Prismarine Slab",
+     "id": "minecraft:prismarine_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 24,
+   "mapartKey": 23,
+   "rgb": {
+    "r": 127,
+    "g": 63,
+    "b": 178
+   },
+   "representative": {
+    "displayName": "Purple Concrete",
+    "id": "minecraft:purple_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 8,
+   "blocks": [
+    {
+     "displayName": "Purple Wool",
+     "id": "minecraft:purple_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Purple Carpet",
+     "id": "minecraft:purple_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Purple Stained Glass",
+     "id": "minecraft:purple_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Purple Concrete",
+     "id": "minecraft:purple_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Purple Concrete Powder",
+     "id": "minecraft:purple_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Purple Glazed Terracotta",
+     "id": "minecraft:purple_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mycelium",
+     "id": "minecraft:mycelium",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Amethyst Block",
+     "id": "minecraft:amethyst_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 25,
+   "mapartKey": 24,
+   "rgb": {
+    "r": 51,
+    "g": 76,
+    "b": 178
+   },
+   "representative": {
+    "displayName": "Blue Concrete",
+    "id": "minecraft:blue_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 6,
+   "blocks": [
+    {
+     "displayName": "Blue Wool",
+     "id": "minecraft:blue_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Blue Carpet",
+     "id": "minecraft:blue_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Blue Stained Glass",
+     "id": "minecraft:blue_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Blue Concrete",
+     "id": "minecraft:blue_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Blue Concrete Powder",
+     "id": "minecraft:blue_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Blue Glazed Terracotta",
+     "id": "minecraft:blue_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 26,
+   "mapartKey": 25,
+   "rgb": {
+    "r": 102,
+    "g": 76,
+    "b": 51
+   },
+   "representative": {
+    "displayName": "Brown Concrete",
+    "id": "minecraft:brown_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 13,
+   "blocks": [
+    {
+     "displayName": "Brown Wool",
+     "id": "minecraft:brown_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Brown Carpet",
+     "id": "minecraft:brown_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Brown Stained Glass",
+     "id": "minecraft:brown_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Brown Concrete",
+     "id": "minecraft:brown_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Brown Concrete Powder",
+     "id": "minecraft:brown_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Brown Glazed Terracotta",
+     "id": "minecraft:brown_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dark Oak Log (any direction)",
+     "id": "minecraft:dark_oak_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dark Oak Planks",
+     "id": "minecraft:dark_oak_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dark Oak Slab",
+     "id": "minecraft:dark_oak_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Spruce Log (horizontal)",
+     "id": "minecraft:spruce_log",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Soul Sand",
+     "id": "minecraft:soul_sand",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Soul Soil",
+     "id": "minecraft:soul_soil",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dark Oak Pressure Plate",
+     "id": "minecraft:dark_oak_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 27,
+   "mapartKey": 26,
+   "rgb": {
+    "r": 102,
+    "g": 127,
+    "b": 51
+   },
+   "representative": {
+    "displayName": "Green Concrete",
+    "id": "minecraft:green_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 7,
+   "blocks": [
+    {
+     "displayName": "Green Wool",
+     "id": "minecraft:green_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Green Carpet",
+     "id": "minecraft:green_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Green Stained Glass",
+     "id": "minecraft:green_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Green Concrete",
+     "id": "minecraft:green_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Green Concrete Powder",
+     "id": "minecraft:green_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Green Glazed Terracotta",
+     "id": "minecraft:green_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dried Kelp Block",
+     "id": "minecraft:dried_kelp_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": true
+    }
+   ]
+  },
+  {
+   "baseId": 28,
+   "mapartKey": 27,
+   "rgb": {
+    "r": 153,
+    "g": 51,
+    "b": 51
+   },
+   "representative": {
+    "displayName": "Red Concrete",
+    "id": "minecraft:red_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 14,
+   "blocks": [
+    {
+     "displayName": "Red Wool",
+     "id": "minecraft:red_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Carpet",
+     "id": "minecraft:red_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Stained Glass",
+     "id": "minecraft:red_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Concrete",
+     "id": "minecraft:red_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Concrete Powder",
+     "id": "minecraft:red_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Glazed Terracotta",
+     "id": "minecraft:red_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bricks",
+     "id": "minecraft:bricks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Bricks Slab",
+     "id": "minecraft:brick_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Nether Wart Block",
+     "id": "minecraft:nether_wart_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Shroomlight",
+     "id": "minecraft:shroomlight",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mangrove Log (vertical)",
+     "id": "minecraft:mangrove_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mangrove Planks",
+     "id": "minecraft:mangrove_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mangrove Slab",
+     "id": "minecraft:mangrove_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mangrove Pressure Plate",
+     "id": "minecraft:mangrove_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 29,
+   "mapartKey": 28,
+   "rgb": {
+    "r": 25,
+    "g": 25,
+    "b": 25
+   },
+   "representative": {
+    "displayName": "Black Concrete",
+    "id": "minecraft:black_concrete",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 17,
+   "blocks": [
+    {
+     "displayName": "Black Wool",
+     "id": "minecraft:black_wool",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Black Carpet",
+     "id": "minecraft:black_carpet",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Black Stained Glass",
+     "id": "minecraft:black_stained_glass",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Black Concrete",
+     "id": "minecraft:black_concrete",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Black Concrete Powder",
+     "id": "minecraft:black_concrete_powder",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Black Glazed Terracotta",
+     "id": "minecraft:black_glazed_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Block of Coal",
+     "id": "minecraft:coal_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Obsidian",
+     "id": "minecraft:obsidian",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Crying Obsidian",
+     "id": "minecraft:crying_obsidian",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Blackstone",
+     "id": "minecraft:blackstone",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Blackstone Slab",
+     "id": "minecraft:blackstone_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Basalt",
+     "id": "minecraft:basalt",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Block Of Netherite",
+     "id": "minecraft:netherite_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Polished Blackstone Pressure Plate",
+     "id": "minecraft:polished_blackstone_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Sculk",
+     "id": "minecraft:sculk",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Sculk Catalyst",
+     "id": "minecraft:sculk_catalyst",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Sculk Shrieker",
+     "id": "minecraft:sculk_shrieker",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 30,
+   "mapartKey": 29,
+   "rgb": {
+    "r": 250,
+    "g": 238,
+    "b": 77
+   },
+   "representative": {
+    "displayName": "Block of Gold",
+    "id": "minecraft:gold_block",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 3,
+   "blocks": [
+    {
+     "displayName": "Block of Gold",
+     "id": "minecraft:gold_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Weighted Pressure Plate (Light)",
+     "id": "minecraft:light_weighted_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Block Of Raw Gold",
+     "id": "minecraft:raw_gold_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 31,
+   "mapartKey": 30,
+   "rgb": {
+    "r": 92,
+    "g": 219,
+    "b": 213
+   },
+   "representative": {
+    "displayName": "Block of Diamond",
+    "id": "minecraft:diamond_block",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 6,
+   "blocks": [
+    {
+     "displayName": "Block of Diamond",
+     "id": "minecraft:diamond_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Prismarine Bricks",
+     "id": "minecraft:prismarine_bricks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Prismarine Brick Slab",
+     "id": "minecraft:prismarine_brick_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dark Prismarine",
+     "id": "minecraft:dark_prismarine",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dark Prismarine Slab",
+     "id": "minecraft:dark_prismarine_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Beacon",
+     "id": "minecraft:beacon",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 32,
+   "mapartKey": 31,
+   "rgb": {
+    "r": 74,
+    "g": 128,
+    "b": 255
+   },
+   "representative": {
+    "displayName": "Lapis Lazuli Block",
+    "id": "minecraft:lapis_block",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Lapis Lazuli Block",
+     "id": "minecraft:lapis_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 33,
+   "mapartKey": 32,
+   "rgb": {
+    "r": 0,
+    "g": 217,
+    "b": 58
+   },
+   "representative": {
+    "displayName": "Block of Emerald",
+    "id": "minecraft:emerald_block",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Block of Emerald",
+     "id": "minecraft:emerald_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 34,
+   "mapartKey": 33,
+   "rgb": {
+    "r": 129,
+    "g": 86,
+    "b": 49
+   },
+   "representative": {
+    "displayName": "Spruce Planks",
+    "id": "minecraft:spruce_planks",
+    "args": {},
+    "supportRequired": false,
+    "flammable": true,
+    "biomeDependent": false
+   },
+   "blockCount": 9,
+   "blocks": [
+    {
+     "displayName": "Spruce Log (vertical)",
+     "id": "minecraft:spruce_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Spruce Planks",
+     "id": "minecraft:spruce_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Spruce Slab",
+     "id": "minecraft:spruce_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Oak Log (horizontal)",
+     "id": "minecraft:oak_log",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Jungle Log (horizontal)",
+     "id": "minecraft:jungle_log",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Podzol",
+     "id": "minecraft:podzol",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Spruce Pressure Plate",
+     "id": "minecraft:spruce_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mangrove Log (horizontal)",
+     "id": "minecraft:mangrove_log",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mangrove Roots",
+     "id": "minecraft:mangrove_roots",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 35,
+   "mapartKey": 34,
+   "rgb": {
+    "r": 112,
+    "g": 2,
+    "b": 0
+   },
+   "representative": {
+    "displayName": "Netherrack",
+    "id": "minecraft:netherrack",
+    "args": {},
+    "supportRequired": false,
+    "flammable": true,
+    "biomeDependent": false
+   },
+   "blockCount": 6,
+   "blocks": [
+    {
+     "displayName": "Netherrack",
+     "id": "minecraft:netherrack",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Nether Brick",
+     "id": "minecraft:nether_bricks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Nether Brick Slab",
+     "id": "minecraft:nether_brick_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Magma Block",
+     "id": "minecraft:magma_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Nether Bricks",
+     "id": "minecraft:red_nether_bricks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Red Nether Brick Slab",
+     "id": "minecraft:red_nether_brick_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 36,
+   "mapartKey": 35,
+   "rgb": {
+    "r": 209,
+    "g": 177,
+    "b": 161
+   },
+   "representative": {
+    "displayName": "White Terracotta",
+    "id": "minecraft:white_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 7,
+   "blocks": [
+    {
+     "displayName": "White Terracotta",
+     "id": "minecraft:white_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Calcite",
+     "id": "minecraft:calcite",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cherry Planks",
+     "id": "minecraft:cherry_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cherry Slab",
+     "id": "minecraft:cherry_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cherry Log (vertical)",
+     "id": "minecraft:cherry_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stripped Cherry Log (vertical)",
+     "id": "minecraft:stripped_cherry_log",
+     "args": {
+      "axis": "y"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cherry Pressure Plate",
+     "id": "minecraft:cherry_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 37,
+   "mapartKey": 36,
+   "rgb": {
+    "r": 159,
+    "g": 82,
+    "b": 36
+   },
+   "representative": {
+    "displayName": "Orange Terracotta",
+    "id": "minecraft:orange_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Orange Terracotta",
+     "id": "minecraft:orange_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 38,
+   "mapartKey": 37,
+   "rgb": {
+    "r": 149,
+    "g": 87,
+    "b": 108
+   },
+   "representative": {
+    "displayName": "Magenta Terracotta",
+    "id": "minecraft:magenta_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Magenta Terracotta",
+     "id": "minecraft:magenta_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 39,
+   "mapartKey": 38,
+   "rgb": {
+    "r": 112,
+    "g": 108,
+    "b": 138
+   },
+   "representative": {
+    "displayName": "Light Blue Terracotta",
+    "id": "minecraft:light_blue_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Light Blue Terracotta",
+     "id": "minecraft:light_blue_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 40,
+   "mapartKey": 39,
+   "rgb": {
+    "r": 186,
+    "g": 133,
+    "b": 36
+   },
+   "representative": {
+    "displayName": "Yellow Terracotta",
+    "id": "minecraft:yellow_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Yellow Terracotta",
+     "id": "minecraft:yellow_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 41,
+   "mapartKey": 40,
+   "rgb": {
+    "r": 103,
+    "g": 117,
+    "b": 53
+   },
+   "representative": {
+    "displayName": "Lime Terracotta",
+    "id": "minecraft:lime_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Lime Terracotta",
+     "id": "minecraft:lime_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 42,
+   "mapartKey": 41,
+   "rgb": {
+    "r": 160,
+    "g": 77,
+    "b": 78
+   },
+   "representative": {
+    "displayName": "Pink Terracotta",
+    "id": "minecraft:pink_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 3,
+   "blocks": [
+    {
+     "displayName": "Pink Terracotta",
+     "id": "minecraft:pink_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stripped Cherry Log (horizontal)",
+     "id": "minecraft:stripped_cherry_log",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stripped Cherry Wood",
+     "id": "minecraft:stripped_cherry_wood",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 43,
+   "mapartKey": 42,
+   "rgb": {
+    "r": 57,
+    "g": 41,
+    "b": 35
+   },
+   "representative": {
+    "displayName": "Gray Terracotta",
+    "id": "minecraft:gray_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 4,
+   "blocks": [
+    {
+     "displayName": "Gray Terracotta",
+     "id": "minecraft:gray_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Tuff",
+     "id": "minecraft:tuff",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cherry Log (horizontal)",
+     "id": "minecraft:cherry_log",
+     "args": {
+      "axis": "x"
+     },
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cherry Wood",
+     "id": "minecraft:cherry_wood",
+     "args": {},
+     "supportRequired": false,
+     "flammable": true,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 44,
+   "mapartKey": 43,
+   "rgb": {
+    "r": 135,
+    "g": 107,
+    "b": 98
+   },
+   "representative": {
+    "displayName": "Light Gray Terracotta",
+    "id": "minecraft:light_gray_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 5,
+   "blocks": [
+    {
+     "displayName": "Light Gray Terracotta",
+     "id": "minecraft:light_gray_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Waxed Exposed Copper",
+     "id": "minecraft:waxed_exposed_copper",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Waxed Exposed Cut Copper Slab",
+     "id": "minecraft:waxed_exposed_cut_copper_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mud Bricks",
+     "id": "minecraft:mud_bricks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mud Brick Slab",
+     "id": "minecraft:mud_brick_slab",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 45,
+   "mapartKey": 44,
+   "rgb": {
+    "r": 87,
+    "g": 92,
+    "b": 92
+   },
+   "representative": {
+    "displayName": "Cyan Terracotta",
+    "id": "minecraft:cyan_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 2,
+   "blocks": [
+    {
+     "displayName": "Cyan Terracotta",
+     "id": "minecraft:cyan_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Mud",
+     "id": "minecraft:mud",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 46,
+   "mapartKey": 45,
+   "rgb": {
+    "r": 122,
+    "g": 73,
+    "b": 88
+   },
+   "representative": {
+    "displayName": "Purple Terracotta",
+    "id": "minecraft:purple_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Purple Terracotta",
+     "id": "minecraft:purple_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 47,
+   "mapartKey": 46,
+   "rgb": {
+    "r": 76,
+    "g": 62,
+    "b": 92
+   },
+   "representative": {
+    "displayName": "Blue Terracotta",
+    "id": "minecraft:blue_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Blue Terracotta",
+     "id": "minecraft:blue_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 48,
+   "mapartKey": 47,
+   "rgb": {
+    "r": 76,
+    "g": 50,
+    "b": 35
+   },
+   "representative": {
+    "displayName": "Brown Terracotta",
+    "id": "minecraft:brown_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 3,
+   "blocks": [
+    {
+     "displayName": "Brown Terracotta",
+     "id": "minecraft:brown_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Dripstone Block",
+     "id": "minecraft:dripstone_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Pointed Dripstone",
+     "id": "minecraft:pointed_dripstone",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 49,
+   "mapartKey": 48,
+   "rgb": {
+    "r": 76,
+    "g": 82,
+    "b": 42
+   },
+   "representative": {
+    "displayName": "Green Terracotta",
+    "id": "minecraft:green_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Green Terracotta",
+     "id": "minecraft:green_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 50,
+   "mapartKey": 49,
+   "rgb": {
+    "r": 142,
+    "g": 60,
+    "b": 46
+   },
+   "representative": {
+    "displayName": "Red Terracotta",
+    "id": "minecraft:red_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Red Terracotta",
+     "id": "minecraft:red_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 51,
+   "mapartKey": 50,
+   "rgb": {
+    "r": 37,
+    "g": 22,
+    "b": 16
+   },
+   "representative": {
+    "displayName": "Black Terracotta",
+    "id": "minecraft:black_terracotta",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Black Terracotta",
+     "id": "minecraft:black_terracotta",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 52,
+   "mapartKey": 51,
+   "rgb": {
+    "r": 189,
+    "g": 48,
+    "b": 49
+   },
+   "representative": {
+    "displayName": "Crimson Nylium",
+    "id": "minecraft:crimson_nylium",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Crimson Nylium",
+     "id": "minecraft:crimson_nylium",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 53,
+   "mapartKey": 52,
+   "rgb": {
+    "r": 148,
+    "g": 63,
+    "b": 97
+   },
+   "representative": {
+    "displayName": "Crimson Planks",
+    "id": "minecraft:crimson_planks",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 5,
+   "blocks": [
+    {
+     "displayName": "Crimson Stem",
+     "id": "minecraft:crimson_stem",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stripped Crimson Stem",
+     "id": "minecraft:stripped_crimson_stem",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Crimson Planks",
+     "id": "minecraft:crimson_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Crimson Slab",
+     "id": "minecraft:crimson_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Crimson Pressure Plate",
+     "id": "minecraft:crimson_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 54,
+   "mapartKey": 53,
+   "rgb": {
+    "r": 92,
+    "g": 25,
+    "b": 29
+   },
+   "representative": {
+    "displayName": "Crimson Hyphae",
+    "id": "minecraft:crimson_hyphae",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 2,
+   "blocks": [
+    {
+     "displayName": "Crimson Hyphae",
+     "id": "minecraft:crimson_hyphae",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stripped Crimson Hyphae",
+     "id": "minecraft:stripped_crimson_hyphae",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 55,
+   "mapartKey": 54,
+   "rgb": {
+    "r": 22,
+    "g": 126,
+    "b": 134
+   },
+   "representative": {
+    "displayName": "Warped Nylium",
+    "id": "minecraft:warped_nylium",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 3,
+   "blocks": [
+    {
+     "displayName": "Warped Nylium",
+     "id": "minecraft:warped_nylium",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Waxed Oxidized Copper",
+     "id": "minecraft:waxed_oxidized_copper",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Waxed Oxidized Cut Copper Slab",
+     "id": "minecraft:waxed_oxidized_cut_copper_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 56,
+   "mapartKey": 55,
+   "rgb": {
+    "r": 58,
+    "g": 142,
+    "b": 140
+   },
+   "representative": {
+    "displayName": "Warped Planks",
+    "id": "minecraft:warped_planks",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 7,
+   "blocks": [
+    {
+     "displayName": "Warped Stem",
+     "id": "minecraft:warped_stem",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stripped Warped Stem",
+     "id": "minecraft:stripped_warped_stem",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Warped Planks",
+     "id": "minecraft:warped_planks",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Warped Slab",
+     "id": "minecraft:warped_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Waxed Weathered Copper",
+     "id": "minecraft:waxed_weathered_copper",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Waxed Weathered Cut Copper Slab",
+     "id": "minecraft:waxed_weathered_cut_copper_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Warped Pressure Plate",
+     "id": "minecraft:warped_pressure_plate",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 57,
+   "mapartKey": 56,
+   "rgb": {
+    "r": 86,
+    "g": 44,
+    "b": 62
+   },
+   "representative": {
+    "displayName": "Warped Hyphae",
+    "id": "minecraft:warped_hyphae",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 2,
+   "blocks": [
+    {
+     "displayName": "Warped Hyphae",
+     "id": "minecraft:warped_hyphae",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Stripped Warped Hyphae",
+     "id": "minecraft:stripped_warped_hyphae",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 58,
+   "mapartKey": 57,
+   "rgb": {
+    "r": 20,
+    "g": 180,
+    "b": 133
+   },
+   "representative": {
+    "displayName": "Warped Wart Block",
+    "id": "minecraft:warped_wart_block",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Warped Wart Block",
+     "id": "minecraft:warped_wart_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 59,
+   "mapartKey": 58,
+   "rgb": {
+    "r": 100,
+    "g": 100,
+    "b": 100
+   },
+   "representative": {
+    "displayName": "Deepslate",
+    "id": "minecraft:deepslate",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 3,
+   "blocks": [
+    {
+     "displayName": "Deepslate",
+     "id": "minecraft:deepslate",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cobbled Deepslate",
+     "id": "minecraft:cobbled_deepslate",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Cobbled Deepslate Slab",
+     "id": "minecraft:cobbled_deepslate_slab",
+     "args": {},
+     "supportRequired": true,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 60,
+   "mapartKey": 59,
+   "rgb": {
+    "r": 216,
+    "g": 175,
+    "b": 147
+   },
+   "representative": {
+    "displayName": "Block Of Raw Iron",
+    "id": "minecraft:raw_iron_block",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 1,
+   "blocks": [
+    {
+     "displayName": "Block Of Raw Iron",
+     "id": "minecraft:raw_iron_block",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  },
+  {
+   "baseId": 61,
+   "mapartKey": 60,
+   "rgb": {
+    "r": 127,
+    "g": 167,
+    "b": 150
+   },
+   "representative": {
+    "displayName": "Verdant Froglight",
+    "id": "minecraft:verdant_froglight",
+    "args": {},
+    "supportRequired": false,
+    "flammable": false,
+    "biomeDependent": false
+   },
+   "blockCount": 2,
+   "blocks": [
+    {
+     "displayName": "Glow Lichen",
+     "id": "minecraft:glow_lichen",
+     "args": {
+      "down": "true"
+     },
+     "supportRequired": true,
+     "flammable": true,
+     "biomeDependent": false
+    },
+    {
+     "displayName": "Verdant Froglight",
+     "id": "minecraft:verdant_froglight",
+     "args": {},
+     "supportRequired": false,
+     "flammable": false,
+     "biomeDependent": false
+    }
+   ]
+  }
+ ]
+}
