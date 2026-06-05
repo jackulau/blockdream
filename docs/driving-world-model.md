@@ -1,0 +1,71 @@
+# Driving world model (drift-sim) — datasets, sim, architecture, browser
+
+A browser-playable, **recursive**, **multimodal (RGB + LiDAR + telemetry)** neural
+driving world model with **good physics**, trained on driving rollouts, runs
+locally, fully open source. Built in `mineworld_wm.drive`.
+
+## Datasets found (verified June 2026)
+
+Hard filter = has the **control actions** (steer/throttle/brake) most perception
+datasets lack. Ranked for action-conditioned multimodal world-model training:
+
+| Dataset | RGB | LiDAR | Telemetry | Control | Size | License | Download |
+|---|---|---|---|---|---|---|---|
+| **immanuelpeter/carla-autopilot-multimodal** ★ | 4-cam | 32-ch | ✓ | **full** | 362 GB | **MIT** | `huggingface-cli download immanuelpeter/carla-autopilot-multimodal-dataset --repo-type dataset` |
+| OpenDILabCommunity/LMDrive | 4-cam | 64-ch | ✓ | + routes | 2.07 TB | CC-BY-NC | HF |
+| nuScenes + **CAN bus expansion** | 6-cam | ✓ | ✓ | ✓ (expansion) | ~300 GB | NC, reg | nuscenes.org/download |
+| commaai/comma2k19 (real) | 1-cam | ✗ | ✓ | steer+speed | ~100 GB | MIT | HF |
+| **commaai/commavq** (real, tokenized) | tokens | ✗ | pose | ✗ | 20.6 GB | MIT | `huggingface-cli download commaai/commavq --repo-type dataset` |
+| autonomousvision/PDM_Lite_Carla_LB2 | ✓ | ✓ | ~ | via pipeline | 309 GB | Apache-2.0 | HF |
+
+Perception-only (no control, secondary): Waymo, KITTI-360, Argoverse 2, PandaSet, ONCE.
+
+**Recommendation:** **carla-autopilot-multimodal** (MIT, exact RGB+LiDAR+telemetry+
+control match) for scale-up; **commaVQ** (`drive/commavq.py` loader) as a tiny
+real-driving in-browser testbed.
+
+## Local good-physics generation (this repo)
+
+CARLA does **not** run on Apple Silicon (confirmed). So we ship a from-scratch
+good-physics sim (`drive/sim.py`): **dynamic bicycle model + Pacejka magic-formula
+tire** (`drive/physics.py`, drift-capable, kinematic-blend at low speed) on an oval
+track, with **raycast LiDAR**, **ego-centric top-down RGB**, and **telemetry**.
+`drive/collect.py` rolls out a pursuit autopilot → RGB + LiDAR + telemetry + control.
+
+Scale-up sim (real engine, optional): **MetaDrive** (`metadriverse/metadrive`,
+Apache-2.0) — the one Mac-native sim with RGB + LiDAR + telemetry + control +
+Bullet physics at 1000+ FPS (install from GitHub `main` on Python 3.12/3.13).
+highway-env (kinematic bicycle, pure-Python) is a fast deterministic fallback.
+
+## Architecture (`drive/`)
+
+drift-sim recipe — per-modality encoders → fused conditioning → recursive transition
+→ per-modality decoder heads:
+- **RGB** → VQ tokens (`Tokenizer`).
+- **LiDAR** → MLP latent (`encoders.LidarCodec`).
+- **control** (steer/throttle/brake) + prev LiDAR + prev telemetry → fused
+  conditioning (`transition.DriveTransition._fuse`).
+- **transition**: AR transformer over next RGB tokens conditioned on the fused
+  vector, + `lidar_head` and `telemetry_head` regressing next LiDAR + telemetry.
+- **recursive**: `DriveTransition.step` feeds its own output back (S_t + A_t → S_{t+1}).
+
+Trained model **obeys physics** (steer-left → higher predicted yaw-rate than
+steer-right) and stays stable over recursive rollout — verified in `test_drive_world`.
+
+Reference open models to deepen toward: **MUVO** (RGB+LiDAR+occupancy, open code+weights),
+**Vista** (RGB action-conditioned, Apache-2.0), **OccWorld/Copilot4D** (LiDAR-as-tokens),
+plus **Oasis/MineWorld** for stable real-time recursive rollout.
+
+## Run it
+```bash
+python -m mineworld_wm.drive.train --rollouts 40 --device mps --out ml/checkpoints/drive.pt
+python -m mineworld_wm.drive.serve --checkpoint ml/checkpoints/drive.pt --port 8766
+# open apps/web /driving.html → Connect → drive with arrows (RGB + LiDAR BEV + telemetry HUD)
+```
+
+## Browser (local, open)
+Served via WebSocket today (RGB PNG + LiDAR + telemetry streamed, recursive). For a
+true server-free in-browser engine: **ONNX Runtime Web + WebGPU**, keep the
+transition transformer small + **q4/q8-quantized**, run in latent space and decode
+RGB with a frozen VAE at low res, predict LiDAR as a low-res range latent visualized
+as a BEV overlay (not per-frame 3D points). Oasis (~20 fps in-browser) is the proof.
