@@ -1,0 +1,143 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import {
+  getJavaMapPalette,
+  getBedrockMapPalette,
+  getSolidBlockMapPalette,
+} from "@mineworld/palette";
+import {
+  preparePalette,
+  quantizeFrame,
+  quantizeVideo,
+  type DitherMethod,
+  type QuantizedFrame,
+  type PreparedPalette,
+} from "@mineworld/color-core";
+import { extractFrames } from "@mineworld/video";
+import { buildMapDat, splitIntoMaps, MAP_DIM } from "@mineworld/emit-java";
+import { buildMcStructure } from "@mineworld/emit-bedrock";
+import { generateJavaDatapack, generateBedrockBehaviorPack, writePack } from "@mineworld/emit-commands";
+
+export type RenderTarget = "map" | "mcstructure" | "datapack" | "behaviorpack";
+export type Edition = "java" | "bedrock";
+
+export interface RenderOptions {
+  input: string;
+  out: string;
+  target: RenderTarget;
+  width: number;
+  height: number;
+  edition?: Edition;
+  fps?: number;
+  maxFrames?: number;
+  dither?: DitherMethod;
+  temporalThreshold?: number;
+  speedTicks?: number;
+  paletteVersion?: string;
+}
+
+export interface RenderResult {
+  target: RenderTarget;
+  frameCount: number;
+  width: number;
+  height: number;
+  filesWritten: string[];
+  notes: string[];
+}
+
+function writeFile(path: string, data: Buffer | string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, data);
+}
+
+function quantizeAll(
+  frames: import("@mineworld/color-core").RgbImage[],
+  pal: PreparedPalette,
+  dither: DitherMethod,
+  temporalThreshold: number | undefined,
+): QuantizedFrame[] {
+  if (frames.length <= 1) {
+    return frames.map((f) => quantizeFrame(f, pal, { method: dither }));
+  }
+  return quantizeVideo(frames, pal, { method: dither, temporalThreshold });
+}
+
+/**
+ * End-to-end render: decode input → quantize → emit artifacts for the chosen
+ * target. Returns the list of files written. Pure enough to unit-test (writes
+ * to `out`, no process state).
+ */
+export function render(opts: RenderOptions): RenderResult {
+  const edition: Edition = opts.edition ?? "java";
+  const notes: string[] = [];
+  const filesWritten: string[] = [];
+
+  const frames = extractFrames(opts.input, {
+    width: opts.width,
+    height: opts.height,
+    fps: opts.fps,
+    maxFrames: opts.maxFrames,
+  });
+  if (frames.length === 0) throw new Error("no frames decoded from input");
+  const isVideo = frames.length > 1;
+  // default dither: video → bayer (temporally stable), still → floyd-steinberg
+  const dither: DitherMethod = opts.dither ?? (isVideo ? "bayer" : "floyd-steinberg");
+
+  if (opts.target === "map") {
+    const mapPal =
+      edition === "bedrock"
+        ? getBedrockMapPalette(opts.paletteVersion)
+        : getJavaMapPalette(opts.paletteVersion);
+    const pal = preparePalette(mapPal);
+    const q = quantizeAll(frames, pal, dither, opts.temporalThreshold);
+    if (opts.width % MAP_DIM !== 0 || opts.height % MAP_DIM !== 0) {
+      throw new Error(`map target requires grid sizes that are multiples of ${MAP_DIM} (got ${opts.width}×${opts.height})`);
+    }
+    q.forEach((frame, fi) => {
+      const tiles = splitIntoMaps(frame);
+      for (const t of tiles) {
+        const name = tiles.length > 1 ? `map_${fi}_c${t.col}_r${t.row}.dat` : `map_${fi}.dat`;
+        const path = join(opts.out, name);
+        writeFile(path, buildMapDat(t.frame));
+        filesWritten.push(path);
+      }
+    });
+    notes.push(`${edition} filled-map .dat (${frames.length} frame(s)); load with an NBT/world tool or the datapack item-frame wall.`);
+    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
+
+  // block-based targets
+  const { palette, blockByMapColorId } = getSolidBlockMapPalette(opts.paletteVersion);
+  const pal = preparePalette(palette);
+  const q = quantizeAll(frames, pal, dither, opts.temporalThreshold);
+  const resolveBlock = (id: number) => blockByMapColorId.get(id)?.id;
+
+  if (opts.target === "mcstructure") {
+    q.forEach((frame, fi) => {
+      const buf = buildMcStructure(frame, (id) => {
+        const b = blockByMapColorId.get(id);
+        return b ? { name: b.id, states: {} } : undefined;
+      });
+      const path = join(opts.out, q.length > 1 ? `frame_${fi}.mcstructure` : `art.mcstructure`);
+      writeFile(path, buf);
+      filesWritten.push(path);
+    });
+    notes.push(`Bedrock .mcstructure (${frames.length} frame(s)); import with a structure block or world tool.`);
+    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
+
+  if (opts.target === "datapack") {
+    const pack = generateJavaDatapack(q, resolveBlock, { speedTicks: opts.speedTicks });
+    writePack(pack, opts.out);
+    filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
+    notes.push(`Vanilla Java datapack: drop in world/datapacks/, run /function ${pack.namespace}:setup then /function ${pack.namespace}:start.`);
+    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
+
+  // behaviorpack
+  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: opts.speedTicks });
+  writePack(pack, opts.out);
+  filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
+  notes.push(`Vanilla Bedrock behavior pack: import the folder, /function ${pack.namespace}/setup then /function ${pack.namespace}/start.`);
+  return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+}

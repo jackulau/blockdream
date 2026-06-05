@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "references": [
+    { "path": "../palette" },
+    { "path": "../color-core" },
+    { "path": "../video" },
+    { "path": "../emit-java" },
+    { "path": "../emit-bedrock" },
+    { "path": "../emit-commands" }
+  ],
+  "include": ["src/**/*"]
+}

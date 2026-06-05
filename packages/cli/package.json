@@ -1,0 +1,21 @@
+{
+  "name": "@mineworld/cli",
+  "version": "0.0.0",
+  "type": "module",
+  "bin": { "mineworld": "./src/index.ts" },
+  "main": "./src/render.ts",
+  "exports": { ".": "./src/render.ts" },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mineworld/palette": "workspace:*",
+    "@mineworld/color-core": "workspace:*",
+    "@mineworld/video": "workspace:*",
+    "@mineworld/emit-java": "workspace:*",
+    "@mineworld/emit-bedrock": "workspace:*",
+    "@mineworld/emit-commands": "workspace:*"
+  },
+  "files": ["src"]
+}
