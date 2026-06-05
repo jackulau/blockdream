@@ -147,6 +147,28 @@ def load_demo_session(demo: str, checkpoint: str | None = None, seed: int = 0, k
     return session
 
 
+def load_real_checkpoint(path: str) -> WorldModelSession:
+    """Load a checkpoint trained on real data (train_real.py) into a session."""
+    from .config import config_from_dict
+    from .tokenizer import Tokenizer
+    from .actions import ActionEncoder
+    from .transition_ar import ARTransition
+
+    ckpt = torch.load(path, map_location="cpu", weights_only=False)
+    cfg = config_from_dict(ckpt["config"])
+    tok = Tokenizer(cfg.tokenizer)
+    enc = ActionEncoder(cfg.action)
+    n = cfg.latent_size**2
+    trans = ARTransition(cfg.dynamics, n_tokens=n, codebook_size=cfg.tokenizer.vq_codebook_size, action_dim=cfg.action.embed_dim)
+    tok.load_state_dict(ckpt["tokenizer"])
+    enc.load_state_dict(ckpt["action"])
+    trans.load_state_dict(ckpt["transition"])
+    session = WorldModelSession(cfg, tok, enc, trans)
+    if ckpt.get("init_frame") is not None:
+        session.default_init = ckpt["init_frame"]
+    return session
+
+
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     import argparse
     import asyncio
@@ -154,12 +176,16 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     ap = argparse.ArgumentParser("mineworld_wm.serve")
     ap.add_argument("--demo", default="walking")
     ap.add_argument("--checkpoint", default=None)
+    ap.add_argument("--real", default=None, help="path to a train_real.py checkpoint (real VPT model)")
     ap.add_argument("--kind", default="ar", choices=["ar", "diffusion"])
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     args = ap.parse_args(argv)
 
-    session = load_demo_session(args.demo, args.checkpoint, kind=args.kind)
+    if args.real:
+        session = load_real_checkpoint(args.real)
+    else:
+        session = load_demo_session(args.demo, args.checkpoint, kind=args.kind)
     server = RolloutServer(session)
     try:
         asyncio.run(run_ws(server, args.host, args.port))

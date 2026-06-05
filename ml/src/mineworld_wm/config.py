@@ -92,3 +92,8 @@ def load_config(path: str | Path | None = None) -> Config:
         return cfg
     data = yaml.safe_load(Path(path).read_text()) or {}
     return _merge(cfg, data)
+
+
+def config_from_dict(data: dict[str, Any]) -> Config:
+    """Rebuild a Config from a `cfg.to_dict()` mapping (e.g. a saved checkpoint)."""
+    return _merge(Config(), data or {})
