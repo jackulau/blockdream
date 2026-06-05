@@ -9,6 +9,7 @@ export default defineConfig({
         index: resolve(__dirname, "index.html"),
         blockart: resolve(__dirname, "blockart.html"),
         worldmodel: resolve(__dirname, "world-model.html"),
+        driving: resolve(__dirname, "driving.html"),
       },
     },
   },

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mineworld — driving world model</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; background: #0e0f12; color: #e8e8ea; }
+      header { padding: 0.9rem 1.25rem; border-bottom: 1px solid #24262c; display: flex; gap: 1rem; align-items: baseline; }
+      header h1 { margin: 0; font-size: 1.05rem; }
+      header a { color: #7dd3fc; text-decoration: none; font-size: 0.85rem; }
+      main { display: flex; gap: 1.5rem; padding: 1.5rem; flex-wrap: wrap; }
+      .stage { display: flex; gap: 1rem; flex-wrap: wrap; }
+      figure { margin: 0; }
+      figcaption { font: 12px ui-monospace, monospace; color: #9aa0a6; margin-top: 0.3rem; }
+      canvas { image-rendering: pixelated; width: 320px; height: 320px; background: #000; border: 1px solid #24262c; border-radius: 6px; }
+      .panel { min-width: 240px; display: flex; flex-direction: column; gap: 0.85rem; }
+      label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: #aeb2b9; }
+      input, button { background: #14161b; color: #e8e8ea; border: 1px solid #333842; border-radius: 5px; padding: 0.45rem; }
+      button { cursor: pointer; }
+      button.primary { background: #14532d; border-color: #1e7a43; }
+      .hud { font: 12px ui-monospace, monospace; color: #b9f6ca; white-space: pre; }
+      .status.ok { color: #69f0ae; } .status.err { color: #ff8a80; } .status.idle { color: #9aa0a6; }
+      .keys { font: 12px ui-monospace, monospace; color: #9aa0a6; line-height: 1.7; }
+      kbd { background: #1c1f26; border: 1px solid #333842; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>mineworld · driving world model <span style="color:#9aa0a6;font-weight:400">(drift-sim style)</span></h1>
+      <a href="/index.html">← home</a>
+    </header>
+    <main>
+      <section class="stage">
+        <figure><canvas id="rgb" width="64" height="64"></canvas><figcaption>RGB (generated)</figcaption></figure>
+        <figure><canvas id="bev" width="96" height="96"></canvas><figcaption>LiDAR (BEV)</figcaption></figure>
+      </section>
+      <section class="panel">
+        <label>Server <input id="url" value="ws://127.0.0.1:8766" /></label>
+        <div style="display:flex;gap:.5rem">
+          <button id="connect" class="primary">Connect</button>
+          <button id="reset">Reset</button>
+        </div>
+        <div class="status idle" id="status">disconnected</div>
+        <div class="hud" id="hud">idle</div>
+        <div class="keys">
+          <strong>Drive</strong> (recursive rollout — the model generates each frame)<br />
+          <kbd>↑</kbd>/<kbd>W</kbd> throttle · <kbd>↓</kbd>/<kbd>S</kbd> brake<br />
+          <kbd>←</kbd>/<kbd>A</kbd> steer left · <kbd>→</kbd>/<kbd>D</kbd> steer right
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/drive.ts"></script>
+  </body>
+</html>
