@@ -64,6 +64,12 @@ importers:
 
   packages/palette: {}
 
+  packages/video:
+    dependencies:
+      '@mineworld/color-core':
+        specifier: workspace:*
+        version: link:../color-core
+
 packages:
 
   '@esbuild/aix-ppc64@0.21.5':
