@@ -1,0 +1,32 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+*.tsbuildinfo
+
+# python
+ml/.venv/
+__pycache__/
+*.pyc
+ml/data/
+ml/checkpoints/
+ml/runs/
+*.ckpt
+*.safetensors
+
+# goal/agent state (per-developer, never shared)
+.claude-workspace/
+
+# os / editor
+.DS_Store
+*.log
+*.tmp
+*.bak
+
+# generated minecraft artifacts (large/binary)
+out/
+*.mcstructure
+*.litematic
+map_*.dat

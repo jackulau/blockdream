@@ -1,0 +1,2212 @@
+{
+ "edition": "java",
+ "version": "1.21.9",
+ "source": "cerus/minecraft-map-colors mappings.json",
+ "shadeMultipliers": [
+  180,
+  220,
+  255,
+  135
+ ],
+ "baseCount": 62,
+ "usableColorCount": 244,
+ "note": "mapColorId = baseId*4 + shadeIndex. baseId 0 (NONE) excluded from match palette (transparent). Direct-written map colors are NOT biome-tinted.",
+ "colors": [
+  {
+   "mapColorId": 4,
+   "baseId": 1,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 89,
+   "g": 125,
+   "b": 39
+  },
+  {
+   "mapColorId": 5,
+   "baseId": 1,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 109,
+   "g": 153,
+   "b": 48
+  },
+  {
+   "mapColorId": 6,
+   "baseId": 1,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 127,
+   "g": 178,
+   "b": 56
+  },
+  {
+   "mapColorId": 7,
+   "baseId": 1,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 67,
+   "g": 94,
+   "b": 29
+  },
+  {
+   "mapColorId": 8,
+   "baseId": 2,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 174,
+   "g": 164,
+   "b": 115
+  },
+  {
+   "mapColorId": 9,
+   "baseId": 2,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 213,
+   "g": 201,
+   "b": 140
+  },
+  {
+   "mapColorId": 10,
+   "baseId": 2,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 247,
+   "g": 233,
+   "b": 163
+  },
+  {
+   "mapColorId": 11,
+   "baseId": 2,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 130,
+   "g": 123,
+   "b": 86
+  },
+  {
+   "mapColorId": 12,
+   "baseId": 3,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 140,
+   "g": 140,
+   "b": 140
+  },
+  {
+   "mapColorId": 13,
+   "baseId": 3,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 171,
+   "g": 171,
+   "b": 171
+  },
+  {
+   "mapColorId": 14,
+   "baseId": 3,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 199,
+   "g": 199,
+   "b": 199
+  },
+  {
+   "mapColorId": 15,
+   "baseId": 3,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 105,
+   "g": 105,
+   "b": 105
+  },
+  {
+   "mapColorId": 16,
+   "baseId": 4,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 180,
+   "g": 0,
+   "b": 0
+  },
+  {
+   "mapColorId": 17,
+   "baseId": 4,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 220,
+   "g": 0,
+   "b": 0
+  },
+  {
+   "mapColorId": 18,
+   "baseId": 4,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 255,
+   "g": 0,
+   "b": 0
+  },
+  {
+   "mapColorId": 19,
+   "baseId": 4,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 135,
+   "g": 0,
+   "b": 0
+  },
+  {
+   "mapColorId": 20,
+   "baseId": 5,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 112,
+   "g": 112,
+   "b": 180
+  },
+  {
+   "mapColorId": 21,
+   "baseId": 5,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 138,
+   "g": 138,
+   "b": 220
+  },
+  {
+   "mapColorId": 22,
+   "baseId": 5,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 160,
+   "g": 160,
+   "b": 255
+  },
+  {
+   "mapColorId": 23,
+   "baseId": 5,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 84,
+   "g": 84,
+   "b": 135
+  },
+  {
+   "mapColorId": 24,
+   "baseId": 6,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 117,
+   "g": 117,
+   "b": 117
+  },
+  {
+   "mapColorId": 25,
+   "baseId": 6,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 144,
+   "g": 144,
+   "b": 144
+  },
+  {
+   "mapColorId": 26,
+   "baseId": 6,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 167,
+   "g": 167,
+   "b": 167
+  },
+  {
+   "mapColorId": 27,
+   "baseId": 6,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 88,
+   "g": 88,
+   "b": 88
+  },
+  {
+   "mapColorId": 28,
+   "baseId": 7,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 0,
+   "g": 87,
+   "b": 0
+  },
+  {
+   "mapColorId": 29,
+   "baseId": 7,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 0,
+   "g": 106,
+   "b": 0
+  },
+  {
+   "mapColorId": 30,
+   "baseId": 7,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 0,
+   "g": 124,
+   "b": 0
+  },
+  {
+   "mapColorId": 31,
+   "baseId": 7,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 0,
+   "g": 65,
+   "b": 0
+  },
+  {
+   "mapColorId": 32,
+   "baseId": 8,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 180,
+   "g": 180,
+   "b": 180
+  },
+  {
+   "mapColorId": 33,
+   "baseId": 8,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 220,
+   "g": 220,
+   "b": 220
+  },
+  {
+   "mapColorId": 34,
+   "baseId": 8,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 255,
+   "g": 255,
+   "b": 255
+  },
+  {
+   "mapColorId": 35,
+   "baseId": 8,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 135,
+   "g": 135,
+   "b": 135
+  },
+  {
+   "mapColorId": 36,
+   "baseId": 9,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 115,
+   "g": 118,
+   "b": 129
+  },
+  {
+   "mapColorId": 37,
+   "baseId": 9,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 141,
+   "g": 144,
+   "b": 158
+  },
+  {
+   "mapColorId": 38,
+   "baseId": 9,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 164,
+   "g": 168,
+   "b": 184
+  },
+  {
+   "mapColorId": 39,
+   "baseId": 9,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 86,
+   "g": 88,
+   "b": 97
+  },
+  {
+   "mapColorId": 40,
+   "baseId": 10,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 106,
+   "g": 76,
+   "b": 54
+  },
+  {
+   "mapColorId": 41,
+   "baseId": 10,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 130,
+   "g": 94,
+   "b": 66
+  },
+  {
+   "mapColorId": 42,
+   "baseId": 10,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 151,
+   "g": 109,
+   "b": 77
+  },
+  {
+   "mapColorId": 43,
+   "baseId": 10,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 79,
+   "g": 57,
+   "b": 40
+  },
+  {
+   "mapColorId": 44,
+   "baseId": 11,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 79,
+   "g": 79,
+   "b": 79
+  },
+  {
+   "mapColorId": 45,
+   "baseId": 11,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 96,
+   "g": 96,
+   "b": 96
+  },
+  {
+   "mapColorId": 46,
+   "baseId": 11,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 112,
+   "g": 112,
+   "b": 112
+  },
+  {
+   "mapColorId": 47,
+   "baseId": 11,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 59,
+   "g": 59,
+   "b": 59
+  },
+  {
+   "mapColorId": 48,
+   "baseId": 12,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 45,
+   "g": 45,
+   "b": 180
+  },
+  {
+   "mapColorId": 49,
+   "baseId": 12,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 55,
+   "g": 55,
+   "b": 220
+  },
+  {
+   "mapColorId": 50,
+   "baseId": 12,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 64,
+   "g": 64,
+   "b": 255
+  },
+  {
+   "mapColorId": 51,
+   "baseId": 12,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 33,
+   "g": 33,
+   "b": 135
+  },
+  {
+   "mapColorId": 52,
+   "baseId": 13,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 100,
+   "g": 84,
+   "b": 50
+  },
+  {
+   "mapColorId": 53,
+   "baseId": 13,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 123,
+   "g": 102,
+   "b": 62
+  },
+  {
+   "mapColorId": 54,
+   "baseId": 13,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 143,
+   "g": 119,
+   "b": 72
+  },
+  {
+   "mapColorId": 55,
+   "baseId": 13,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 75,
+   "g": 63,
+   "b": 38
+  },
+  {
+   "mapColorId": 56,
+   "baseId": 14,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 180,
+   "g": 177,
+   "b": 172
+  },
+  {
+   "mapColorId": 57,
+   "baseId": 14,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 220,
+   "g": 217,
+   "b": 211
+  },
+  {
+   "mapColorId": 58,
+   "baseId": 14,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 255,
+   "g": 252,
+   "b": 245
+  },
+  {
+   "mapColorId": 59,
+   "baseId": 14,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 135,
+   "g": 133,
+   "b": 129
+  },
+  {
+   "mapColorId": 60,
+   "baseId": 15,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 152,
+   "g": 89,
+   "b": 36
+  },
+  {
+   "mapColorId": 61,
+   "baseId": 15,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 186,
+   "g": 109,
+   "b": 44
+  },
+  {
+   "mapColorId": 62,
+   "baseId": 15,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 216,
+   "g": 127,
+   "b": 51
+  },
+  {
+   "mapColorId": 63,
+   "baseId": 15,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 114,
+   "g": 67,
+   "b": 27
+  },
+  {
+   "mapColorId": 64,
+   "baseId": 16,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 125,
+   "g": 53,
+   "b": 152
+  },
+  {
+   "mapColorId": 65,
+   "baseId": 16,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 153,
+   "g": 65,
+   "b": 186
+  },
+  {
+   "mapColorId": 66,
+   "baseId": 16,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 178,
+   "g": 76,
+   "b": 216
+  },
+  {
+   "mapColorId": 67,
+   "baseId": 16,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 94,
+   "g": 40,
+   "b": 114
+  },
+  {
+   "mapColorId": 68,
+   "baseId": 17,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 72,
+   "g": 108,
+   "b": 152
+  },
+  {
+   "mapColorId": 69,
+   "baseId": 17,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 88,
+   "g": 132,
+   "b": 186
+  },
+  {
+   "mapColorId": 70,
+   "baseId": 17,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 102,
+   "g": 153,
+   "b": 216
+  },
+  {
+   "mapColorId": 71,
+   "baseId": 17,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 54,
+   "g": 81,
+   "b": 114
+  },
+  {
+   "mapColorId": 72,
+   "baseId": 18,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 161,
+   "g": 161,
+   "b": 36
+  },
+  {
+   "mapColorId": 73,
+   "baseId": 18,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 197,
+   "g": 197,
+   "b": 44
+  },
+  {
+   "mapColorId": 74,
+   "baseId": 18,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 229,
+   "g": 229,
+   "b": 51
+  },
+  {
+   "mapColorId": 75,
+   "baseId": 18,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 121,
+   "g": 121,
+   "b": 27
+  },
+  {
+   "mapColorId": 76,
+   "baseId": 19,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 89,
+   "g": 144,
+   "b": 17
+  },
+  {
+   "mapColorId": 77,
+   "baseId": 19,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 109,
+   "g": 176,
+   "b": 21
+  },
+  {
+   "mapColorId": 78,
+   "baseId": 19,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 127,
+   "g": 204,
+   "b": 25
+  },
+  {
+   "mapColorId": 79,
+   "baseId": 19,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 67,
+   "g": 108,
+   "b": 13
+  },
+  {
+   "mapColorId": 80,
+   "baseId": 20,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 170,
+   "g": 89,
+   "b": 116
+  },
+  {
+   "mapColorId": 81,
+   "baseId": 20,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 208,
+   "g": 109,
+   "b": 142
+  },
+  {
+   "mapColorId": 82,
+   "baseId": 20,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 242,
+   "g": 127,
+   "b": 165
+  },
+  {
+   "mapColorId": 83,
+   "baseId": 20,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 128,
+   "g": 67,
+   "b": 87
+  },
+  {
+   "mapColorId": 84,
+   "baseId": 21,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 53,
+   "g": 53,
+   "b": 53
+  },
+  {
+   "mapColorId": 85,
+   "baseId": 21,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 65,
+   "g": 65,
+   "b": 65
+  },
+  {
+   "mapColorId": 86,
+   "baseId": 21,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 76,
+   "g": 76,
+   "b": 76
+  },
+  {
+   "mapColorId": 87,
+   "baseId": 21,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 40,
+   "g": 40,
+   "b": 40
+  },
+  {
+   "mapColorId": 88,
+   "baseId": 22,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 108,
+   "g": 108,
+   "b": 108
+  },
+  {
+   "mapColorId": 89,
+   "baseId": 22,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 132,
+   "g": 132,
+   "b": 132
+  },
+  {
+   "mapColorId": 90,
+   "baseId": 22,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 153,
+   "g": 153,
+   "b": 153
+  },
+  {
+   "mapColorId": 91,
+   "baseId": 22,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 81,
+   "g": 81,
+   "b": 81
+  },
+  {
+   "mapColorId": 92,
+   "baseId": 23,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 53,
+   "g": 89,
+   "b": 108
+  },
+  {
+   "mapColorId": 93,
+   "baseId": 23,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 65,
+   "g": 109,
+   "b": 132
+  },
+  {
+   "mapColorId": 94,
+   "baseId": 23,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 76,
+   "g": 127,
+   "b": 153
+  },
+  {
+   "mapColorId": 95,
+   "baseId": 23,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 40,
+   "g": 67,
+   "b": 81
+  },
+  {
+   "mapColorId": 96,
+   "baseId": 24,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 89,
+   "g": 44,
+   "b": 125
+  },
+  {
+   "mapColorId": 97,
+   "baseId": 24,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 109,
+   "g": 54,
+   "b": 153
+  },
+  {
+   "mapColorId": 98,
+   "baseId": 24,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 127,
+   "g": 63,
+   "b": 178
+  },
+  {
+   "mapColorId": 99,
+   "baseId": 24,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 67,
+   "g": 33,
+   "b": 94
+  },
+  {
+   "mapColorId": 100,
+   "baseId": 25,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 36,
+   "g": 53,
+   "b": 125
+  },
+  {
+   "mapColorId": 101,
+   "baseId": 25,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 44,
+   "g": 65,
+   "b": 153
+  },
+  {
+   "mapColorId": 102,
+   "baseId": 25,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 51,
+   "g": 76,
+   "b": 178
+  },
+  {
+   "mapColorId": 103,
+   "baseId": 25,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 27,
+   "g": 40,
+   "b": 94
+  },
+  {
+   "mapColorId": 104,
+   "baseId": 26,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 72,
+   "g": 53,
+   "b": 36
+  },
+  {
+   "mapColorId": 105,
+   "baseId": 26,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 88,
+   "g": 65,
+   "b": 44
+  },
+  {
+   "mapColorId": 106,
+   "baseId": 26,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 102,
+   "g": 76,
+   "b": 51
+  },
+  {
+   "mapColorId": 107,
+   "baseId": 26,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 54,
+   "g": 40,
+   "b": 27
+  },
+  {
+   "mapColorId": 108,
+   "baseId": 27,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 72,
+   "g": 89,
+   "b": 36
+  },
+  {
+   "mapColorId": 109,
+   "baseId": 27,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 88,
+   "g": 109,
+   "b": 44
+  },
+  {
+   "mapColorId": 110,
+   "baseId": 27,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 102,
+   "g": 127,
+   "b": 51
+  },
+  {
+   "mapColorId": 111,
+   "baseId": 27,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 54,
+   "g": 67,
+   "b": 27
+  },
+  {
+   "mapColorId": 112,
+   "baseId": 28,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 108,
+   "g": 36,
+   "b": 36
+  },
+  {
+   "mapColorId": 113,
+   "baseId": 28,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 132,
+   "g": 44,
+   "b": 44
+  },
+  {
+   "mapColorId": 114,
+   "baseId": 28,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 153,
+   "g": 51,
+   "b": 51
+  },
+  {
+   "mapColorId": 115,
+   "baseId": 28,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 81,
+   "g": 27,
+   "b": 27
+  },
+  {
+   "mapColorId": 116,
+   "baseId": 29,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 17,
+   "g": 17,
+   "b": 17
+  },
+  {
+   "mapColorId": 117,
+   "baseId": 29,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 21,
+   "g": 21,
+   "b": 21
+  },
+  {
+   "mapColorId": 118,
+   "baseId": 29,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 25,
+   "g": 25,
+   "b": 25
+  },
+  {
+   "mapColorId": 119,
+   "baseId": 29,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 13,
+   "g": 13,
+   "b": 13
+  },
+  {
+   "mapColorId": 120,
+   "baseId": 30,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 176,
+   "g": 168,
+   "b": 54
+  },
+  {
+   "mapColorId": 121,
+   "baseId": 30,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 215,
+   "g": 205,
+   "b": 66
+  },
+  {
+   "mapColorId": 122,
+   "baseId": 30,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 250,
+   "g": 238,
+   "b": 77
+  },
+  {
+   "mapColorId": 123,
+   "baseId": 30,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 132,
+   "g": 126,
+   "b": 40
+  },
+  {
+   "mapColorId": 124,
+   "baseId": 31,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 64,
+   "g": 154,
+   "b": 150
+  },
+  {
+   "mapColorId": 125,
+   "baseId": 31,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 79,
+   "g": 188,
+   "b": 183
+  },
+  {
+   "mapColorId": 126,
+   "baseId": 31,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 92,
+   "g": 219,
+   "b": 213
+  },
+  {
+   "mapColorId": 127,
+   "baseId": 31,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 48,
+   "g": 115,
+   "b": 112
+  },
+  {
+   "mapColorId": 128,
+   "baseId": 32,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 52,
+   "g": 90,
+   "b": 180
+  },
+  {
+   "mapColorId": 129,
+   "baseId": 32,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 63,
+   "g": 110,
+   "b": 220
+  },
+  {
+   "mapColorId": 130,
+   "baseId": 32,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 74,
+   "g": 128,
+   "b": 255
+  },
+  {
+   "mapColorId": 131,
+   "baseId": 32,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 39,
+   "g": 67,
+   "b": 135
+  },
+  {
+   "mapColorId": 132,
+   "baseId": 33,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 0,
+   "g": 153,
+   "b": 40
+  },
+  {
+   "mapColorId": 133,
+   "baseId": 33,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 0,
+   "g": 187,
+   "b": 50
+  },
+  {
+   "mapColorId": 134,
+   "baseId": 33,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 0,
+   "g": 217,
+   "b": 58
+  },
+  {
+   "mapColorId": 135,
+   "baseId": 33,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 0,
+   "g": 114,
+   "b": 30
+  },
+  {
+   "mapColorId": 136,
+   "baseId": 34,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 91,
+   "g": 60,
+   "b": 34
+  },
+  {
+   "mapColorId": 137,
+   "baseId": 34,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 111,
+   "g": 74,
+   "b": 42
+  },
+  {
+   "mapColorId": 138,
+   "baseId": 34,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 129,
+   "g": 86,
+   "b": 49
+  },
+  {
+   "mapColorId": 139,
+   "baseId": 34,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 68,
+   "g": 45,
+   "b": 25
+  },
+  {
+   "mapColorId": 140,
+   "baseId": 35,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 79,
+   "g": 1,
+   "b": 0
+  },
+  {
+   "mapColorId": 141,
+   "baseId": 35,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 96,
+   "g": 1,
+   "b": 0
+  },
+  {
+   "mapColorId": 142,
+   "baseId": 35,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 112,
+   "g": 2,
+   "b": 0
+  },
+  {
+   "mapColorId": 143,
+   "baseId": 35,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 59,
+   "g": 1,
+   "b": 0
+  },
+  {
+   "mapColorId": 144,
+   "baseId": 36,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 147,
+   "g": 124,
+   "b": 113
+  },
+  {
+   "mapColorId": 145,
+   "baseId": 36,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 180,
+   "g": 152,
+   "b": 138
+  },
+  {
+   "mapColorId": 146,
+   "baseId": 36,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 209,
+   "g": 177,
+   "b": 161
+  },
+  {
+   "mapColorId": 147,
+   "baseId": 36,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 110,
+   "g": 93,
+   "b": 85
+  },
+  {
+   "mapColorId": 148,
+   "baseId": 37,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 112,
+   "g": 57,
+   "b": 25
+  },
+  {
+   "mapColorId": 149,
+   "baseId": 37,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 137,
+   "g": 70,
+   "b": 31
+  },
+  {
+   "mapColorId": 150,
+   "baseId": 37,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 159,
+   "g": 82,
+   "b": 36
+  },
+  {
+   "mapColorId": 151,
+   "baseId": 37,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 84,
+   "g": 43,
+   "b": 19
+  },
+  {
+   "mapColorId": 152,
+   "baseId": 38,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 105,
+   "g": 61,
+   "b": 76
+  },
+  {
+   "mapColorId": 153,
+   "baseId": 38,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 128,
+   "g": 75,
+   "b": 93
+  },
+  {
+   "mapColorId": 154,
+   "baseId": 38,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 149,
+   "g": 87,
+   "b": 108
+  },
+  {
+   "mapColorId": 155,
+   "baseId": 38,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 78,
+   "g": 46,
+   "b": 57
+  },
+  {
+   "mapColorId": 156,
+   "baseId": 39,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 79,
+   "g": 76,
+   "b": 97
+  },
+  {
+   "mapColorId": 157,
+   "baseId": 39,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 96,
+   "g": 93,
+   "b": 119
+  },
+  {
+   "mapColorId": 158,
+   "baseId": 39,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 112,
+   "g": 108,
+   "b": 138
+  },
+  {
+   "mapColorId": 159,
+   "baseId": 39,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 59,
+   "g": 57,
+   "b": 73
+  },
+  {
+   "mapColorId": 160,
+   "baseId": 40,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 131,
+   "g": 93,
+   "b": 25
+  },
+  {
+   "mapColorId": 161,
+   "baseId": 40,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 160,
+   "g": 114,
+   "b": 31
+  },
+  {
+   "mapColorId": 162,
+   "baseId": 40,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 186,
+   "g": 133,
+   "b": 36
+  },
+  {
+   "mapColorId": 163,
+   "baseId": 40,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 98,
+   "g": 70,
+   "b": 19
+  },
+  {
+   "mapColorId": 164,
+   "baseId": 41,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 72,
+   "g": 82,
+   "b": 37
+  },
+  {
+   "mapColorId": 165,
+   "baseId": 41,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 88,
+   "g": 100,
+   "b": 45
+  },
+  {
+   "mapColorId": 166,
+   "baseId": 41,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 103,
+   "g": 117,
+   "b": 53
+  },
+  {
+   "mapColorId": 167,
+   "baseId": 41,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 54,
+   "g": 61,
+   "b": 28
+  },
+  {
+   "mapColorId": 168,
+   "baseId": 42,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 112,
+   "g": 54,
+   "b": 55
+  },
+  {
+   "mapColorId": 169,
+   "baseId": 42,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 138,
+   "g": 66,
+   "b": 67
+  },
+  {
+   "mapColorId": 170,
+   "baseId": 42,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 160,
+   "g": 77,
+   "b": 78
+  },
+  {
+   "mapColorId": 171,
+   "baseId": 42,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 84,
+   "g": 40,
+   "b": 41
+  },
+  {
+   "mapColorId": 172,
+   "baseId": 43,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 40,
+   "g": 28,
+   "b": 24
+  },
+  {
+   "mapColorId": 173,
+   "baseId": 43,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 49,
+   "g": 35,
+   "b": 30
+  },
+  {
+   "mapColorId": 174,
+   "baseId": 43,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 57,
+   "g": 41,
+   "b": 35
+  },
+  {
+   "mapColorId": 175,
+   "baseId": 43,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 30,
+   "g": 21,
+   "b": 18
+  },
+  {
+   "mapColorId": 176,
+   "baseId": 44,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 95,
+   "g": 75,
+   "b": 69
+  },
+  {
+   "mapColorId": 177,
+   "baseId": 44,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 116,
+   "g": 92,
+   "b": 84
+  },
+  {
+   "mapColorId": 178,
+   "baseId": 44,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 135,
+   "g": 107,
+   "b": 98
+  },
+  {
+   "mapColorId": 179,
+   "baseId": 44,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 71,
+   "g": 56,
+   "b": 51
+  },
+  {
+   "mapColorId": 180,
+   "baseId": 45,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 61,
+   "g": 64,
+   "b": 64
+  },
+  {
+   "mapColorId": 181,
+   "baseId": 45,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 75,
+   "g": 79,
+   "b": 79
+  },
+  {
+   "mapColorId": 182,
+   "baseId": 45,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 87,
+   "g": 92,
+   "b": 92
+  },
+  {
+   "mapColorId": 183,
+   "baseId": 45,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 46,
+   "g": 48,
+   "b": 48
+  },
+  {
+   "mapColorId": 184,
+   "baseId": 46,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 86,
+   "g": 51,
+   "b": 62
+  },
+  {
+   "mapColorId": 185,
+   "baseId": 46,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 105,
+   "g": 62,
+   "b": 75
+  },
+  {
+   "mapColorId": 186,
+   "baseId": 46,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 122,
+   "g": 73,
+   "b": 88
+  },
+  {
+   "mapColorId": 187,
+   "baseId": 46,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 64,
+   "g": 38,
+   "b": 46
+  },
+  {
+   "mapColorId": 188,
+   "baseId": 47,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 53,
+   "g": 43,
+   "b": 64
+  },
+  {
+   "mapColorId": 189,
+   "baseId": 47,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 65,
+   "g": 53,
+   "b": 79
+  },
+  {
+   "mapColorId": 190,
+   "baseId": 47,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 76,
+   "g": 62,
+   "b": 92
+  },
+  {
+   "mapColorId": 191,
+   "baseId": 47,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 40,
+   "g": 32,
+   "b": 48
+  },
+  {
+   "mapColorId": 192,
+   "baseId": 48,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 53,
+   "g": 35,
+   "b": 24
+  },
+  {
+   "mapColorId": 193,
+   "baseId": 48,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 65,
+   "g": 43,
+   "b": 30
+  },
+  {
+   "mapColorId": 194,
+   "baseId": 48,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 76,
+   "g": 50,
+   "b": 35
+  },
+  {
+   "mapColorId": 195,
+   "baseId": 48,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 40,
+   "g": 26,
+   "b": 18
+  },
+  {
+   "mapColorId": 196,
+   "baseId": 49,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 53,
+   "g": 57,
+   "b": 29
+  },
+  {
+   "mapColorId": 197,
+   "baseId": 49,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 65,
+   "g": 70,
+   "b": 36
+  },
+  {
+   "mapColorId": 198,
+   "baseId": 49,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 76,
+   "g": 82,
+   "b": 42
+  },
+  {
+   "mapColorId": 199,
+   "baseId": 49,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 40,
+   "g": 43,
+   "b": 22
+  },
+  {
+   "mapColorId": 200,
+   "baseId": 50,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 100,
+   "g": 42,
+   "b": 32
+  },
+  {
+   "mapColorId": 201,
+   "baseId": 50,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 122,
+   "g": 51,
+   "b": 39
+  },
+  {
+   "mapColorId": 202,
+   "baseId": 50,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 142,
+   "g": 60,
+   "b": 46
+  },
+  {
+   "mapColorId": 203,
+   "baseId": 50,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 75,
+   "g": 31,
+   "b": 24
+  },
+  {
+   "mapColorId": 204,
+   "baseId": 51,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 26,
+   "g": 15,
+   "b": 11
+  },
+  {
+   "mapColorId": 205,
+   "baseId": 51,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 31,
+   "g": 18,
+   "b": 13
+  },
+  {
+   "mapColorId": 206,
+   "baseId": 51,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 37,
+   "g": 22,
+   "b": 16
+  },
+  {
+   "mapColorId": 207,
+   "baseId": 51,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 19,
+   "g": 11,
+   "b": 8
+  },
+  {
+   "mapColorId": 208,
+   "baseId": 52,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 133,
+   "g": 33,
+   "b": 34
+  },
+  {
+   "mapColorId": 209,
+   "baseId": 52,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 163,
+   "g": 41,
+   "b": 42
+  },
+  {
+   "mapColorId": 210,
+   "baseId": 52,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 189,
+   "g": 48,
+   "b": 49
+  },
+  {
+   "mapColorId": 211,
+   "baseId": 52,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 100,
+   "g": 25,
+   "b": 25
+  },
+  {
+   "mapColorId": 212,
+   "baseId": 53,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 104,
+   "g": 44,
+   "b": 68
+  },
+  {
+   "mapColorId": 213,
+   "baseId": 53,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 127,
+   "g": 54,
+   "b": 83
+  },
+  {
+   "mapColorId": 214,
+   "baseId": 53,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 148,
+   "g": 63,
+   "b": 97
+  },
+  {
+   "mapColorId": 215,
+   "baseId": 53,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 78,
+   "g": 33,
+   "b": 51
+  },
+  {
+   "mapColorId": 216,
+   "baseId": 54,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 64,
+   "g": 17,
+   "b": 20
+  },
+  {
+   "mapColorId": 217,
+   "baseId": 54,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 79,
+   "g": 21,
+   "b": 25
+  },
+  {
+   "mapColorId": 218,
+   "baseId": 54,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 92,
+   "g": 25,
+   "b": 29
+  },
+  {
+   "mapColorId": 219,
+   "baseId": 54,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 48,
+   "g": 13,
+   "b": 15
+  },
+  {
+   "mapColorId": 220,
+   "baseId": 55,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 15,
+   "g": 88,
+   "b": 94
+  },
+  {
+   "mapColorId": 221,
+   "baseId": 55,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 18,
+   "g": 108,
+   "b": 115
+  },
+  {
+   "mapColorId": 222,
+   "baseId": 55,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 22,
+   "g": 126,
+   "b": 134
+  },
+  {
+   "mapColorId": 223,
+   "baseId": 55,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 11,
+   "g": 66,
+   "b": 70
+  },
+  {
+   "mapColorId": 224,
+   "baseId": 56,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 40,
+   "g": 100,
+   "b": 98
+  },
+  {
+   "mapColorId": 225,
+   "baseId": 56,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 50,
+   "g": 122,
+   "b": 120
+  },
+  {
+   "mapColorId": 226,
+   "baseId": 56,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 58,
+   "g": 142,
+   "b": 140
+  },
+  {
+   "mapColorId": 227,
+   "baseId": 56,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 30,
+   "g": 75,
+   "b": 74
+  },
+  {
+   "mapColorId": 228,
+   "baseId": 57,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 60,
+   "g": 31,
+   "b": 43
+  },
+  {
+   "mapColorId": 229,
+   "baseId": 57,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 74,
+   "g": 37,
+   "b": 53
+  },
+  {
+   "mapColorId": 230,
+   "baseId": 57,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 86,
+   "g": 44,
+   "b": 62
+  },
+  {
+   "mapColorId": 231,
+   "baseId": 57,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 45,
+   "g": 23,
+   "b": 32
+  },
+  {
+   "mapColorId": 232,
+   "baseId": 58,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 14,
+   "g": 127,
+   "b": 93
+  },
+  {
+   "mapColorId": 233,
+   "baseId": 58,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 17,
+   "g": 155,
+   "b": 114
+  },
+  {
+   "mapColorId": 234,
+   "baseId": 58,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 20,
+   "g": 180,
+   "b": 133
+  },
+  {
+   "mapColorId": 235,
+   "baseId": 58,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 10,
+   "g": 95,
+   "b": 70
+  },
+  {
+   "mapColorId": 236,
+   "baseId": 59,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 70,
+   "g": 70,
+   "b": 70
+  },
+  {
+   "mapColorId": 237,
+   "baseId": 59,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 86,
+   "g": 86,
+   "b": 86
+  },
+  {
+   "mapColorId": 238,
+   "baseId": 59,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 100,
+   "g": 100,
+   "b": 100
+  },
+  {
+   "mapColorId": 239,
+   "baseId": 59,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 52,
+   "g": 52,
+   "b": 52
+  },
+  {
+   "mapColorId": 240,
+   "baseId": 60,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 152,
+   "g": 123,
+   "b": 103
+  },
+  {
+   "mapColorId": 241,
+   "baseId": 60,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 186,
+   "g": 150,
+   "b": 126
+  },
+  {
+   "mapColorId": 242,
+   "baseId": 60,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 216,
+   "g": 175,
+   "b": 147
+  },
+  {
+   "mapColorId": 243,
+   "baseId": 60,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 114,
+   "g": 92,
+   "b": 77
+  },
+  {
+   "mapColorId": 244,
+   "baseId": 61,
+   "shadeIndex": 0,
+   "mult": 180,
+   "r": 89,
+   "g": 117,
+   "b": 105
+  },
+  {
+   "mapColorId": 245,
+   "baseId": 61,
+   "shadeIndex": 1,
+   "mult": 220,
+   "r": 109,
+   "g": 144,
+   "b": 129
+  },
+  {
+   "mapColorId": 246,
+   "baseId": 61,
+   "shadeIndex": 2,
+   "mult": 255,
+   "r": 127,
+   "g": 167,
+   "b": 150
+  },
+  {
+   "mapColorId": 247,
+   "baseId": 61,
+   "shadeIndex": 3,
+   "mult": 135,
+   "r": 67,
+   "g": 88,
+   "b": 79
+  }
+ ]
+}
