@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./nbt" },
+    { "path": "./palette" },
+    { "path": "./color-core" },
+    { "path": "./emit-java" },
+    { "path": "./emit-bedrock" }
+  ]
+}

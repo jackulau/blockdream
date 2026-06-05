@@ -1,5 +1,5 @@
 {
-  "name": "@mineworld/emit-java",
+  "name": "@mineworld/nbt",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -8,11 +8,6 @@
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run"
-  },
-  "dependencies": {
-    "@mineworld/palette": "workspace:*",
-    "@mineworld/color-core": "workspace:*",
-    "@mineworld/nbt": "workspace:*"
   },
   "files": ["src"]
 }
