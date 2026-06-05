@@ -26,6 +26,7 @@ hue line, sacrificing chroma instead of hue.
 - **Why not CIELAB ΔE76:** CIELAB's hue non-linearity (blues bend to purple) shifts
   hue exactly where we don't want it.
 - OKLab is hue-linear, cheap, continuous for small *and* large diffs.
+- **Benchmark result (measured):** matching with OKLab lands within ~15% of CIEDE2000-optimal by the ΔE00 gold standard on saturated content, with no discontinuities — confirming OKLab as the default; CIEDE2000 is kept only as an offline quality metric (`ciede2000`, `deltaE2000Srgb`).
 
 ## Decision 2 — Gamut mapping: **OKLCh hold-hue, hue-penalized nearest match**
 Convert target to OKLCh `(L, C, h)`. Match by minimizing

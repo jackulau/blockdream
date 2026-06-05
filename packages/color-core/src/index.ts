@@ -4,3 +4,4 @@ export * from "./match";
 export * from "./dither";
 export * from "./temporal";
 export * from "./quality";
+export * from "./ciede2000";
