@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { QuantizedFrame } from "@mineworld/color-core";
 import { computeDeltas, type FrameDelta } from "./delta";
+import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
 
 export interface DatapackOptions {
   /** datapack namespace (a..z0-9_-). Default "mineworld". */
@@ -17,6 +18,8 @@ export interface DatapackOptions {
   fallbackBlock?: string;
   /** start playing immediately on load (else call <ns>:start). Default false. */
   autoplay?: boolean;
+  /** max setblock commands per function before splitting into sub-functions. */
+  maxCommandsPerFunction?: number;
 }
 
 export interface GeneratedPack {
@@ -47,23 +50,21 @@ function setblockLine(
   return `setblock ${x} ${y} ${z} ${block} replace`;
 }
 
-function frameToFunction(
+function frameSetblockLines(
   delta: FrameDelta,
-  width: number,
   height: number,
   origin: { x: number; y: number; z: number },
   resolveBlock: (mapColorId: number) => string | undefined,
   fallback: string,
-): string {
-  const lines: string[] = [`# frame ${delta.index}${delta.keyframe ? " (keyframe)" : ` (Δ ${delta.cells.length})`}`];
-  void width;
+): string[] {
+  const lines: string[] = [];
   for (const c of delta.cells) {
     const wx = origin.x + c.x;
     const wy = origin.y + (height - 1 - c.y); // image row 0 at top
     const wz = origin.z;
     lines.push(setblockLine(wx, wy, wz, resolveBlock(c.mapColorId) ?? fallback));
   }
-  return lines.join("\n") + "\n";
+  return lines;
 }
 
 /**
@@ -88,15 +89,25 @@ export function generateJavaDatapack(
   const fallback = opts.fallbackBlock ?? "minecraft:air";
   const { width: W, height: H } = frames[0]!;
 
+  const limit = Math.max(1, Math.floor(opts.maxCommandsPerFunction ?? DEFAULT_MAX_COMMANDS));
   const deltas = computeDeltas(frames);
   const files = new Map<string, string>();
   const fnDir = `data/${ns}/function`;
 
-  // per-frame functions
+  // per-frame functions (split into sub-functions if over the command budget)
   let totalSetblocks = 0;
   for (const d of deltas) {
     totalSetblocks += d.cells.length;
-    files.set(`${fnDir}/frames/${d.index}.mcfunction`, frameToFunction(d, W, H, origin, resolveBlock, fallback));
+    const lines = frameSetblockLines(d, H, origin, resolveBlock, fallback);
+    const header = `# frame ${d.index}${d.keyframe ? " (keyframe)" : ` (Δ ${d.cells.length})`}`;
+    writeSplitFunction(
+      files,
+      `${fnDir}/frames/${d.index}`,
+      lines,
+      limit,
+      (k) => `function ${ns}:frames/${d.index}/part${k}`,
+      header,
+    );
   }
 
   // macro dispatcher: called with storage {idx:int}

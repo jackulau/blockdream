@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { QuantizedFrame } from "@mineworld/color-core";
 import { computeDeltas, type FrameDelta } from "./delta";
+import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
 import type { GeneratedPack } from "./datapack";
 
 export interface BehaviorPackOptions {
@@ -15,6 +16,8 @@ export interface BehaviorPackOptions {
   autoplay?: boolean;
   /** override the two manifest UUIDs (header, module); else derived deterministically. */
   uuids?: [string, string];
+  /** max setblock commands per function before splitting into sub-functions. */
+  maxCommandsPerFunction?: number;
 }
 
 /** Deterministic UUID (v4-shaped) from a seed string — reproducible packs/tests. */
@@ -29,18 +32,18 @@ function setblockLine(x: number, y: number, z: number, block: string): string {
   return `setblock ${x} ${y} ${z} ${block} replace`;
 }
 
-function frameToFunction(
+function frameSetblockLines(
   delta: FrameDelta,
   height: number,
   origin: { x: number; y: number; z: number },
   resolveBlock: (id: number) => string | undefined,
   fallback: string,
-): string {
-  const lines: string[] = [`# frame ${delta.index}${delta.keyframe ? " (keyframe)" : ` (Δ ${delta.cells.length})`}`];
+): string[] {
+  const lines: string[] = [];
   for (const c of delta.cells) {
     lines.push(setblockLine(origin.x + c.x, origin.y + (height - 1 - c.y), origin.z, resolveBlock(c.mapColorId) ?? fallback));
   }
-  return lines.join("\n") + "\n";
+  return lines;
 }
 
 /**
@@ -95,13 +98,23 @@ export function generateBedrockBehaviorPack(
   const speed = Math.max(1, Math.floor(opts.speedTicks ?? 2));
   const fallback = opts.fallbackBlock ?? "minecraft:air";
   const { width: W, height: H } = frames[0]!;
+  const limit = Math.max(1, Math.floor(opts.maxCommandsPerFunction ?? DEFAULT_MAX_COMMANDS));
   const deltas = computeDeltas(frames);
   const files = new Map<string, string>();
 
   let totalSetblocks = 0;
   for (const d of deltas) {
     totalSetblocks += d.cells.length;
-    files.set(`functions/${ns}/frames/${d.index}.mcfunction`, frameToFunction(d, H, origin, resolveBlock, fallback));
+    const lines = frameSetblockLines(d, H, origin, resolveBlock, fallback);
+    const header = `# frame ${d.index}${d.keyframe ? " (keyframe)" : ` (Δ ${d.cells.length})`}`;
+    writeSplitFunction(
+      files,
+      `functions/${ns}/frames/${d.index}`,
+      lines,
+      limit,
+      (k) => `function ${ns}/frames/${d.index}/part${k}`,
+      header,
+    );
   }
 
   const dispatchRoot = buildDispatchTree(ns, frames.length, files);
