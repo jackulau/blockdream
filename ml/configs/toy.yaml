@@ -1,0 +1,23 @@
+# Tiny CPU preset — every stage runs in seconds. Not a real training config.
+tokenizer:
+  image_size: 32
+  base_channels: 16
+  latent_channels: 4
+  downsample: 4
+  vq_codebook_size: 64   # >0 → AR tokens; train.py sets 0 automatically for diffusion
+action:
+  embed_dim: 32
+dynamics:
+  kind: ar               # ar | diffusion
+  dim: 64
+  depth: 2
+  heads: 4
+  diffusion_steps: 8
+train:
+  lr: 0.002
+  batch_size: 4
+  max_steps: 50
+  seed: 0
+  device: cpu
+demo:
+  name: walking
