@@ -89,6 +89,37 @@ export function blockAverageError(
   return sum / n;
 }
 
+export interface CoverageReport {
+  /** fraction of the sampled sRGB cube within `threshold` OKLab ΔE of some palette color */
+  covered: number;
+  /** mean nearest-color ΔE over the whole cube (lower = the palette reaches more colors) */
+  meanNearest: number;
+  total: number;
+}
+
+/**
+ * Gamut coverage: how much of the sRGB cube the palette can represent. Samples
+ * the cube on a `step` grid, finds each sample's nearest palette ΔE, and reports
+ * the fraction within `threshold` plus the mean nearest ΔE. Higher covered /
+ * lower meanNearest = a wider, more capable palette.
+ */
+export function gamutCoverage(pal: PreparedPalette, step = 16, threshold = 0.04): CoverageReport {
+  let covered = 0;
+  let sum = 0;
+  let total = 0;
+  for (let r = 0; r <= 255; r += step) {
+    for (let g = 0; g <= 255; g += step) {
+      for (let b = 0; b <= 255; b += step) {
+        const d = Math.sqrt(nearestByLab(srgbToOklab(r, g, b), pal).dist2);
+        sum += d;
+        if (d <= threshold) covered++;
+        total++;
+      }
+    }
+  }
+  return { covered: covered / total, meanNearest: sum / total, total };
+}
+
 export interface QualityReport {
   method: DitherMethod;
   meanMatchError: number;

@@ -1,0 +1,2718 @@
+{
+ "edition": "java",
+ "version": "1.21.x",
+ "source": "Joshuadobson/minecraft-tools blocks.json (avg_lab -> sRGB)",
+ "note": "biome-independent opaque solid building blocks; filter full_block&&building_block&&!transparent&&!leaves&&!glass + name biome-exclusion. avg color computed in linear light by source.",
+ "count": 301,
+ "blocks": [
+  {
+   "id": "minecraft:acacia_log",
+   "name": "Acacia Log",
+   "r": 105,
+   "g": 98,
+   "b": 88,
+   "noise": 11.471,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:acacia_planks",
+   "name": "Acacia Planks",
+   "r": 170,
+   "g": 91,
+   "b": 51,
+   "noise": 15.465,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:acacia_shelf",
+   "name": "Acacia Shelf",
+   "r": 158,
+   "g": 86,
+   "b": 54,
+   "noise": 21.209,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:amethyst_block",
+   "name": "Amethyst Block",
+   "r": 140,
+   "g": 104,
+   "b": 194,
+   "noise": 75.704,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:amethyst_cluster",
+   "name": "Amethyst Cluster",
+   "r": 174,
+   "g": 137,
+   "b": 210,
+   "noise": 182.523,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:andesite",
+   "name": "Andesite",
+   "r": 137,
+   "g": 137,
+   "b": 138,
+   "noise": 14.828,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:attached_melon_stem",
+   "name": "Attached Melon Stem",
+   "r": 147,
+   "g": 147,
+   "b": 147,
+   "noise": 58.505,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:attached_pumpkin_stem",
+   "name": "Attached Pumpkin Stem",
+   "r": 146,
+   "g": 146,
+   "b": 146,
+   "noise": 77.42,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:bamboo_block",
+   "name": "Bamboo Block",
+   "r": 130,
+   "g": 147,
+   "b": 59,
+   "noise": 46.655,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:bamboo_mosaic",
+   "name": "Bamboo Mosaic",
+   "r": 193,
+   "g": 172,
+   "b": 79,
+   "noise": 39.867,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:bamboo_planks",
+   "name": "Bamboo Planks",
+   "r": 196,
+   "g": 175,
+   "b": 82,
+   "noise": 41.754,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:bamboo_shelf",
+   "name": "Bamboo Shelf",
+   "r": 185,
+   "g": 166,
+   "b": 77,
+   "noise": 32.442,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:bedrock",
+   "name": "Bedrock",
+   "r": 95,
+   "g": 95,
+   "b": 95,
+   "noise": 83.74,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:big_dripleaf_stem",
+   "name": "Big Dripleaf Stem",
+   "r": 94,
+   "g": 118,
+   "b": 46,
+   "noise": 53.311,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:birch_log",
+   "name": "Birch Log",
+   "r": 224,
+   "g": 223,
+   "b": 219,
+   "noise": 142.105,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:birch_planks",
+   "name": "Birch Planks",
+   "r": 194,
+   "g": 177,
+   "b": 122,
+   "noise": 24.21,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:birch_shelf",
+   "name": "Birch Shelf",
+   "r": 177,
+   "g": 158,
+   "b": 108,
+   "noise": 29.335,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:black_concrete",
+   "name": "Black Concrete",
+   "r": 8,
+   "g": 10,
+   "b": 15,
+   "noise": 0.032,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:black_concrete_powder",
+   "name": "Black Concrete Powder",
+   "r": 27,
+   "g": 28,
+   "b": 33,
+   "noise": 5.216,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:black_glazed_terracotta",
+   "name": "Black Glazed Terracotta",
+   "r": 89,
+   "g": 33,
+   "b": 36,
+   "noise": 254.315,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:black_shulker_box",
+   "name": "Black Shulker Box",
+   "r": 26,
+   "g": 26,
+   "b": 30,
+   "noise": 2.954,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:black_terracotta",
+   "name": "Black Terracotta",
+   "r": 37,
+   "g": 23,
+   "b": 16,
+   "noise": 0.167,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:black_wool",
+   "name": "Black Wool",
+   "r": 22,
+   "g": 22,
+   "b": 27,
+   "noise": 4.004,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:blackstone",
+   "name": "Blackstone",
+   "r": 44,
+   "g": 39,
+   "b": 46,
+   "noise": 27.699,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:blue_concrete",
+   "name": "Blue Concrete",
+   "r": 45,
+   "g": 47,
+   "b": 143,
+   "noise": 0.036,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:blue_concrete_powder",
+   "name": "Blue Concrete Powder",
+   "r": 70,
+   "g": 74,
+   "b": 167,
+   "noise": 3.216,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:blue_glazed_terracotta",
+   "name": "Blue Glazed Terracotta",
+   "r": 50,
+   "g": 77,
+   "b": 153,
+   "noise": 195.435,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:blue_ice",
+   "name": "Blue Ice",
+   "r": 117,
+   "g": 168,
+   "b": 253,
+   "noise": 13.602,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:blue_shulker_box",
+   "name": "Blue Shulker Box",
+   "r": 44,
+   "g": 46,
+   "b": 141,
+   "noise": 11.234,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:blue_terracotta",
+   "name": "Blue Terracotta",
+   "r": 74,
+   "g": 60,
+   "b": 91,
+   "noise": 0.303,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:blue_wool",
+   "name": "Blue Wool",
+   "r": 53,
+   "g": 58,
+   "b": 158,
+   "noise": 3.954,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:bookshelf",
+   "name": "Bookshelf",
+   "r": 134,
+   "g": 108,
+   "b": 78,
+   "noise": 437.679,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:bricks",
+   "name": "Bricks",
+   "r": 153,
+   "g": 101,
+   "b": 89,
+   "noise": 67.041,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:brown_concrete",
+   "name": "Brown Concrete",
+   "r": 96,
+   "g": 60,
+   "b": 32,
+   "noise": 0.033,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:brown_concrete_powder",
+   "name": "Brown Concrete Powder",
+   "r": 126,
+   "g": 85,
+   "b": 54,
+   "noise": 3.931,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:brown_glazed_terracotta",
+   "name": "Brown Glazed Terracotta",
+   "r": 138,
+   "g": 110,
+   "b": 96,
+   "noise": 231.124,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:brown_mushroom_block",
+   "name": "Brown Mushroom Block",
+   "r": 149,
+   "g": 112,
+   "b": 81,
+   "noise": 1.658,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:brown_shulker_box",
+   "name": "Brown Shulker Box",
+   "r": 107,
+   "g": 66,
+   "b": 36,
+   "noise": 3.626,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:brown_terracotta",
+   "name": "Brown Terracotta",
+   "r": 77,
+   "g": 51,
+   "b": 36,
+   "noise": 0.29,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:brown_wool",
+   "name": "Brown Wool",
+   "r": 115,
+   "g": 72,
+   "b": 41,
+   "noise": 4.504,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:budding_amethyst",
+   "name": "Budding Amethyst",
+   "r": 142,
+   "g": 105,
+   "b": 191,
+   "noise": 112.711,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:calcite",
+   "name": "Calcite",
+   "r": 225,
+   "g": 226,
+   "b": 222,
+   "noise": 16.108,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:carved_pumpkin",
+   "name": "Carved Pumpkin",
+   "r": 168,
+   "g": 103,
+   "b": 24,
+   "noise": 333.883,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cherry_log",
+   "name": "Cherry Log",
+   "r": 56,
+   "g": 34,
+   "b": 45,
+   "noise": 7.757,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:cherry_planks",
+   "name": "Cherry Planks",
+   "r": 227,
+   "g": 180,
+   "b": 174,
+   "noise": 24.615,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:cherry_shelf",
+   "name": "Cherry Shelf",
+   "r": 203,
+   "g": 132,
+   "b": 132,
+   "noise": 22.156,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_copper",
+   "name": "Chiseled Copper",
+   "r": 187,
+   "g": 103,
+   "b": 76,
+   "noise": 25.44,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_deepslate",
+   "name": "Chiseled Deepslate",
+   "r": 57,
+   "g": 57,
+   "b": 58,
+   "noise": 17.461,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_nether_bricks",
+   "name": "Chiseled Nether Bricks",
+   "r": 49,
+   "g": 24,
+   "b": 29,
+   "noise": 14.824,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_polished_blackstone",
+   "name": "Chiseled Polished Blackstone",
+   "r": 57,
+   "g": 53,
+   "b": 62,
+   "noise": 33.445,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_quartz_block",
+   "name": "Chiseled Quartz Block",
+   "r": 232,
+   "g": 227,
+   "b": 218,
+   "noise": 4.215,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_red_sandstone",
+   "name": "Chiseled Red Sandstone",
+   "r": 184,
+   "g": 98,
+   "b": 30,
+   "noise": 13.297,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_resin_bricks",
+   "name": "Chiseled Resin Bricks",
+   "r": 203,
+   "g": 91,
+   "b": 28,
+   "noise": 72.831,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_sandstone",
+   "name": "Chiseled Sandstone",
+   "r": 217,
+   "g": 204,
+   "b": 158,
+   "noise": 25.351,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_stone_bricks",
+   "name": "Chiseled Stone Bricks",
+   "r": 122,
+   "g": 121,
+   "b": 122,
+   "noise": 26.544,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_tuff",
+   "name": "Chiseled Tuff",
+   "r": 92,
+   "g": 97,
+   "b": 90,
+   "noise": 24.003,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chiseled_tuff_bricks",
+   "name": "Chiseled Tuff Bricks",
+   "r": 102,
+   "g": 105,
+   "b": 98,
+   "noise": 24.288,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:chorus_plant",
+   "name": "Chorus Plant",
+   "r": 98,
+   "g": 65,
+   "b": 98,
+   "noise": 45.554,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:clay",
+   "name": "Clay",
+   "r": 161,
+   "g": 167,
+   "b": 180,
+   "noise": 3.886,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:coal_block",
+   "name": "Coal Block",
+   "r": 18,
+   "g": 17,
+   "b": 17,
+   "noise": 3.642,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:coarse_dirt",
+   "name": "Coarse Dirt",
+   "r": 125,
+   "g": 90,
+   "b": 63,
+   "noise": 52.817,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cobbled_deepslate",
+   "name": "Cobbled Deepslate",
+   "r": 81,
+   "g": 81,
+   "b": 83,
+   "noise": 26.87,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cobblestone",
+   "name": "Cobblestone",
+   "r": 132,
+   "g": 132,
+   "b": 132,
+   "noise": 43.889,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cobweb",
+   "name": "Cobweb",
+   "r": 230,
+   "g": 234,
+   "b": 235,
+   "noise": 18.512,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:copper_bars",
+   "name": "Copper Bars",
+   "r": 158,
+   "g": 83,
+   "b": 58,
+   "noise": 22.087,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:copper_block",
+   "name": "Copper Block",
+   "r": 194,
+   "g": 109,
+   "b": 82,
+   "noise": 19.597,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:copper_bulb",
+   "name": "Copper Bulb",
+   "r": 164,
+   "g": 92,
+   "b": 65,
+   "noise": 70.436,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:copper_grate",
+   "name": "Copper Grate",
+   "r": 194,
+   "g": 109,
+   "b": 81,
+   "noise": 19.903,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cracked_deepslate_bricks",
+   "name": "Cracked Deepslate Bricks",
+   "r": 69,
+   "g": 69,
+   "b": 70,
+   "noise": 33.061,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cracked_deepslate_tiles",
+   "name": "Cracked Deepslate Tiles",
+   "r": 55,
+   "g": 55,
+   "b": 55,
+   "noise": 14.784,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cracked_nether_bricks",
+   "name": "Cracked Nether Bricks",
+   "r": 43,
+   "g": 21,
+   "b": 25,
+   "noise": 12.874,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cracked_polished_blackstone_bricks",
+   "name": "Cracked Polished Blackstone Bricks",
+   "r": 47,
+   "g": 42,
+   "b": 50,
+   "noise": 31.644,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cracked_stone_bricks",
+   "name": "Cracked Stone Bricks",
+   "r": 120,
+   "g": 119,
+   "b": 120,
+   "noise": 18.742,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:creaking_heart",
+   "name": "Creaking Heart",
+   "r": 86,
+   "g": 73,
+   "b": 69,
+   "noise": 39.855,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:crimson_nylium",
+   "name": "Crimson Nylium",
+   "r": 133,
+   "g": 38,
+   "b": 38,
+   "noise": 85.872,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:crimson_planks",
+   "name": "Crimson Planks",
+   "r": 105,
+   "g": 50,
+   "b": 73,
+   "noise": 27.89,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:crimson_shelf",
+   "name": "Crimson Shelf",
+   "r": 131,
+   "g": 53,
+   "b": 84,
+   "noise": 12.472,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:crimson_stem",
+   "name": "Crimson Stem",
+   "r": 97,
+   "g": 28,
+   "b": 36,
+   "noise": 139.568,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:crying_obsidian",
+   "name": "Crying Obsidian",
+   "r": 49,
+   "g": 13,
+   "b": 92,
+   "noise": 443.195,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cut_copper",
+   "name": "Cut Copper",
+   "r": 193,
+   "g": 109,
+   "b": 83,
+   "noise": 22.981,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cut_red_sandstone",
+   "name": "Cut Red Sandstone",
+   "r": 190,
+   "g": 103,
+   "b": 33,
+   "noise": 9.415,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cut_sandstone",
+   "name": "Cut Sandstone",
+   "r": 218,
+   "g": 207,
+   "b": 162,
+   "noise": 17.405,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cyan_concrete",
+   "name": "Cyan Concrete",
+   "r": 21,
+   "g": 119,
+   "b": 136,
+   "noise": 0.03,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cyan_concrete_powder",
+   "name": "Cyan Concrete Powder",
+   "r": 37,
+   "g": 149,
+   "b": 157,
+   "noise": 9.297,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cyan_glazed_terracotta",
+   "name": "Cyan Glazed Terracotta",
+   "r": 79,
+   "g": 130,
+   "b": 136,
+   "noise": 179.089,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cyan_shulker_box",
+   "name": "Cyan Shulker Box",
+   "r": 20,
+   "g": 123,
+   "b": 136,
+   "noise": 14.485,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:cyan_terracotta",
+   "name": "Cyan Terracotta",
+   "r": 87,
+   "g": 91,
+   "b": 91,
+   "noise": 0.4,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:cyan_wool",
+   "name": "Cyan Wool",
+   "r": 21,
+   "g": 138,
+   "b": 145,
+   "noise": 9.989,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:dark_oak_log",
+   "name": "Dark Oak Log",
+   "r": 62,
+   "g": 47,
+   "b": 27,
+   "noise": 7.967,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:dark_oak_planks",
+   "name": "Dark Oak Planks",
+   "r": 68,
+   "g": 44,
+   "b": 21,
+   "noise": 13.369,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:dark_oak_shelf",
+   "name": "Dark Oak Shelf",
+   "r": 67,
+   "g": 52,
+   "b": 33,
+   "noise": 7.022,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:dark_prismarine",
+   "name": "Dark Prismarine",
+   "r": 53,
+   "g": 95,
+   "b": 78,
+   "noise": 36.981,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:deepslate",
+   "name": "Deepslate",
+   "r": 83,
+   "g": 83,
+   "b": 85,
+   "noise": 28.512,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:deepslate_bricks",
+   "name": "Deepslate Bricks",
+   "r": 75,
+   "g": 75,
+   "b": 75,
+   "noise": 30.845,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:deepslate_tiles",
+   "name": "Deepslate Tiles",
+   "r": 57,
+   "g": 57,
+   "b": 57,
+   "noise": 15.008,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:diamond_block",
+   "name": "Diamond Block",
+   "r": 113,
+   "g": 238,
+   "b": 229,
+   "noise": 45.962,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:diorite",
+   "name": "Diorite",
+   "r": 193,
+   "g": 193,
+   "b": 193,
+   "noise": 54.027,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:dirt",
+   "name": "Dirt",
+   "r": 138,
+   "g": 99,
+   "b": 70,
+   "noise": 41.228,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:dragon_egg",
+   "name": "Dragon Egg",
+   "r": 15,
+   "g": 10,
+   "b": 18,
+   "noise": 28.514,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:dripstone_block",
+   "name": "Dripstone Block",
+   "r": 136,
+   "g": 110,
+   "b": 94,
+   "noise": 30.006,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:emerald_block",
+   "name": "Emerald Block",
+   "r": 57,
+   "g": 206,
+   "b": 99,
+   "noise": 75.238,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:end_stone",
+   "name": "End Stone",
+   "r": 220,
+   "g": 224,
+   "b": 159,
+   "noise": 17.386,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:end_stone_bricks",
+   "name": "End Stone Bricks",
+   "r": 220,
+   "g": 226,
+   "b": 164,
+   "noise": 33.214,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:exposed_chiseled_copper",
+   "name": "Exposed Chiseled Copper",
+   "r": 158,
+   "g": 120,
+   "b": 102,
+   "noise": 38.943,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:exposed_copper",
+   "name": "Exposed Copper",
+   "r": 164,
+   "g": 126,
+   "b": 105,
+   "noise": 44.248,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:exposed_copper_bars",
+   "name": "Exposed Copper Bars",
+   "r": 138,
+   "g": 109,
+   "b": 91,
+   "noise": 33.24,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:exposed_copper_bulb",
+   "name": "Exposed Copper Bulb",
+   "r": 142,
+   "g": 110,
+   "b": 93,
+   "noise": 63.068,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:exposed_copper_grate",
+   "name": "Exposed Copper Grate",
+   "r": 165,
+   "g": 127,
+   "b": 106,
+   "noise": 45.512,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:exposed_cut_copper",
+   "name": "Exposed Cut Copper",
+   "r": 158,
+   "g": 123,
+   "b": 103,
+   "noise": 49.412,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:farmland",
+   "name": "Farmland",
+   "r": 147,
+   "g": 106,
+   "b": 73,
+   "noise": 43.315,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:gilded_blackstone",
+   "name": "Gilded Blackstone",
+   "r": 72,
+   "g": 56,
+   "b": 44,
+   "noise": 176.498,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:glow_item_frame",
+   "name": "Glow Item Frame",
+   "r": 168,
+   "g": 124,
+   "b": 77,
+   "noise": 315.139,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:glowstone",
+   "name": "Glowstone",
+   "r": 184,
+   "g": 151,
+   "b": 111,
+   "noise": 258.938,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:gold_block",
+   "name": "Gold Block",
+   "r": 247,
+   "g": 211,
+   "b": 69,
+   "noise": 71.985,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:granite",
+   "name": "Granite",
+   "r": 152,
+   "g": 106,
+   "b": 89,
+   "noise": 28.132,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:gravel",
+   "name": "Gravel",
+   "r": 133,
+   "g": 129,
+   "b": 128,
+   "noise": 15.671,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:gray_concrete",
+   "name": "Gray Concrete",
+   "r": 55,
+   "g": 58,
+   "b": 62,
+   "noise": 0.019,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:gray_concrete_powder",
+   "name": "Gray Concrete Powder",
+   "r": 77,
+   "g": 81,
+   "b": 85,
+   "noise": 2.257,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:gray_glazed_terracotta",
+   "name": "Gray Glazed Terracotta",
+   "r": 91,
+   "g": 98,
+   "b": 100,
+   "noise": 64.037,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:gray_shulker_box",
+   "name": "Gray Shulker Box",
+   "r": 56,
+   "g": 59,
+   "b": 63,
+   "noise": 4.37,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:gray_terracotta",
+   "name": "Gray Terracotta",
+   "r": 58,
+   "g": 42,
+   "b": 36,
+   "noise": 0.22,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:gray_wool",
+   "name": "Gray Wool",
+   "r": 63,
+   "g": 69,
+   "b": 72,
+   "noise": 2.608,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:green_concrete",
+   "name": "Green Concrete",
+   "r": 73,
+   "g": 91,
+   "b": 36,
+   "noise": 0.039,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:green_concrete_powder",
+   "name": "Green Concrete Powder",
+   "r": 97,
+   "g": 120,
+   "b": 45,
+   "noise": 13.53,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:green_glazed_terracotta",
+   "name": "Green Glazed Terracotta",
+   "r": 127,
+   "g": 149,
+   "b": 100,
+   "noise": 228.727,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:green_shulker_box",
+   "name": "Green Shulker Box",
+   "r": 79,
+   "g": 101,
+   "b": 32,
+   "noise": 12.858,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:green_terracotta",
+   "name": "Green Terracotta",
+   "r": 76,
+   "g": 83,
+   "b": 42,
+   "noise": 0.223,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:green_wool",
+   "name": "Green Wool",
+   "r": 85,
+   "g": 110,
+   "b": 28,
+   "noise": 20.116,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:honeycomb_block",
+   "name": "Honeycomb Block",
+   "r": 231,
+   "g": 155,
+   "b": 51,
+   "noise": 103.056,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:iron_bars",
+   "name": "Iron Bars",
+   "r": 142,
+   "g": 144,
+   "b": 141,
+   "noise": 55.325,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:iron_block",
+   "name": "Iron Block",
+   "r": 221,
+   "g": 221,
+   "b": 221,
+   "noise": 13.78,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:item_frame",
+   "name": "Item Frame",
+   "r": 125,
+   "g": 69,
+   "b": 43,
+   "noise": 109.856,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:jack_o_lantern",
+   "name": "Jack O Lantern",
+   "r": 219,
+   "g": 164,
+   "b": 73,
+   "noise": 177.432,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:jungle_log",
+   "name": "Jungle Log",
+   "r": 87,
+   "g": 69,
+   "b": 26,
+   "noise": 18.64,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:jungle_planks",
+   "name": "Jungle Planks",
+   "r": 164,
+   "g": 118,
+   "b": 84,
+   "noise": 33.404,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:jungle_shelf",
+   "name": "Jungle Shelf",
+   "r": 157,
+   "g": 123,
+   "b": 76,
+   "noise": 19.786,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:lapis_block",
+   "name": "Lapis Block",
+   "r": 31,
+   "g": 69,
+   "b": 141,
+   "noise": 28.136,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:large_amethyst_bud",
+   "name": "Large Amethyst Bud",
+   "r": 173,
+   "g": 140,
+   "b": 206,
+   "noise": 255.499,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_blue_concrete",
+   "name": "Light Blue Concrete",
+   "r": 36,
+   "g": 137,
+   "b": 199,
+   "noise": 0.053,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_blue_concrete_powder",
+   "name": "Light Blue Concrete Powder",
+   "r": 75,
+   "g": 181,
+   "b": 214,
+   "noise": 13.537,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_blue_glazed_terracotta",
+   "name": "Light Blue Glazed Terracotta",
+   "r": 129,
+   "g": 180,
+   "b": 213,
+   "noise": 375.652,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_blue_shulker_box",
+   "name": "Light Blue Shulker Box",
+   "r": 50,
+   "g": 165,
+   "b": 212,
+   "noise": 28.585,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_blue_terracotta",
+   "name": "Light Blue Terracotta",
+   "r": 114,
+   "g": 109,
+   "b": 138,
+   "noise": 0.266,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:light_blue_wool",
+   "name": "Light Blue Wool",
+   "r": 60,
+   "g": 176,
+   "b": 218,
+   "noise": 23.823,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:light_gray_concrete",
+   "name": "Light Gray Concrete",
+   "r": 125,
+   "g": 125,
+   "b": 115,
+   "noise": 0.027,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_gray_concrete_powder",
+   "name": "Light Gray Concrete Powder",
+   "r": 155,
+   "g": 155,
+   "b": 149,
+   "noise": 4.668,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_gray_glazed_terracotta",
+   "name": "Light Gray Glazed Terracotta",
+   "r": 160,
+   "g": 172,
+   "b": 174,
+   "noise": 115.222,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_gray_shulker_box",
+   "name": "Light Gray Shulker Box",
+   "r": 126,
+   "g": 126,
+   "b": 117,
+   "noise": 16.672,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:light_gray_terracotta",
+   "name": "Light Gray Terracotta",
+   "r": 135,
+   "g": 107,
+   "b": 98,
+   "noise": 0.246,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:light_gray_wool",
+   "name": "Light Gray Wool",
+   "r": 142,
+   "g": 143,
+   "b": 135,
+   "noise": 4.806,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:lime_concrete",
+   "name": "Lime Concrete",
+   "r": 94,
+   "g": 169,
+   "b": 25,
+   "noise": 0.083,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:lime_concrete_powder",
+   "name": "Lime Concrete Powder",
+   "r": 126,
+   "g": 190,
+   "b": 42,
+   "noise": 5.544,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:lime_glazed_terracotta",
+   "name": "Lime Glazed Terracotta",
+   "r": 177,
+   "g": 200,
+   "b": 79,
+   "noise": 281.425,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:lime_shulker_box",
+   "name": "Lime Shulker Box",
+   "r": 101,
+   "g": 174,
+   "b": 23,
+   "noise": 27.463,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:lime_terracotta",
+   "name": "Lime Terracotta",
+   "r": 104,
+   "g": 118,
+   "b": 53,
+   "noise": 0.443,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:lime_wool",
+   "name": "Lime Wool",
+   "r": 113,
+   "g": 186,
+   "b": 26,
+   "noise": 6.407,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:magenta_concrete",
+   "name": "Magenta Concrete",
+   "r": 169,
+   "g": 49,
+   "b": 159,
+   "noise": 0.045,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:magenta_concrete_powder",
+   "name": "Magenta Concrete Powder",
+   "r": 193,
+   "g": 85,
+   "b": 185,
+   "noise": 5.98,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:magenta_glazed_terracotta",
+   "name": "Magenta Glazed Terracotta",
+   "r": 210,
+   "g": 112,
+   "b": 193,
+   "noise": 176.171,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:magenta_shulker_box",
+   "name": "Magenta Shulker Box",
+   "r": 175,
+   "g": 55,
+   "b": 164,
+   "noise": 7.477,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:magenta_terracotta",
+   "name": "Magenta Terracotta",
+   "r": 150,
+   "g": 88,
+   "b": 109,
+   "noise": 0.479,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:magenta_wool",
+   "name": "Magenta Wool",
+   "r": 190,
+   "g": 70,
+   "b": 181,
+   "noise": 6.822,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:mangrove_log",
+   "name": "Mangrove Log",
+   "r": 85,
+   "g": 68,
+   "b": 41,
+   "noise": 10.549,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:mangrove_planks",
+   "name": "Mangrove Planks",
+   "r": 119,
+   "g": 56,
+   "b": 50,
+   "noise": 17.32,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:mangrove_shelf",
+   "name": "Mangrove Shelf",
+   "r": 110,
+   "g": 47,
+   "b": 43,
+   "noise": 12.352,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:medium_amethyst_bud",
+   "name": "Medium Amethyst Bud",
+   "r": 170,
+   "g": 131,
+   "b": 205,
+   "noise": 150.419,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:melon_stem",
+   "name": "Melon Stem",
+   "r": 160,
+   "g": 160,
+   "b": 160,
+   "noise": 80.362,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:moss_block",
+   "name": "Moss Block",
+   "r": 91,
+   "g": 111,
+   "b": 46,
+   "noise": 30.726,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:mossy_cobblestone",
+   "name": "Mossy Cobblestone",
+   "r": 114,
+   "g": 121,
+   "b": 103,
+   "noise": 95.217,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:mossy_stone_bricks",
+   "name": "Mossy Stone Bricks",
+   "r": 118,
+   "g": 123,
+   "b": 110,
+   "noise": 85.829,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:mud",
+   "name": "Mud",
+   "r": 61,
+   "g": 58,
+   "b": 61,
+   "noise": 6.276,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:mud_bricks",
+   "name": "Mud Bricks",
+   "r": 139,
+   "g": 105,
+   "b": 80,
+   "noise": 27.155,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:mushroom_stem",
+   "name": "Mushroom Stem",
+   "r": 203,
+   "g": 197,
+   "b": 186,
+   "noise": 2.594,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:nether_bricks",
+   "name": "Nether Bricks",
+   "r": 47,
+   "g": 23,
+   "b": 27,
+   "noise": 11.641,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:nether_wart_block",
+   "name": "Nether Wart Block",
+   "r": 117,
+   "g": 4,
+   "b": 3,
+   "noise": 21.434,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:netherite_block",
+   "name": "Netherite Block",
+   "r": 68,
+   "g": 64,
+   "b": 66,
+   "noise": 16.686,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:netherrack",
+   "name": "Netherrack",
+   "r": 99,
+   "g": 40,
+   "b": 40,
+   "noise": 12.913,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:oak_log",
+   "name": "Oak Log",
+   "r": 113,
+   "g": 88,
+   "b": 52,
+   "noise": 36.905,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:oak_planks",
+   "name": "Oak Planks",
+   "r": 165,
+   "g": 134,
+   "b": 81,
+   "noise": 36.969,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:oak_shelf",
+   "name": "Oak Shelf",
+   "r": 149,
+   "g": 120,
+   "b": 70,
+   "noise": 52.617,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:obsidian",
+   "name": "Obsidian",
+   "r": 21,
+   "g": 14,
+   "b": 35,
+   "noise": 41.842,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:orange_concrete",
+   "name": "Orange Concrete",
+   "r": 224,
+   "g": 97,
+   "b": 1,
+   "noise": 0.069,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:orange_concrete_powder",
+   "name": "Orange Concrete Powder",
+   "r": 227,
+   "g": 133,
+   "b": 34,
+   "noise": 10.984,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:orange_glazed_terracotta",
+   "name": "Orange Glazed Terracotta",
+   "r": 193,
+   "g": 154,
+   "b": 127,
+   "noise": 947.065,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:orange_shulker_box",
+   "name": "Orange Shulker Box",
+   "r": 235,
+   "g": 107,
+   "b": 9,
+   "noise": 8.403,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:orange_terracotta",
+   "name": "Orange Terracotta",
+   "r": 162,
+   "g": 84,
+   "b": 38,
+   "noise": 0.432,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:orange_wool",
+   "name": "Orange Wool",
+   "r": 241,
+   "g": 119,
+   "b": 22,
+   "noise": 10.732,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:oxidized_chiseled_copper",
+   "name": "Oxidized Chiseled Copper",
+   "r": 85,
+   "g": 165,
+   "b": 135,
+   "noise": 42.062,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:oxidized_copper",
+   "name": "Oxidized Copper",
+   "r": 84,
+   "g": 165,
+   "b": 135,
+   "noise": 37.186,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:oxidized_copper_bars",
+   "name": "Oxidized Copper Bars",
+   "r": 65,
+   "g": 125,
+   "b": 102,
+   "noise": 29.197,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:oxidized_copper_bulb",
+   "name": "Oxidized Copper Bulb",
+   "r": 73,
+   "g": 140,
+   "b": 115,
+   "noise": 86.985,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:oxidized_copper_grate",
+   "name": "Oxidized Copper Grate",
+   "r": 84,
+   "g": 164,
+   "b": 134,
+   "noise": 44.493,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:oxidized_cut_copper",
+   "name": "Oxidized Cut Copper",
+   "r": 82,
+   "g": 157,
+   "b": 129,
+   "noise": 47.537,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:packed_ice",
+   "name": "Packed Ice",
+   "r": 143,
+   "g": 180,
+   "b": 251,
+   "noise": 12.984,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:packed_mud",
+   "name": "Packed Mud",
+   "r": 143,
+   "g": 107,
+   "b": 80,
+   "noise": 8.372,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:pale_moss_block",
+   "name": "Pale Moss Block",
+   "r": 108,
+   "g": 114,
+   "b": 106,
+   "noise": 17.251,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:pale_oak_log",
+   "name": "Pale Oak Log",
+   "r": 90,
+   "g": 80,
+   "b": 77,
+   "noise": 16.984,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:pale_oak_planks",
+   "name": "Pale Oak Planks",
+   "r": 229,
+   "g": 219,
+   "b": 218,
+   "noise": 25.248,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:pale_oak_shelf",
+   "name": "Pale Oak Shelf",
+   "r": 229,
+   "g": 219,
+   "b": 218,
+   "noise": 22.731,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:pink_concrete",
+   "name": "Pink Concrete",
+   "r": 214,
+   "g": 101,
+   "b": 143,
+   "noise": 0.059,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:pink_concrete_powder",
+   "name": "Pink Concrete Powder",
+   "r": 229,
+   "g": 155,
+   "b": 182,
+   "noise": 17.378,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:pink_glazed_terracotta",
+   "name": "Pink Glazed Terracotta",
+   "r": 236,
+   "g": 158,
+   "b": 183,
+   "noise": 68.796,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:pink_shulker_box",
+   "name": "Pink Shulker Box",
+   "r": 231,
+   "g": 123,
+   "b": 158,
+   "noise": 13.411,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:pink_terracotta",
+   "name": "Pink Terracotta",
+   "r": 162,
+   "g": 78,
+   "b": 79,
+   "noise": 0.463,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:pink_wool",
+   "name": "Pink Wool",
+   "r": 238,
+   "g": 144,
+   "b": 173,
+   "noise": 27.808,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:polished_andesite",
+   "name": "Polished Andesite",
+   "r": 135,
+   "g": 137,
+   "b": 136,
+   "noise": 24.269,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:polished_blackstone",
+   "name": "Polished Blackstone",
+   "r": 55,
+   "g": 51,
+   "b": 60,
+   "noise": 23.271,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:polished_blackstone_bricks",
+   "name": "Polished Blackstone Bricks",
+   "r": 51,
+   "g": 46,
+   "b": 55,
+   "noise": 28.686,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:polished_deepslate",
+   "name": "Polished Deepslate",
+   "r": 76,
+   "g": 76,
+   "b": 76,
+   "noise": 25.937,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:polished_diorite",
+   "name": "Polished Diorite",
+   "r": 197,
+   "g": 197,
+   "b": 198,
+   "noise": 53.717,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:polished_granite",
+   "name": "Polished Granite",
+   "r": 156,
+   "g": 109,
+   "b": 92,
+   "noise": 28.982,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:polished_tuff",
+   "name": "Polished Tuff",
+   "r": 99,
+   "g": 105,
+   "b": 101,
+   "noise": 11.142,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:powder_snow",
+   "name": "Powder Snow",
+   "r": 248,
+   "g": 253,
+   "b": 253,
+   "noise": 1.721,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:prismarine",
+   "name": "Prismarine",
+   "r": 106,
+   "g": 160,
+   "b": 155,
+   "noise": 132.51,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:prismarine_bricks",
+   "name": "Prismarine Bricks",
+   "r": 102,
+   "g": 173,
+   "b": 161,
+   "noise": 27.503,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:pumpkin_stem",
+   "name": "Pumpkin Stem",
+   "r": 159,
+   "g": 159,
+   "b": 159,
+   "noise": 61.983,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:purple_concrete",
+   "name": "Purple Concrete",
+   "r": 100,
+   "g": 32,
+   "b": 156,
+   "noise": 0.031,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:purple_concrete_powder",
+   "name": "Purple Concrete Powder",
+   "r": 132,
+   "g": 56,
+   "b": 178,
+   "noise": 3.492,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:purple_glazed_terracotta",
+   "name": "Purple Glazed Terracotta",
+   "r": 118,
+   "g": 51,
+   "b": 165,
+   "noise": 358.632,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:purple_shulker_box",
+   "name": "Purple Shulker Box",
+   "r": 104,
+   "g": 33,
+   "b": 157,
+   "noise": 10.696,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:purple_terracotta",
+   "name": "Purple Terracotta",
+   "r": 118,
+   "g": 70,
+   "b": 86,
+   "noise": 0.499,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:purple_wool",
+   "name": "Purple Wool",
+   "r": 123,
+   "g": 43,
+   "b": 173,
+   "noise": 6.714,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:purpur_block",
+   "name": "Purpur Block",
+   "r": 171,
+   "g": 128,
+   "b": 171,
+   "noise": 20.819,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:purpur_pillar",
+   "name": "Purpur Pillar",
+   "r": 173,
+   "g": 132,
+   "b": 173,
+   "noise": 24.711,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:quartz_bricks",
+   "name": "Quartz Bricks",
+   "r": 235,
+   "g": 229,
+   "b": 222,
+   "noise": 3.566,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:quartz_pillar",
+   "name": "Quartz Pillar",
+   "r": 236,
+   "g": 231,
+   "b": 224,
+   "noise": 3.97,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:raw_copper_block",
+   "name": "Raw Copper Block",
+   "r": 163,
+   "g": 109,
+   "b": 83,
+   "noise": 159.354,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:raw_gold_block",
+   "name": "Raw Gold Block",
+   "r": 224,
+   "g": 177,
+   "b": 61,
+   "noise": 161.76,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:raw_iron_block",
+   "name": "Raw Iron Block",
+   "r": 173,
+   "g": 142,
+   "b": 116,
+   "noise": 73.108,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_concrete",
+   "name": "Red Concrete",
+   "r": 142,
+   "g": 33,
+   "b": 33,
+   "noise": 0.063,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_concrete_powder",
+   "name": "Red Concrete Powder",
+   "r": 169,
+   "g": 54,
+   "b": 51,
+   "noise": 3.822,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_glazed_terracotta",
+   "name": "Red Glazed Terracotta",
+   "r": 184,
+   "g": 67,
+   "b": 59,
+   "noise": 50.003,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_mushroom_block",
+   "name": "Red Mushroom Block",
+   "r": 201,
+   "g": 57,
+   "b": 55,
+   "noise": 44.38,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_nether_bricks",
+   "name": "Red Nether Bricks",
+   "r": 74,
+   "g": 8,
+   "b": 10,
+   "noise": 31.185,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_sand",
+   "name": "Red Sand",
+   "r": 191,
+   "g": 103,
+   "b": 33,
+   "noise": 4.785,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_sandstone",
+   "name": "Red Sandstone",
+   "r": 188,
+   "g": 100,
+   "b": 31,
+   "noise": 11.753,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_shulker_box",
+   "name": "Red Shulker Box",
+   "r": 142,
+   "g": 32,
+   "b": 30,
+   "noise": 11.944,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:red_terracotta",
+   "name": "Red Terracotta",
+   "r": 143,
+   "g": 61,
+   "b": 47,
+   "noise": 0.432,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:red_wool",
+   "name": "Red Wool",
+   "r": 161,
+   "g": 40,
+   "b": 35,
+   "noise": 6.001,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:resin_block",
+   "name": "Resin Block",
+   "r": 219,
+   "g": 105,
+   "b": 30,
+   "noise": 59.255,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:resin_bricks",
+   "name": "Resin Bricks",
+   "r": 208,
+   "g": 95,
+   "b": 28,
+   "noise": 69.975,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:rooted_dirt",
+   "name": "Rooted Dirt",
+   "r": 148,
+   "g": 107,
+   "b": 82,
+   "noise": 47.975,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:sand",
+   "name": "Sand",
+   "r": 219,
+   "g": 208,
+   "b": 164,
+   "noise": 5.769,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:sandstone",
+   "name": "Sandstone",
+   "r": 217,
+   "g": 204,
+   "b": 158,
+   "noise": 22.237,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:sculk",
+   "name": "Sculk",
+   "r": 13,
+   "g": 39,
+   "b": 45,
+   "noise": 39.968,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:sea_lantern",
+   "name": "Sea Lantern",
+   "r": 184,
+   "g": 205,
+   "b": 196,
+   "noise": 106.039,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:shroomlight",
+   "name": "Shroomlight",
+   "r": 242,
+   "g": 157,
+   "b": 93,
+   "noise": 185.465,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:shulker_box",
+   "name": "Shulker Box",
+   "r": 140,
+   "g": 97,
+   "b": 140,
+   "noise": 8.536,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:smooth_basalt",
+   "name": "Smooth Basalt",
+   "r": 75,
+   "g": 75,
+   "b": 79,
+   "noise": 22.242,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:smooth_stone",
+   "name": "Smooth Stone",
+   "r": 160,
+   "g": 160,
+   "b": 160,
+   "noise": 15.847,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:snow",
+   "name": "Snow",
+   "r": 249,
+   "g": 254,
+   "b": 254,
+   "noise": 1.256,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:soul_sand",
+   "name": "Soul Sand",
+   "r": 84,
+   "g": 64,
+   "b": 53,
+   "noise": 18.897,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:soul_soil",
+   "name": "Soul Soil",
+   "r": 78,
+   "g": 59,
+   "b": 48,
+   "noise": 12.666,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:spawner",
+   "name": "Spawner",
+   "r": 39,
+   "g": 52,
+   "b": 68,
+   "noise": 46.606,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:sponge",
+   "name": "Sponge",
+   "r": 197,
+   "g": 194,
+   "b": 75,
+   "noise": 42.718,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:spruce_log",
+   "name": "Spruce Log",
+   "r": 60,
+   "g": 39,
+   "b": 18,
+   "noise": 10.189,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:spruce_planks",
+   "name": "Spruce Planks",
+   "r": 117,
+   "g": 86,
+   "b": 49,
+   "noise": 15.499,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:spruce_shelf",
+   "name": "Spruce Shelf",
+   "r": 105,
+   "g": 84,
+   "b": 48,
+   "noise": 13.407,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:stone",
+   "name": "Stone",
+   "r": 126,
+   "g": 126,
+   "b": 126,
+   "noise": 6.01,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:stone_bricks",
+   "name": "Stone Bricks",
+   "r": 124,
+   "g": 124,
+   "b": 124,
+   "noise": 18.482,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:stripped_acacia_log",
+   "name": "Stripped Acacia Log",
+   "r": 175,
+   "g": 93,
+   "b": 60,
+   "noise": 6.838,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_bamboo_block",
+   "name": "Stripped Bamboo Block",
+   "r": 196,
+   "g": 175,
+   "b": 82,
+   "noise": 41.754,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:stripped_birch_log",
+   "name": "Stripped Birch Log",
+   "r": 197,
+   "g": 177,
+   "b": 119,
+   "noise": 6.489,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_cherry_log",
+   "name": "Stripped Cherry Log",
+   "r": 215,
+   "g": 145,
+   "b": 149,
+   "noise": 3.828,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_crimson_stem",
+   "name": "Stripped Crimson Stem",
+   "r": 138,
+   "g": 58,
+   "b": 90,
+   "noise": 5.152,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_dark_oak_log",
+   "name": "Stripped Dark Oak Log",
+   "r": 73,
+   "g": 57,
+   "b": 36,
+   "noise": 2.874,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_jungle_log",
+   "name": "Stripped Jungle Log",
+   "r": 172,
+   "g": 133,
+   "b": 85,
+   "noise": 10.481,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_mangrove_log",
+   "name": "Stripped Mangrove Log",
+   "r": 120,
+   "g": 55,
+   "b": 48,
+   "noise": 4.509,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_oak_log",
+   "name": "Stripped Oak Log",
+   "r": 178,
+   "g": 145,
+   "b": 87,
+   "noise": 8.345,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_pale_oak_log",
+   "name": "Stripped Pale Oak Log",
+   "r": 246,
+   "g": 238,
+   "b": 237,
+   "noise": 3.673,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_spruce_log",
+   "name": "Stripped Spruce Log",
+   "r": 116,
+   "g": 90,
+   "b": 53,
+   "noise": 6.593,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:stripped_warped_stem",
+   "name": "Stripped Warped Stem",
+   "r": 58,
+   "g": 151,
+   "b": 148,
+   "noise": 5.439,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:structure_block",
+   "name": "Structure Block",
+   "r": 122,
+   "g": 102,
+   "b": 122,
+   "noise": 287.981,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:terracotta",
+   "name": "Terracotta",
+   "r": 152,
+   "g": 94,
+   "b": 68,
+   "noise": 0.565,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:test_instance_block",
+   "name": "Test Instance Block",
+   "r": 145,
+   "g": 141,
+   "b": 140,
+   "noise": 190.063,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:tuff",
+   "name": "Tuff",
+   "r": 111,
+   "g": 111,
+   "b": 105,
+   "noise": 25.551,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:tuff_bricks",
+   "name": "Tuff Bricks",
+   "r": 102,
+   "g": 105,
+   "b": 98,
+   "noise": 28.663,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:warped_nylium",
+   "name": "Warped Nylium",
+   "r": 51,
+   "g": 117,
+   "b": 104,
+   "noise": 84.232,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:warped_planks",
+   "name": "Warped Planks",
+   "r": 45,
+   "g": 109,
+   "b": 104,
+   "noise": 48.513,
+   "family": "planks"
+  },
+  {
+   "id": "minecraft:warped_shelf",
+   "name": "Warped Shelf",
+   "r": 52,
+   "g": 142,
+   "b": 136,
+   "noise": 17.68,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:warped_stem",
+   "name": "Warped Stem",
+   "r": 63,
+   "g": 68,
+   "b": 81,
+   "noise": 217.038,
+   "family": "log"
+  },
+  {
+   "id": "minecraft:warped_wart_block",
+   "name": "Warped Wart Block",
+   "r": 23,
+   "g": 122,
+   "b": 122,
+   "noise": 35.196,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:weathered_chiseled_copper",
+   "name": "Weathered Chiseled Copper",
+   "r": 106,
+   "g": 154,
+   "b": 115,
+   "noise": 71.623,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:weathered_copper",
+   "name": "Weathered Copper",
+   "r": 109,
+   "g": 155,
+   "b": 113,
+   "noise": 55.392,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:weathered_copper_bars",
+   "name": "Weathered Copper Bars",
+   "r": 88,
+   "g": 126,
+   "b": 95,
+   "noise": 76.006,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:weathered_copper_bulb",
+   "name": "Weathered Copper Bulb",
+   "r": 95,
+   "g": 132,
+   "b": 103,
+   "noise": 99.594,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:weathered_copper_grate",
+   "name": "Weathered Copper Grate",
+   "r": 107,
+   "g": 155,
+   "b": 114,
+   "noise": 54.702,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:weathered_cut_copper",
+   "name": "Weathered Cut Copper",
+   "r": 111,
+   "g": 148,
+   "b": 110,
+   "noise": 71.785,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:wet_sponge",
+   "name": "Wet Sponge",
+   "r": 173,
+   "g": 183,
+   "b": 71,
+   "noise": 36.891,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:white_concrete",
+   "name": "White Concrete",
+   "r": 207,
+   "g": 213,
+   "b": 214,
+   "noise": 0.029,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:white_concrete_powder",
+   "name": "White Concrete Powder",
+   "r": 226,
+   "g": 228,
+   "b": 228,
+   "noise": 2.864,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:white_glazed_terracotta",
+   "name": "White Glazed Terracotta",
+   "r": 213,
+   "g": 219,
+   "b": 215,
+   "noise": 601.592,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:white_shulker_box",
+   "name": "White Shulker Box",
+   "r": 216,
+   "g": 221,
+   "b": 222,
+   "noise": 10.153,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:white_terracotta",
+   "name": "White Terracotta",
+   "r": 210,
+   "g": 178,
+   "b": 161,
+   "noise": 0.551,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:white_wool",
+   "name": "White Wool",
+   "r": 234,
+   "g": 237,
+   "b": 237,
+   "noise": 6.521,
+   "family": "wool"
+  },
+  {
+   "id": "minecraft:yellow_concrete",
+   "name": "Yellow Concrete",
+   "r": 241,
+   "g": 175,
+   "b": 22,
+   "noise": 0.077,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:yellow_concrete_powder",
+   "name": "Yellow Concrete Powder",
+   "r": 233,
+   "g": 199,
+   "b": 57,
+   "noise": 12.02,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:yellow_glazed_terracotta",
+   "name": "Yellow Glazed Terracotta",
+   "r": 237,
+   "g": 198,
+   "b": 113,
+   "noise": 237.704,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:yellow_shulker_box",
+   "name": "Yellow Shulker Box",
+   "r": 248,
+   "g": 189,
+   "b": 30,
+   "noise": 7.252,
+   "family": "other"
+  },
+  {
+   "id": "minecraft:yellow_terracotta",
+   "name": "Yellow Terracotta",
+   "r": 186,
+   "g": 133,
+   "b": 35,
+   "noise": 0.445,
+   "family": "terracotta"
+  },
+  {
+   "id": "minecraft:yellow_wool",
+   "name": "Yellow Wool",
+   "r": 249,
+   "g": 198,
+   "b": 42,
+   "noise": 10.465,
+   "family": "wool"
+  }
+ ]
+}

@@ -119,6 +119,70 @@ export interface BlockPalette {
   bases: BlockBase[];
 }
 
+// --- Full solid-block color palette (wide gamut, from texture averages) -----
+
+export interface BlockColor {
+  id: string;
+  name: string;
+  r: number;
+  g: number;
+  b: number;
+  /** texture variance (high = noisy/patterned; prefer low for clean pixel art). */
+  noise: number;
+  family: string;
+}
+
+export interface BlockColorPalette {
+  edition: string;
+  version: string;
+  source: string;
+  note: string;
+  count: number;
+  blocks: BlockColor[];
+}
+
+/** The wide-gamut biome-independent solid-block color set (~301 blocks). */
+export function getFullBlockColorPalette(version = "1.21"): BlockColorPalette {
+  const key = `java-block-colors-${version}`;
+  const hit = cache.get(key) as unknown as BlockColorPalette | undefined;
+  if (hit) return hit;
+  const raw = readFileSync(`${DATA_DIR}${key}.json`, "utf8");
+  const parsed = JSON.parse(raw) as BlockColorPalette;
+  cache.set(key, parsed as unknown as MapPalette);
+  return parsed;
+}
+
+/**
+ * The full solid-block set shaped as a MapPalette for the color-core matcher.
+ * `mapColorId` carries the block's index so the caller recovers which block to
+ * place (it is NOT a map-item color id — this is the block-build path).
+ */
+export function getFullBlockMapPalette(version = "1.21"): {
+  palette: MapPalette;
+  blockByMapColorId: Map<number, BlockColor>;
+} {
+  const bp = getFullBlockColorPalette(version);
+  const colors: MapColor[] = [];
+  const blockByMapColorId = new Map<number, BlockColor>();
+  bp.blocks.forEach((blk, i) => {
+    colors.push({ mapColorId: i, baseId: i, shadeIndex: 2, mult: 255, r: blk.r, g: blk.g, b: blk.b });
+    blockByMapColorId.set(i, blk);
+  });
+  return {
+    palette: {
+      edition: "java",
+      version,
+      source: bp.source,
+      shadeMultipliers: [180, 220, 255, 135],
+      baseCount: colors.length,
+      usableColorCount: colors.length,
+      note: "full solid-block build palette (wide gamut); mapColorId = block index",
+      colors,
+    },
+    blockByMapColorId,
+  };
+}
+
 export function getJavaBlockPalette(version = "1.21"): BlockPalette {
   const key = `java-block-palette-${version}`;
   const hit = cache.get(key) as BlockPalette | undefined;
