@@ -3,7 +3,7 @@ import {
   srgbChannelToLinear,
   linearToSrgbChannel,
 } from "./oklab";
-import { nearestByLab, lutNearest, type PreparedPalette, type RgbLut } from "./match";
+import { nearestByLab, nearestByLabHue, lutNearest, type PreparedPalette, type RgbLut } from "./match";
 import type { RgbImage, QuantizedFrame } from "./image";
 
 export type DitherMethod = "none" | "floyd-steinberg" | "bayer";
@@ -14,10 +14,19 @@ export interface QuantizeOptions {
   bayerAmplitude?: number;
   /** Optional prebuilt LUT (buildRgbLut) for O(1)/pixel matching — the fast path. */
   lut?: RgbLut;
+  /**
+   * Gamut-map by hue: when set (the hue-penalty λ, e.g. 0.8), out-of-gamut
+   * saturated colors keep their hue instead of going muddy. Overrides the LUT
+   * (the hue-penalized search is exact). Best for stills/hero quality.
+   */
+  gamutMap?: number;
 }
 
-/** Nearest palette index for a linear-RGB triple — LUT (fast) or exact OKLab. */
-function matchLinear(lr: number, lg: number, lb: number, pal: PreparedPalette, lut?: RgbLut): number {
+/** Nearest palette index for a linear-RGB triple — gamut-mapped, LUT (fast), or exact OKLab. */
+function matchLinear(lr: number, lg: number, lb: number, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): number {
+  if (gamutMap !== undefined) {
+    return nearestByLabHue(linearRgbToOklab(lr, lg, lb), pal, gamutMap).index;
+  }
   if (lut) {
     return lutNearest(lut, linearToSrgbChannel(lr), linearToSrgbChannel(lg), linearToSrgbChannel(lb));
   }
@@ -52,13 +61,13 @@ function writePixel(frame: QuantizedFrame, p: number, entryIndex: number, mapCol
  * Pass a prebuilt `lut` (buildRgbLut) for O(1)/pixel matching — the fast path
  * for real-time/video; without it, exact brute-force OKLab match.
  */
-export function quantizeNearest(img: RgbImage, pal: PreparedPalette, lut?: RgbLut): QuantizedFrame {
+export function quantizeNearest(img: RgbImage, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): QuantizedFrame {
   const frame = emptyFrame(img);
   const px = img.width * img.height;
   for (let p = 0; p < px; p++) {
     const i = p * 3;
     let index: number;
-    if (lut) {
+    if (gamutMap === undefined && lut) {
       index = lutNearest(lut, img.data[i]!, img.data[i + 1]!, img.data[i + 2]!);
     } else {
       const lab = linearRgbToOklab(
@@ -66,7 +75,7 @@ export function quantizeNearest(img: RgbImage, pal: PreparedPalette, lut?: RgbLu
         srgbChannelToLinear(img.data[i + 1]!),
         srgbChannelToLinear(img.data[i + 2]!),
       );
-      index = nearestByLab(lab, pal).index;
+      index = gamutMap === undefined ? nearestByLab(lab, pal).index : nearestByLabHue(lab, pal, gamutMap).index;
     }
     writePixel(frame, p, index, pal.entries[index]!.color.mapColorId);
   }
@@ -78,7 +87,7 @@ export function quantizeNearest(img: RgbImage, pal: PreparedPalette, lut?: RgbLu
  * error is computed and diffused in LINEAR light so gamma doesn't bias it.
  * Serpentine scan reduces directional worming artifacts.
  */
-export function quantizeFloydSteinberg(img: RgbImage, pal: PreparedPalette, lut?: RgbLut): QuantizedFrame {
+export function quantizeFloydSteinberg(img: RgbImage, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): QuantizedFrame {
   const { width, height } = img;
   const frame = emptyFrame(img);
   const buf = toLinearBuffer(img); // mutated in place with diffused error
@@ -99,7 +108,7 @@ export function quantizeFloydSteinberg(img: RgbImage, pal: PreparedPalette, lut?
       const lr = buf[i]!;
       const lg = buf[i + 1]!;
       const lb = buf[i + 2]!;
-      const index = matchLinear(lr, lg, lb, pal, lut);
+      const index = matchLinear(lr, lg, lb, pal, lut, gamutMap);
       const chosen = pal.entries[index]!.lin;
       writePixel(frame, p, index, pal.entries[index]!.color.mapColorId);
 
@@ -151,6 +160,7 @@ export function quantizeBayer(
   pal: PreparedPalette,
   amplitude = 0.06,
   lut?: RgbLut,
+  gamutMap?: number,
 ): QuantizedFrame {
   const { width, height } = img;
   const frame = emptyFrame(img);
@@ -162,7 +172,7 @@ export function quantizeBayer(
       const lr = srgbChannelToLinear(img.data[i]!) + t;
       const lg = srgbChannelToLinear(img.data[i + 1]!) + t;
       const lb = srgbChannelToLinear(img.data[i + 2]!) + t;
-      const index = matchLinear(lr, lg, lb, pal, lut);
+      const index = matchLinear(lr, lg, lb, pal, lut, gamutMap);
       writePixel(frame, p, index, pal.entries[index]!.color.mapColorId);
     }
   }
@@ -176,12 +186,12 @@ export function quantizeFrame(
 ): QuantizedFrame {
   switch (opts.method ?? "floyd-steinberg") {
     case "none":
-      return quantizeNearest(img, pal, opts.lut);
+      return quantizeNearest(img, pal, opts.lut, opts.gamutMap);
     case "bayer":
-      return quantizeBayer(img, pal, opts.bayerAmplitude, opts.lut);
+      return quantizeBayer(img, pal, opts.bayerAmplitude, opts.lut, opts.gamutMap);
     case "floyd-steinberg":
     default:
-      return quantizeFloydSteinberg(img, pal, opts.lut);
+      return quantizeFloydSteinberg(img, pal, opts.lut, opts.gamutMap);
   }
 }
 

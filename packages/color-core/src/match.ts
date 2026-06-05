@@ -11,6 +11,10 @@ export interface PreparedColor {
   lab: Lab;
   /** Linear-light RGB, each 0..1. */
   lin: [number, number, number];
+  /** OKLCh chroma = √(a²+b²). */
+  chroma: number;
+  /** OKLCh hue = atan2(b, a) in radians. */
+  hue: number;
 }
 
 export interface PreparedPalette {
@@ -23,16 +27,28 @@ export function preparePalette(p: MapPalette): PreparedPalette {
   return {
     version: p.version,
     edition: p.edition,
-    entries: p.colors.map((color) => ({
-      color,
-      lab: srgbToOklab(color.r, color.g, color.b),
-      lin: [
-        srgbChannelToLinear(color.r),
-        srgbChannelToLinear(color.g),
-        srgbChannelToLinear(color.b),
-      ],
-    })),
+    entries: p.colors.map((color) => {
+      const lab = srgbToOklab(color.r, color.g, color.b);
+      return {
+        color,
+        lab,
+        lin: [
+          srgbChannelToLinear(color.r),
+          srgbChannelToLinear(color.g),
+          srgbChannelToLinear(color.b),
+        ],
+        chroma: Math.hypot(lab.a, lab.b),
+        hue: Math.atan2(lab.b, lab.a),
+      };
+    }),
   };
+}
+
+/** Shortest angular distance between two hues (radians, 0..π). */
+export function hueDistance(h1: number, h2: number): number {
+  let d = Math.abs(h1 - h2) % (2 * Math.PI);
+  if (d > Math.PI) d = 2 * Math.PI - d;
+  return d;
 }
 
 function labDist2(a: Lab, b: Lab): number {
@@ -65,6 +81,40 @@ export function nearestByLab(query: Lab, pal: PreparedPalette): Match {
 /** Convenience: nearest palette color to an 8-bit sRGB triple. */
 export function nearestSrgb(r: number, g: number, b: number, pal: PreparedPalette): Match {
   return nearestByLab(srgbToOklab(r, g, b), pal);
+}
+
+/**
+ * Gamut-mapped nearest match: OKLab distance plus a HUE penalty weighted by the
+ * target's chroma. For saturated (out-of-gamut) inputs this keeps the source
+ * HUE — picking a duller same-hue block instead of a closer-but-wrong-hue or
+ * muddy-gray one. Neutral inputs (chroma→0) fall back to plain nearest, since
+ * hue is meaningless there. `lambda` controls hue rigidity.
+ */
+export function nearestByLabHue(query: Lab, pal: PreparedPalette, lambda = 0.6): Match {
+  const cT = Math.hypot(query.a, query.b);
+  const hT = Math.atan2(query.b, query.a);
+  let bestIdx = 0;
+  let bestPenalty = Infinity;
+  let bestDist2 = Infinity;
+  for (let i = 0; i < pal.entries.length; i++) {
+    const e = pal.entries[i]!;
+    const dL = query.L - e.lab.L;
+    const da = query.a - e.lab.a;
+    const db = query.b - e.lab.b;
+    const dist2 = dL * dL + da * da + db * db;
+    const hd = hueDistance(hT, e.hue);
+    const penalty = dist2 + lambda * cT * hd * hd;
+    if (penalty < bestPenalty) {
+      bestPenalty = penalty;
+      bestIdx = i;
+      bestDist2 = dist2;
+    }
+  }
+  return { index: bestIdx, color: pal.entries[bestIdx]!.color, dist2: bestDist2 };
+}
+
+export function nearestSrgbHue(r: number, g: number, b: number, pal: PreparedPalette, lambda = 0.6): Match {
+  return nearestByLabHue(srgbToOklab(r, g, b), pal, lambda);
 }
 
 /**
