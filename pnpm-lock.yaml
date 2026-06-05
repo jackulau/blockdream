@@ -39,6 +39,15 @@ importers:
         specifier: workspace:*
         version: link:../palette
 
+  packages/emit-commands:
+    dependencies:
+      '@mineworld/color-core':
+        specifier: workspace:*
+        version: link:../color-core
+      '@mineworld/palette':
+        specifier: workspace:*
+        version: link:../palette
+
   packages/emit-java:
     dependencies:
       '@mineworld/color-core':
