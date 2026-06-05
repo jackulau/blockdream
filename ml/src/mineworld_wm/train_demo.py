@@ -13,7 +13,7 @@ from pathlib import Path
 import torch
 
 from .demos import build_demo_session
-from .data import MovingDotEnv
+from .data import demo_env
 
 DIRS = {0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}  # up/down/left/right deltas
 
@@ -27,18 +27,31 @@ def centroid(frame: torch.Tensor) -> tuple[float, float]:
 
 
 def build_pairs(size: int, n_buttons: int, n_pos: int, step: float, seed: int):
-    env = MovingDotEnv(size=size, n_buttons=n_buttons, step=step)
-    g = torch.Generator().manual_seed(seed)
+    """Dense, step-aligned coverage so the free-running rollout never leaves the
+    trained distribution (avoids autoregressive drift). The agent lives on a grid
+    of positions spaced `step` apart and is clamped to a padded interior — so it
+    slides to a wall and stays there (a trained, stable state) instead of drifting.
+    """
+    env = demo_env(size=size, n_buttons=n_buttons, step=step)
+    pad = 8
+    s = int(step)
+    lo, hi = pad, size - pad
+    grid = list(range(lo, hi + 1, s))  # exactly the centers the rollout can occupy
+
+    def clamp(v: int) -> int:
+        return max(lo, min(hi, v))
+
     pairs = []
-    for _ in range(n_pos):
-        x = float(torch.randint(8, size - 8, (1,), generator=g).item())
-        y = float(torch.randint(8, size - 8, (1,), generator=g).item())
-        for d, (dx, dy) in DIRS.items():
-            ft = env._render(x, y)
-            ft1 = env._render(x + dx * env.step, y + dy * env.step)
-            btn = torch.zeros(n_buttons)
-            btn[d] = 1.0
-            pairs.append((ft, btn, torch.zeros(2), ft1, d))
+    for x in grid:
+        for y in grid:
+            for d, (dx, dy) in DIRS.items():
+                nx = clamp(x + dx * s)
+                ny = clamp(y + dy * s)
+                ft = env._render(x, y)
+                ft1 = env._render(nx, ny)
+                btn = torch.zeros(n_buttons)
+                btn[d] = 1.0
+                pairs.append((ft, btn, torch.zeros(2), ft1, d))
     return pairs
 
 
@@ -46,8 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("mineworld_wm.train_demo")
     ap.add_argument("--demo", default="walking")
     ap.add_argument("--kind", default="ar", choices=["ar", "diffusion"])
-    ap.add_argument("--steps", type=int, default=400)
-    ap.add_argument("--tok-steps", type=int, default=300)
+    ap.add_argument("--steps", type=int, default=600)
+    ap.add_argument("--tok-steps", type=int, default=600)
     ap.add_argument("--out", default="checkpoints/walking.pt")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args(argv)
@@ -92,9 +105,12 @@ def main(argv: list[str] | None = None) -> int:
             first = loss.item()
         last = loss.item()
 
-    # 3) action-correctness check via the live session
+    # 3) action-correctness + crispness check via the live session
     correct = 0
-    for ft, b, c, _ft1, d in pairs:
+    gen_err = 0.0
+    with torch.no_grad():
+        recon_mse = torch.nn.functional.mse_loss(tok(frames).recon, frames).item()
+    for ft, b, c, ft1, d in pairs:
         session.reset(ft)
         res = session.step(b, c)
         cx0, cy0 = centroid(ft)
@@ -102,13 +118,16 @@ def main(argv: list[str] | None = None) -> int:
         dx, dy = DIRS[d]
         moved = (dx != 0 and (cx1 - cx0) * dx > 0.3) or (dy != 0 and (cy1 - cy0) * dy > 0.3)
         correct += int(moved)
+        gen_err += torch.nn.functional.l1_loss(res.frame, ft1).item()
     acc = correct / len(pairs)
+    gen_err /= len(pairs)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     torch.save({"config": cfg.to_dict(), "demo": args.demo, "kind": args.kind,
                 "tokenizer": tok.state_dict(), "action": enc.state_dict(), "transition": trans.state_dict()}, out)
-    print(f"[train_demo] {args.demo}/{args.kind}  loss {first:.3f}->{last:.3f}  action-correct {acc:.2f}  → {out}")
+    print(f"[train_demo] {args.demo}/{args.kind}  trans-loss {first:.3f}->{last:.3f}  "
+          f"recon-mse {recon_mse:.4f}  gen-frame-L1 {gen_err:.4f}  action-correct {acc:.2f}  → {out}")
     return 0 if acc > 0.6 else 1
 
 

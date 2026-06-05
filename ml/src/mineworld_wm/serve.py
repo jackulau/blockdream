@@ -54,11 +54,13 @@ class WorldModelSession:
         self.step_idx = 0
         # cached state (the rollout cache): prev tokens (AR) or prev latent (diffusion)
         self._prev: torch.Tensor | None = None
+        # default seed frame for reset() (set by load_demo_session to a centered agent)
+        self.default_init: torch.Tensor | None = None
 
     @torch.no_grad()
     def reset(self, init_frame: torch.Tensor | None = None) -> StepResult:
         if init_frame is None:
-            init_frame = torch.zeros(3, self.size, self.size)
+            init_frame = self.default_init if self.default_init is not None else torch.zeros(3, self.size, self.size)
         x = init_frame.unsqueeze(0)
         if self.kind == "ar":
             self._prev = self.tok.tokenize(x).flatten(1)  # (1, N)
@@ -138,6 +140,10 @@ def load_demo_session(demo: str, checkpoint: str | None = None, seed: int = 0, k
         session.tok.load_state_dict(ckpt["tokenizer"])
         session.enc.load_state_dict(ckpt["action"])
         session.trans.load_state_dict(ckpt["transition"])
+    # seed reset() from a centered-agent frame so the interactive rollout starts valid
+    from .data import demo_init_frame
+
+    session.default_init = demo_init_frame(session.size)
     return session
 
 

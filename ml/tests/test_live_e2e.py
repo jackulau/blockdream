@@ -29,10 +29,13 @@ def ensure_checkpoint() -> Path:
 
 
 def centroid_x(png_b64: str) -> float:
+    # threshold out the (non-black) background so we track the bright agent only
     im = np.asarray(Image.open(io.BytesIO(base64.b64decode(png_b64))).convert("L"), dtype=float)
-    xs = np.arange(im.shape[1])
-    col = im.sum(0)
-    return float((col * xs).sum() / (col.sum() + 1e-6))
+    mask = im > 90  # agent luma ~170, background ~24
+    if mask.sum() < 1:
+        return 0.0
+    xs = np.arange(im.shape[1])[None, :]
+    return float((xs * mask).sum() / mask.sum())
 
 
 async def _drive():

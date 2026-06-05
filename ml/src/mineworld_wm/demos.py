@@ -69,10 +69,12 @@ class DemoEncoder(nn.Module):
 def demo_config(spec: DemoSpec, image_size: int = 32, kind: str | None = None) -> Config:
     k = kind or spec.kind
     cfg = Config()
-    cfg.tokenizer = TokenizerConfig(image_size=image_size, base_channels=24, latent_channels=4, downsample=4,
-                                    vq_codebook_size=128 if k == "ar" else 0)
+    # downsample=4 → 8×8 = 64 tokens (keeps AR generation fast); bigger codebook +
+    # channels keep the decode crisp despite the heavy compression.
+    cfg.tokenizer = TokenizerConfig(image_size=image_size, base_channels=48, latent_channels=6, downsample=4,
+                                    vq_codebook_size=256 if k == "ar" else 0)
     cfg.action = ActionConfig(embed_dim=64)
-    cfg.dynamics = DynamicsConfig(kind=k, dim=96 if k == "ar" else 48, depth=3, heads=4, diffusion_steps=8)
+    cfg.dynamics = DynamicsConfig(kind=k, dim=128 if k == "ar" else 64, depth=3, heads=4, diffusion_steps=8)
     cfg.demo.name = spec.name
     cfg.demo.active_buttons = list(spec.active_buttons)
     return cfg

@@ -27,23 +27,40 @@ class Rollout:
 
 
 class MovingDotEnv:
-    """Deterministic moving-dot world. button[0..3] = up/down/left/right nudges;
-    camera (dx, dy) adds continuous motion. Frame = a 3×3 bright patch at the dot."""
+    """Deterministic moving-agent world. button[0..3] = up/down/left/right nudges;
+    camera (dx, dy) adds continuous motion. Frame = a solid colored square (the
+    agent) on a solid background. A larger, high-contrast colored agent is far
+    easier for a small tokenizer to reconstruct crisply than a 3×3 white speck."""
 
-    def __init__(self, size: int = 32, n_buttons: int = 9, step: float = 3.0):
+    def __init__(
+        self,
+        size: int = 32,
+        n_buttons: int = 9,
+        step: float = 3.0,
+        agent_size: int = 3,
+        agent_color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        bg_color: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ):
         self.size = size
         self.n_buttons = n_buttons
         self.step = step
+        self.agent_size = agent_size
+        self.agent_color = agent_color
+        self.bg_color = bg_color
 
     def _render(self, x: float, y: float) -> torch.Tensor:
-        img = torch.zeros(3, self.size, self.size)
+        img = torch.empty(3, self.size, self.size)
+        for c in range(3):
+            img[c].fill_(self.bg_color[c])
         cx = int(round(x))
         cy = int(round(y))
-        for dy in (-1, 0, 1):
-            for dx in (-1, 0, 1):
+        r = self.agent_size // 2
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
                 px = min(max(cx + dx, 0), self.size - 1)
                 py = min(max(cy + dy, 0), self.size - 1)
-                img[:, py, px] = 1.0
+                for c in range(3):
+                    img[c, py, px] = self.agent_color[c]
         return img
 
     def rollout(self, seq_len: int, generator: torch.Generator) -> Rollout:
@@ -75,6 +92,20 @@ class MovingDotEnv:
             x = min(max(x, 0.0), s - 1.0)
             y = min(max(y, 0.0), s - 1.0)
         return Rollout(torch.stack(frames), torch.stack(buttons), torch.stack(camera))
+
+
+# Canonical demo agent (shared by train_demo + the server's reset frame so the
+# interactive rollout starts from a valid centered-agent state).
+DEMO_AGENT = dict(agent_size=9, agent_color=(0.32, 0.9, 0.38), bg_color=(0.07, 0.09, 0.16))
+
+
+def demo_env(size: int = 32, n_buttons: int = 9, step: float = 4.0) -> MovingDotEnv:
+    return MovingDotEnv(size=size, n_buttons=n_buttons, step=step, **DEMO_AGENT)
+
+
+def demo_init_frame(size: int = 32) -> torch.Tensor:
+    """A centered-agent frame to seed the interactive rollout."""
+    return demo_env(size)._render(size / 2, size / 2)
 
 
 def make_rollouts(n: int, seq_len: int, size: int = 32, n_buttons: int = 9, seed: int = 0) -> list[Rollout]:
