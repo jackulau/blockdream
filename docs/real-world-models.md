@@ -87,6 +87,28 @@ bash ml/scripts/train_real.sh --m4 80 80000
 then the AR transition — the AR steps dominate). Serve when done:
 `python -m mineworld_wm.serve --real ml/checkpoints/vpt.pt`.
 
+### Multi-day run (hardened, hourly checkpoints)
+For a long, days-long run use the production trainer (`train_long.py`) via:
+```bash
+bash ml/scripts/train_m4_multiday.sh [segments]   # default 100 (~50 min footage, ~16 GB)
+```
+It is built for unattended multi-day training:
+- **Resumable** — re-run the same command (or it auto-restarts on crash) and it
+  continues exactly from `ml/runs/m4/latest.pt` (model + optimizer + step + phase).
+- **Hourly checkpoints** (`--ckpt-every-min 60`), atomic writes (a crash mid-save
+  can't corrupt the checkpoint).
+- **Cached, resumable data pool** — a stopped download skips already-fetched
+  segments; pool is per-segment `seg_*.npz` (no all-in-RAM load).
+- **Progress you can watch** — `ml/runs/m4/log.csv` (train + val loss) and
+  `ml/runs/m4/samples/*.png` (real frame on top, the model's reconstruction below —
+  watch it sharpen).
+- **Two-phase** — tokenizer first (40k steps), tokens cached, then AR ~forever.
+- Stop gracefully any time: `touch ml/runs/m4/STOP` (saves a final checkpoint).
+
+Run it under `nohup`/`tmux` (or just leave the terminal open); serve the latest
+checkpoint while it trains: `python -m mineworld_wm.serve --real ml/runs/m4/latest.pt`.
+More `segments` = more data = sharper (bounded by the 24 GB / 128px ceiling).
+
 ## Honest limits
 - CPU-only here → small data + few steps → blurry. The pipeline is real and
   automatic; **fidelity scales with data + GPU** (`--full`).
