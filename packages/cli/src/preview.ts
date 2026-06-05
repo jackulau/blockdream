@@ -8,7 +8,7 @@ import {
   type PreparedPalette,
   type DitherMethod,
 } from "@mineworld/color-core";
-import { getJavaMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette, getFullBlockMapPalette } from "@mineworld/palette";
 import { extractFrames, rgbToPng } from "@mineworld/video";
 
 function renderQuantized(q: QuantizedFrame, pal: PreparedPalette): RgbImage {
@@ -57,14 +57,23 @@ export interface PreviewOptions {
   method?: DitherMethod;
   scale?: number;
   paletteVersion?: string;
+  /** "map" = 244 map colors (default); "block" = full ~301 solid-block gamut. */
+  palette?: "map" | "block";
+  /** hue-penalty λ for gamut-mapped matching (keeps saturated hues). Off if unset. */
+  gamutMap?: number;
+}
+
+function pickPalette(opts: PreviewOptions): PreparedPalette {
+  if (opts.palette === "block") return preparePalette(getFullBlockMapPalette(opts.paletteVersion).palette);
+  return preparePalette(getJavaMapPalette(opts.paletteVersion));
 }
 
 /** Render a clip's first frame to a side-by-side (source | block-art) PNG buffer. */
 export function previewPng(input: string, opts: PreviewOptions = {}): Buffer {
   const grid = opts.grid ?? 128;
-  const pal = preparePalette(getJavaMapPalette(opts.paletteVersion));
+  const pal = pickPalette(opts);
   const [source] = extractFrames(input, { width: grid, height: grid, maxFrames: 1 });
   if (!source) throw new Error("no frame decoded");
-  const q = quantizeFrame(source, pal, { method: opts.method ?? "floyd-steinberg" });
+  const q = quantizeFrame(source, pal, { method: opts.method ?? "floyd-steinberg", gamutMap: opts.gamutMap });
   return rgbToPng(buildComparison(source, q, pal, opts.scale ?? 4));
 }

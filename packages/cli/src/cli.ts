@@ -50,6 +50,8 @@ export function runCli(argv: string[]): number {
       speed: { type: "string" },
       version: { type: "string" },
       out: { type: "string" },
+      palette: { type: "string" },
+      gamut: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -66,7 +68,12 @@ export function runCli(argv: string[]): number {
     const out = values.out ?? "preview.png";
     const grid = values.grid ? parseInt(values.grid.split("x")[0]!, 10) : 128;
     try {
-      const png = previewPng(input, { grid, method: values.dither as DitherMethod | undefined });
+      const png = previewPng(input, {
+        grid,
+        method: values.dither as DitherMethod | undefined,
+        palette: values.palette === "block" ? "block" : "map",
+        gamutMap: values.gamut ? Number(values.gamut) : undefined,
+      });
       writeFileSync(out, png);
       process.stdout.write(`✓ preview (source | block-art) → ${out} (${png.length} bytes)\n`);
       return 0;
