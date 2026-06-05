@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mineworld-wm"
+version = "0.0.0"
+description = "mineworld — neural Minecraft world model (server AR + browser latent-diffusion)"
+requires-python = ">=3.10"
+dependencies = [
+  "torch>=2.4",
+  "numpy>=1.26",
+  "pillow>=10.0",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mineworld_wm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
