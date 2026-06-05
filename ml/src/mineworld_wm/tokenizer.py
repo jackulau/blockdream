@@ -119,6 +119,13 @@ class Tokenizer(nn.Module):
         _, _, idx = self.vq(self.encode(x))
         return idx
 
+    def decode_tokens(self, idx: torch.Tensor) -> torch.Tensor:
+        """Discrete token grid (B, h, w) → image. Requires a VQ codebook."""
+        if self.vq is None:
+            raise RuntimeError("decode_tokens() requires vq_codebook_size > 0")
+        z = self.vq.embedding(idx).permute(0, 3, 1, 2).contiguous()  # (B, C, h, w)
+        return self.decode(z)
+
     def forward(self, x: torch.Tensor) -> TokenizerOutput:
         z = self.encode(x)
         vq_loss = torch.zeros((), device=x.device)
