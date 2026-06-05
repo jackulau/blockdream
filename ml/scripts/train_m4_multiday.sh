@@ -37,8 +37,10 @@ echo "[multiday] resumable: re-run this command any time to continue from $OUT/l
 
 if [ "$DRY" = "1" ]; then echo "[multiday] --dry-run: nothing launched."; exit 0; fi
 
-# 1) build/extend the pool (resumable — skips already-cached segments)
-"$PY" -m mineworld_wm.data_pool --segments "$SEGMENTS" --seconds "$SECONDS_" --size "$SIZE" --fps "$FPS" --out "$POOL"
+# 1) build/extend the pool (resumable — skips already-cached segments).
+# Tagged "general" (VPT contractor = walking/mining). Add elytra/boat/pig by building
+# more tagged pools and passing --pools (see docs/movement-types.md).
+"$PY" -m mineworld_wm.data_pool --segments "$SEGMENTS" --seconds "$SECONDS_" --size "$SIZE" --fps "$FPS" --out "$POOL" --skill general
 
 # 2) train, auto-restarting on crash (resume is automatic), until STOP or step targets
 mkdir -p "$OUT"

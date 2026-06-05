@@ -22,10 +22,10 @@ from PIL import Image
 
 from .config import config_from_dict
 from .tokenizer import Tokenizer
-from .actions import ActionEncoder
 from .transition_ar import ARTransition
 from .train_real import make_config
-from .data_pool import load_pool
+from .data_pool import load_pools
+from .movement import SkillRealEncoder, N_MOVEMENT
 from .device import pick_device, device_name
 
 
@@ -59,7 +59,8 @@ def _dump_sample(tok: Tokenizer, frames: torch.Tensor, val_idx: np.ndarray, out:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("mineworld_wm.train_long")
-    ap.add_argument("--pool", required=True)
+    ap.add_argument("--pool", default=None, help="single pool dir")
+    ap.add_argument("--pools", default=None, help="comma-separated tagged pool dirs (multi-skill)")
     ap.add_argument("--out", required=True)
     ap.add_argument("--preset", default="m4")
     ap.add_argument("--device", default="auto")
@@ -78,11 +79,13 @@ def main(argv: list[str] | None = None) -> int:
     dev = pick_device(args.device)
     torch.manual_seed(args.seed)
 
-    # data
-    frames_np, actions_np, pairs = load_pool(args.pool)
+    # data (one or more movement-type-tagged pools)
+    dirs = args.pools.split(",") if args.pools else [args.pool]
+    frames_np, actions_np, pairs, skills_np = load_pools(dirs)
     frames = torch.from_numpy(frames_np).float().permute(0, 3, 1, 2) / 255.0  # (N,3,H,W) on CPU
     buttons = torch.from_numpy(actions_np[:, :9]).float()
     camera = torch.from_numpy(actions_np[:, 9:]).float()
+    skills = torch.from_numpy(skills_np).long()
     H = frames.shape[2]
     cfg = make_config(H, args.preset)
     n_tokens = cfg.latent_size**2
@@ -94,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     val_frames_idx = np.unique(val_pairs.reshape(-1))
 
     tok = Tokenizer(cfg.tokenizer).to(dev)
-    enc = ActionEncoder(cfg.action).to(dev)
+    enc = SkillRealEncoder(cfg.action, N_MOVEMENT).to(dev)  # movement-type conditioned
     ar = ARTransition(cfg.dynamics, n_tokens=n_tokens, codebook_size=cfg.tokenizer.vq_codebook_size, action_dim=cfg.action.embed_dim).to(dev)
     tok_opt = torch.optim.Adam(tok.parameters(), lr=args.lr)
     ar_opt = torch.optim.Adam(list(ar.parameters()) + list(enc.parameters()), lr=args.lr)
@@ -116,6 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     def save(tag: str, loss: float, val: float):
         _atomic_save({"phase": phase, "tok_step": tok_step, "ar_step": ar_step,
                       "config": cfg.to_dict(), "kind": "ar",
+                      "skill_conditioned": True, "n_skills": N_MOVEMENT,
                       "tok": tok.state_dict(), "enc": enc.state_dict(), "ar": ar.state_dict(),
                       "tok_opt": tok_opt.state_dict(), "ar_opt": ar_opt.state_dict(),
                       "tokenizer": tok.state_dict(), "action": enc.state_dict(), "transition": ar.state_dict(),
@@ -170,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         sel = pair_arr[np.random.randint(0, len(pair_arr), args.batch)]
         prev = tokens[sel[:, 0]].to(dev)
         nxt = tokens[sel[:, 1]].to(dev)
-        action = enc(buttons[sel[:, 0]].to(dev), camera[sel[:, 0]].to(dev))
+        action = enc(buttons[sel[:, 0]].to(dev), camera[sel[:, 0]].to(dev), skill=skills[sel[:, 0]].to(dev))
         return prev, nxt, action
 
     while phase == "ar" and ar_step < args.ar_steps and not time_up():

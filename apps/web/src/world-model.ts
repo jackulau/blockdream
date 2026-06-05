@@ -41,11 +41,21 @@ function sendReset() {
   ws?.send(JSON.stringify({ type: "reset" }));
 }
 
+// map the demo selector to a movement-type (skill) the conditioned model understands
+const DEMO_SKILL: Record<string, string> = {
+  walking: "walk", boat: "boat", elytra: "elytra", world: "general", gameplay: "general",
+};
+
 function sendAction() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const a = actionFromKeys(held);
   sentAt = performance.now();
-  ws.send(JSON.stringify({ type: "action", buttons: a.buttons, camera: a.camera }));
+  ws.send(JSON.stringify({
+    type: "action",
+    buttons: a.buttons,
+    camera: a.camera,
+    skill: DEMO_SKILL[demoSel.value] ?? "general", // movement type from the selector
+  }));
 }
 
 function onFrame(msg: { shape: number[]; png_b64: string }) {

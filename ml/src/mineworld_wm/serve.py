@@ -56,6 +56,8 @@ class WorldModelSession:
         self._prev: torch.Tensor | None = None
         # default seed frame for reset() (set by load_demo_session to a centered agent)
         self.default_init: torch.Tensor | None = None
+        # current movement type (skill id) for a skill-conditioned model
+        self.skill: int = 0
 
     @torch.no_grad()
     def reset(self, init_frame: torch.Tensor | None = None) -> StepResult:
@@ -73,6 +75,8 @@ class WorldModelSession:
     def step(self, buttons: torch.Tensor, camera: torch.Tensor) -> StepResult:
         if self._prev is None:
             self.reset()
+        if hasattr(self.enc, "default_skill"):
+            self.enc.default_skill = self.skill  # condition on the selected movement type
         action = self.enc(buttons.view(1, -1), camera.view(1, 2))
         if self.kind == "ar":
             nxt = self.trans.generate(self._prev, action)  # (1, N)
@@ -93,8 +97,18 @@ class RolloutServer:
     def __init__(self, session: WorldModelSession):
         self.session = session
 
+    def _set_skill(self, msg: dict) -> None:
+        if "skill" in msg and msg["skill"] is not None:
+            from .movement import skill_id
+            s = msg["skill"]
+            self.session.skill = skill_id(s) if isinstance(s, str) else int(s)
+
     def handle(self, msg: dict) -> dict:
         t = msg.get("type")
+        self._set_skill(msg)  # any message may carry a "skill" (movement type)
+        if t == "skill":
+            from .movement import MOVEMENT_TYPES
+            return {"type": "ok", "skill": MOVEMENT_TYPES[self.session.skill]}
         if t == "reset":
             r = self.session.reset()
         elif t == "action":
@@ -148,7 +162,7 @@ def load_demo_session(demo: str, checkpoint: str | None = None, seed: int = 0, k
 
 
 def load_real_checkpoint(path: str) -> WorldModelSession:
-    """Load a checkpoint trained on real data (train_real.py) into a session."""
+    """Load a checkpoint trained on real data (train_real.py / train_long.py)."""
     from .config import config_from_dict
     from .tokenizer import Tokenizer
     from .actions import ActionEncoder
@@ -157,7 +171,11 @@ def load_real_checkpoint(path: str) -> WorldModelSession:
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     cfg = config_from_dict(ckpt["config"])
     tok = Tokenizer(cfg.tokenizer)
-    enc = ActionEncoder(cfg.action)
+    if ckpt.get("skill_conditioned"):
+        from .movement import SkillRealEncoder, N_MOVEMENT
+        enc = SkillRealEncoder(cfg.action, ckpt.get("n_skills", N_MOVEMENT))
+    else:
+        enc = ActionEncoder(cfg.action)
     n = cfg.latent_size**2
     trans = ARTransition(cfg.dynamics, n_tokens=n, codebook_size=cfg.tokenizer.vq_codebook_size, action_dim=cfg.action.embed_dim)
     tok.load_state_dict(ckpt["tokenizer"])

@@ -17,10 +17,12 @@ from .prepare_vpt import fetch_index, fetch_jsonl, stream_frames, INDEX_URL, VPT
 from .vpt_actions import parse_vpt_action
 
 
-def prepare_pool(segments: int, seconds: float, fps: int, size: int, out: str, index_url: str = INDEX_URL) -> int:
-    """Download/extract `segments` VPT clips into out/seg_*.npz, skipping cached ones."""
+def prepare_pool(segments: int, seconds: float, fps: int, size: int, out: str, index_url: str = INDEX_URL, skill: str = "general") -> int:
+    """Download/extract `segments` VPT clips into out/seg_*.npz, skipping cached ones.
+    `skill` tags the whole pool with a movement type (written to out/skill.txt)."""
     out_dir = Path(out)
     out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "skill.txt").write_text(skill)
     idx = fetch_index(index_url)
     base, relpaths = idx["basedir"], idx["relpaths"]
     step = max(1, VPT_FPS // fps)
@@ -68,6 +70,30 @@ def load_pool(out: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return np.concatenate(frames_list), np.concatenate(actions_list), np.asarray(pairs, dtype=np.int64)
 
 
+def pool_skill(out: str) -> str:
+    f = Path(out) / "skill.txt"
+    return f.read_text().strip() if f.exists() else "general"
+
+
+def load_pools(dirs: list[str]) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Combine multiple tagged pools → (frames, actions, pairs, per-frame skill ids).
+    Pairs are offset into the combined frame array; skill id comes from each pool tag."""
+    from .movement import skill_id
+
+    frames_all, actions_all, pairs_all, skills_all = [], [], [], []
+    offset = 0
+    for d in dirs:
+        f, a, p = load_pool(d)
+        sid = skill_id(pool_skill(d))
+        frames_all.append(f)
+        actions_all.append(a)
+        pairs_all.append(p + offset)  # offset local pair indices into the combined array
+        skills_all.append(np.full(f.shape[0], sid, dtype=np.int64))
+        offset += f.shape[0]
+    return (np.concatenate(frames_all), np.concatenate(actions_all),
+            np.concatenate(pairs_all), np.concatenate(skills_all))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("mineworld_wm.data_pool")
     ap.add_argument("--segments", type=int, default=80)
@@ -75,8 +101,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--fps", type=int, default=10)
     ap.add_argument("--size", type=int, default=128)
     ap.add_argument("--out", default="ml/data/pool128")
+    ap.add_argument("--skill", default="general", help="movement type tag for this pool")
     args = ap.parse_args(argv)
-    n = prepare_pool(args.segments, args.seconds, args.fps, args.size, args.out)
+    n = prepare_pool(args.segments, args.seconds, args.fps, args.size, args.out, skill=args.skill)
     return 0 if n > 0 else 1
 
 
