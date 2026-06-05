@@ -1,5 +1,5 @@
 import { linearRgbToOklab, srgbChannelToLinear, type Lab } from "./oklab";
-import { nearestByLab, type PreparedPalette } from "./match";
+import { nearestByLab, lutNearest, type PreparedPalette } from "./match";
 import { quantizeFrame, type QuantizeOptions } from "./dither";
 import type { RgbImage, QuantizedFrame } from "./image";
 
@@ -59,13 +59,15 @@ export function quantizeVideo(
         srgbChannelToLinear(img.data[i + 1]!),
         srgbChannelToLinear(img.data[i + 2]!),
       );
-      const m = nearestByLab(target, pal);
-      let chosenIdx = m.index;
+      // fast path: LUT picks the index, then dist2 is one labDist2 (not 244)
+      const idx = opts.lut ? lutNearest(opts.lut, img.data[i]!, img.data[i + 1]!, img.data[i + 2]!) : nearestByLab(target, pal).index;
+      const bestDist2 = labDist2(target, pal.entries[idx]!.lab);
+      let chosenIdx = idx;
       if (prev) {
         const prevIdx = prev.paletteIndex[p]!;
         if (prevIdx !== chosenIdx) {
           const keepDist = labDist2(target, pal.entries[prevIdx]!.lab);
-          if (keepDist <= m.dist2 + threshold) chosenIdx = prevIdx;
+          if (keepDist <= bestDist2 + threshold) chosenIdx = prevIdx;
         }
       }
       frame.paletteIndex[p] = chosenIdx;

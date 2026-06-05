@@ -9,6 +9,7 @@ import {
   preparePalette,
   quantizeFrame,
   quantizeVideo,
+  buildRgbLut,
   type DitherMethod,
   type QuantizedFrame,
   type PreparedPalette,
@@ -68,9 +69,12 @@ function quantizeAll(
   temporalThreshold: number | undefined,
 ): QuantizedFrame[] {
   if (frames.length <= 1) {
+    // single still → exact OKLab match (best quality)
     return frames.map((f) => quantizeFrame(f, pal, { method: dither }));
   }
-  return quantizeVideo(frames, pal, { method: dither, temporalThreshold });
+  // video → prebuilt LUT for O(1)/pixel matching (≈20× faster, imperceptible penalty)
+  const lut = buildRgbLut(pal);
+  return quantizeVideo(frames, pal, { method: dither, temporalThreshold, lut });
 }
 
 /**

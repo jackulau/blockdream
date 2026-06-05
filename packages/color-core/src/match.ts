@@ -66,3 +66,40 @@ export function nearestByLab(query: Lab, pal: PreparedPalette): Match {
 export function nearestSrgb(r: number, g: number, b: number, pal: PreparedPalette): Match {
   return nearestByLab(srgbToOklab(r, g, b), pal);
 }
+
+/**
+ * Precomputed 3D RGB → palette-index lookup table for O(1) matching (the brute
+ * force is O(palette) per pixel — the lag source for video). Each cell stores the
+ * perceptually-nearest entry index, computed once via the OKLab matcher. `res`
+ * cells per axis (33 → 8-bit-ish grid, ~36k cells); higher = more accurate.
+ */
+export interface RgbLut {
+  res: number;
+  table: Int32Array;
+}
+
+export function buildRgbLut(pal: PreparedPalette, res = 33): RgbLut {
+  const table = new Int32Array(res * res * res);
+  const step = 255 / (res - 1);
+  let i = 0;
+  for (let ri = 0; ri < res; ri++) {
+    const r = ri * step;
+    for (let gi = 0; gi < res; gi++) {
+      const g = gi * step;
+      for (let bi = 0; bi < res; bi++) {
+        const b = bi * step;
+        table[i++] = nearestByLab(srgbToOklab(r, g, b), pal).index;
+      }
+    }
+  }
+  return { res, table };
+}
+
+/** O(1) nearest-palette-index lookup for an 8-bit sRGB triple via the LUT. */
+export function lutNearest(lut: RgbLut, r: number, g: number, b: number): number {
+  const s = (lut.res - 1) / 255;
+  const ri = Math.round((r < 0 ? 0 : r > 255 ? 255 : r) * s);
+  const gi = Math.round((g < 0 ? 0 : g > 255 ? 255 : g) * s);
+  const bi = Math.round((b < 0 ? 0 : b > 255 ? 255 : b) * s);
+  return lut.table[(ri * lut.res + gi) * lut.res + bi]!;
+}
