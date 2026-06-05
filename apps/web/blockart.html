@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mineworld — block-art tester</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        font: 14px/1.5 ui-sans-serif, system-ui, sans-serif;
+        background: #121315;
+        color: #e6e6e6;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      header { padding: 1rem 1.25rem; border-bottom: 1px solid #2a2c30; }
+      header h1 { margin: 0; font-size: 1.1rem; letter-spacing: 0.2px; }
+      header p { margin: 0.25rem 0 0; color: #9aa0a6; font-size: 0.85rem; }
+      main { display: flex; gap: 1.25rem; padding: 1.25rem; flex-wrap: wrap; }
+      .controls { display: flex; flex-direction: column; gap: 0.75rem; min-width: 220px; }
+      .controls label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: #b8bcc2; }
+      .controls select, .controls input[type="range"], .controls input[type="file"] { width: 100%; }
+      .canvases { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+      figure { margin: 0; }
+      figcaption { font-size: 0.75rem; color: #9aa0a6; margin-top: 0.4rem; }
+      canvas { image-rendering: pixelated; border: 1px solid #2a2c30; background: #0b0c0d; max-width: 512px; }
+      .stat { font-size: 0.8rem; color: #9aa0a6; }
+      code { color: #7dd3fc; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>mineworld · block-art tester</h1>
+      <a href="/index.html" style="color:#7dd3fc;font-size:.85rem;text-decoration:none">← home</a> <a href="/world-model.html" style="color:#7dd3fc;font-size:.85rem;text-decoration:none">world-model tester →</a>
+      <p>Drop an image to preview how it maps to the Minecraft map palette (OKLab + dithering). The full GIF/video → datapack/.mcstructure pipeline lives in the <code>mineworld</code> CLI.</p>
+    </header>
+    <main>
+      <section class="controls">
+        <label>Image
+          <input id="file" type="file" accept="image/*" />
+        </label>
+        <label>Grid width
+          <input id="grid" type="range" min="16" max="256" step="16" value="128" />
+          <span id="gridVal" class="stat">128 px</span>
+        </label>
+        <label>Dither
+          <select id="dither">
+            <option value="floyd-steinberg">Floyd–Steinberg</option>
+            <option value="bayer">Bayer (ordered)</option>
+            <option value="none">None (nearest)</option>
+          </select>
+        </label>
+        <label>Palette
+          <select id="palette">
+            <option value="map">Map colors (244)</option>
+          </select>
+        </label>
+        <div id="stats" class="stat"></div>
+      </section>
+      <section class="canvases">
+        <figure><canvas id="src" width="256" height="256"></canvas><figcaption>source</figcaption></figure>
+        <figure><canvas id="out" width="256" height="256"></canvas><figcaption>block-art</figcaption></figure>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

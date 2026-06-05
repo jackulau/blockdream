@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mineworld — world-model tester</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; background: #0e0f12; color: #e8e8ea; }
+      header { padding: 0.9rem 1.25rem; border-bottom: 1px solid #24262c; display: flex; align-items: baseline; gap: 1rem; }
+      header h1 { margin: 0; font-size: 1.05rem; }
+      header a { color: #7dd3fc; text-decoration: none; font-size: 0.85rem; }
+      main { display: flex; gap: 1.5rem; padding: 1.5rem; flex-wrap: wrap; }
+      .stage { position: relative; }
+      canvas { image-rendering: pixelated; width: 480px; height: 480px; background: #000; border: 1px solid #24262c; border-radius: 6px; }
+      .hud { position: absolute; top: 8px; left: 8px; font: 12px ui-monospace, monospace; background: rgba(0,0,0,0.55); padding: 4px 8px; border-radius: 4px; color: #b9f6ca; pointer-events: none; }
+      .panel { min-width: 240px; display: flex; flex-direction: column; gap: 0.85rem; }
+      .panel label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: #aeb2b9; }
+      .row { display: flex; gap: 0.5rem; }
+      button { background: #1c1f26; color: #e8e8ea; border: 1px solid #333842; border-radius: 5px; padding: 0.5rem 0.8rem; cursor: pointer; }
+      button:hover { background: #262a33; }
+      button.primary { background: #14532d; border-color: #1e7a43; }
+      input, select { background: #14161b; color: #e8e8ea; border: 1px solid #333842; border-radius: 5px; padding: 0.4rem; }
+      .keys { font: 12px ui-monospace, monospace; color: #9aa0a6; line-height: 1.7; }
+      kbd { background: #1c1f26; border: 1px solid #333842; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+      .status { font: 12px ui-monospace, monospace; }
+      .status.ok { color: #69f0ae; } .status.err { color: #ff8a80; } .status.idle { color: #9aa0a6; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>mineworld · world-model tester</h1>
+      <a href="/index.html">← home</a>
+      <a href="/blockart.html">block-art tester →</a>
+    </header>
+    <main>
+      <div class="stage">
+        <canvas id="screen" width="32" height="32"></canvas>
+        <div class="hud" id="hud">idle</div>
+      </div>
+      <div class="panel">
+        <label>Demo
+          <select id="demo">
+            <option value="walking">walking</option>
+            <option value="boat">boat</option>
+            <option value="elytra">elytra</option>
+            <option value="world">world</option>
+            <option value="gameplay">gameplay</option>
+          </select>
+        </label>
+        <label>Server
+          <input id="url" value="ws://127.0.0.1:8765" />
+        </label>
+        <div class="row">
+          <button id="connect" class="primary">Connect</button>
+          <button id="reset">Reset</button>
+        </div>
+        <div class="status idle" id="status">disconnected</div>
+        <div class="keys">
+          <strong>Drive</strong><br />
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move ·
+          <kbd>Space</kbd> jump · <kbd>Shift</kbd> sneak<br />
+          <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> camera (look)
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/world-model.ts"></script>
+  </body>
+</html>
