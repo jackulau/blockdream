@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "mineworld Block-Art Player",
+    "description": "Animates a block-art video on a wall using the Script API (system.runInterval + per-frame delta block placement). Bedrock's best-available 'native' real-time path — the Script API cannot paint map items, so this drives the solid-block wall.",
+    "uuid": "7c4a9b2e-1d3f-4a6b-9c8d-0e1f2a3b4c5d",
+    "version": [0, 1, 0],
+    "min_engine_version": [1, 21, 0]
+  },
+  "modules": [
+    {
+      "type": "script",
+      "language": "javascript",
+      "uuid": "9e2b1c4d-5a6f-4b7c-8d9e-0f1a2b3c4d5e",
+      "version": [0, 1, 0],
+      "entry": "scripts/main.js"
+    }
+  ],
+  "dependencies": [
+    { "module_name": "@minecraft/server", "version": "1.14.0" }
+  ]
+}

@@ -16,9 +16,20 @@ import {
 import { extractFrames } from "@mineworld/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@mineworld/emit-java";
 import { buildMcStructure } from "@mineworld/emit-bedrock";
-import { generateJavaDatapack, generateBedrockBehaviorPack, writePack } from "@mineworld/emit-commands";
+import {
+  generateJavaDatapack,
+  generateBedrockBehaviorPack,
+  generateBedrockScriptAddon,
+  writePack,
+} from "@mineworld/emit-commands";
 
-export type RenderTarget = "map" | "mcstructure" | "datapack" | "behaviorpack" | "mwframes";
+export type RenderTarget =
+  | "map"
+  | "mcstructure"
+  | "datapack"
+  | "behaviorpack"
+  | "bedrock-script"
+  | "mwframes";
 export type Edition = "java" | "bedrock";
 
 export interface RenderOptions {
@@ -143,6 +154,14 @@ export function render(opts: RenderOptions): RenderResult {
       filesWritten.push(path);
     });
     notes.push(`Bedrock .mcstructure (${frames.length} frame(s)); import with a structure block or world tool.`);
+    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
+
+  if (opts.target === "bedrock-script") {
+    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: opts.speedTicks });
+    writePack(pack, opts.out);
+    filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
+    notes.push(`Bedrock Script-API behavior pack: import behavior_pack/, then in chat: !mw start.`);
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 

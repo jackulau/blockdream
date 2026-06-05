@@ -22,7 +22,14 @@ Options:
   -h, --help
 `;
 
-const TARGETS = new Set<RenderTarget>(["map", "mcstructure", "datapack", "behaviorpack", "mwframes"]);
+const TARGETS = new Set<RenderTarget>([
+  "map",
+  "mcstructure",
+  "datapack",
+  "behaviorpack",
+  "bedrock-script",
+  "mwframes",
+]);
 const DITHERS = new Set<DitherMethod>(["floyd-steinberg", "bayer", "none"]);
 
 export function runCli(argv: string[]): number {
