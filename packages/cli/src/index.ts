@@ -2,6 +2,7 @@
 import { runCli } from "./cli";
 
 export * from "./render";
+export * from "./preview";
 export { runCli } from "./cli";
 
 // run as a CLI when invoked directly (tsx/node entrypoint)

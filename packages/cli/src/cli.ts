@@ -1,8 +1,11 @@
+import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { render, type RenderOptions, type RenderTarget, type Edition } from "./render";
+import { previewPng } from "./preview";
 import type { DitherMethod } from "@mineworld/color-core";
 
 const USAGE = `mineworld render <input> [options]
+mineworld preview <input> --out preview.png   (side-by-side source | block-art PNG)
 
 Convert a GIF/video into Minecraft block-art.
 
@@ -51,12 +54,27 @@ export function runCli(argv: string[]): number {
     },
   });
 
-  if (values.help || positionals[0] !== "render" || !positionals[1]) {
+  const verb = positionals[0];
+  if (values.help || (verb !== "render" && verb !== "preview") || !positionals[1]) {
     process.stdout.write(USAGE);
     return values.help ? 0 : 1;
   }
 
   const input = positionals[1];
+
+  if (verb === "preview") {
+    const out = values.out ?? "preview.png";
+    const grid = values.grid ? parseInt(values.grid.split("x")[0]!, 10) : 128;
+    try {
+      const png = previewPng(input, { grid, method: values.dither as DitherMethod | undefined });
+      writeFileSync(out, png);
+      process.stdout.write(`✓ preview (source | block-art) → ${out} (${png.length} bytes)\n`);
+      return 0;
+    } catch (e) {
+      process.stderr.write(`✗ preview failed: ${(e as Error).message}\n`);
+      return 1;
+    }
+  }
   const target = (values.target ?? "datapack") as RenderTarget;
   if (!TARGETS.has(target)) {
     process.stderr.write(`unknown --target ${target}\n`);

@@ -20,9 +20,9 @@ export interface FfmpegResult {
   status: number | null;
 }
 
-/** Run ffmpeg with the given args; stdout is captured as binary. */
-export function runFfmpeg(args: string[], maxBuffer = 1 << 30): FfmpegResult {
-  const r = spawnSync(ffmpegBin(), args, { maxBuffer });
+/** Run ffmpeg with the given args; stdout is captured as binary. Optional stdin input. */
+export function runFfmpeg(args: string[], maxBuffer = 1 << 30, input?: Buffer): FfmpegResult {
+  const r = spawnSync(ffmpegBin(), args, { maxBuffer, input });
   if (r.error) throw r.error;
   return {
     stdout: r.stdout ?? Buffer.alloc(0),
