@@ -7,7 +7,8 @@ const USAGE = `mineworld render <input> [options]
 Convert a GIF/video into Minecraft block-art.
 
 Options:
-  --target <t>       map | mcstructure | datapack | behaviorpack   (default: datapack)
+  --target <t>       map | mcstructure | datapack | behaviorpack | mwframes
+                       (default: datapack; mwframes = Fabric map-wall mod pool)
   --edition <e>      java | bedrock                                (map target only; default: java)
   --grid <WxH>       block grid size      (default: 128x128 for map, 64x64 otherwise)
   --fps <n>          sample frame rate    (default: source rate)
@@ -21,7 +22,7 @@ Options:
   -h, --help
 `;
 
-const TARGETS = new Set<RenderTarget>(["map", "mcstructure", "datapack", "behaviorpack"]);
+const TARGETS = new Set<RenderTarget>(["map", "mcstructure", "datapack", "behaviorpack", "mwframes"]);
 const DITHERS = new Set<DitherMethod>(["floyd-steinberg", "bayer", "none"]);
 
 export function runCli(argv: string[]): number {

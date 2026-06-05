@@ -14,11 +14,11 @@ import {
   type PreparedPalette,
 } from "@mineworld/color-core";
 import { extractFrames } from "@mineworld/video";
-import { buildMapDat, splitIntoMaps, MAP_DIM } from "@mineworld/emit-java";
+import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@mineworld/emit-java";
 import { buildMcStructure } from "@mineworld/emit-bedrock";
 import { generateJavaDatapack, generateBedrockBehaviorPack, writePack } from "@mineworld/emit-commands";
 
-export type RenderTarget = "map" | "mcstructure" | "datapack" | "behaviorpack";
+export type RenderTarget = "map" | "mcstructure" | "datapack" | "behaviorpack" | "mwframes";
 export type Edition = "java" | "bedrock";
 
 export interface RenderOptions {
@@ -103,6 +103,26 @@ export function render(opts: RenderOptions): RenderResult {
       }
     });
     notes.push(`${edition} filled-map .dat (${frames.length} frame(s)); load with an NBT/world tool or the datapack item-frame wall.`);
+    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
+
+  if (opts.target === "mwframes") {
+    const mapPal =
+      edition === "bedrock"
+        ? getBedrockMapPalette(opts.paletteVersion)
+        : getJavaMapPalette(opts.paletteVersion);
+    const pal = preparePalette(mapPal);
+    const q = quantizeAll(frames, pal, dither, opts.temporalThreshold);
+    if (opts.width % MAP_DIM !== 0 || opts.height % MAP_DIM !== 0) {
+      throw new Error(`mwframes target requires grid sizes that are multiples of ${MAP_DIM}`);
+    }
+    const pool = buildFramePool(q, opts.speedTicks);
+    const binPath = join(opts.out, "frames.bin");
+    const mapsPath = join(opts.out, "maps.txt");
+    writeFile(binPath, pool.bin);
+    writeFile(mapsPath, pool.mapsTxtTemplate);
+    filesWritten.push(binPath, mapsPath);
+    notes.push(`Fabric map-wall pool (${pool.cols}×${pool.rows} maps, ${frames.length} frames). Edit maps.txt with real map ids; the mods/java-fabric mod plays it.`);
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
