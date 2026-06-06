@@ -28,6 +28,26 @@
       canvas { image-rendering: pixelated; border: 1px solid #2a2c30; background: #0b0c0d; max-width: 512px; }
       .stat { font-size: 0.8rem; color: #9aa0a6; }
       code { color: #7dd3fc; }
+      #out { cursor: crosshair; }
+      .tooltip {
+        position: fixed; pointer-events: none; z-index: 50; display: none;
+        background: #0b0c0dee; border: 1px solid #3a3d42; border-radius: 6px;
+        padding: 0.4rem 0.55rem; font: 12px ui-monospace, monospace; color: #e6e6e6;
+        box-shadow: 0 6px 20px #000a;
+      }
+      .tooltip .sw { display: inline-block; width: 12px; height: 12px; border: 1px solid #0008; vertical-align: -2px; margin-right: 6px; image-rendering: pixelated; }
+      .tooltip .id { color: #7dd3fc; }
+      .materials { min-width: 260px; max-width: 340px; }
+      .materials h2 { font-size: 0.9rem; margin: 0 0 0.5rem; }
+      .materials label.tex { font-size: 0.75rem; color: #9aa0a6; display: flex; gap: 0.35rem; align-items: center; margin-bottom: 0.5rem; }
+      .bom { list-style: none; margin: 0; padding: 0; max-height: 560px; overflow: auto; }
+      .bom li { display: grid; grid-template-columns: 28px 1fr auto; gap: 0.5rem; align-items: center; padding: 0.25rem 0.3rem; border-radius: 5px; }
+      .bom li:nth-child(odd) { background: #ffffff08; }
+      .bom .ic { width: 26px; height: 26px; image-rendering: pixelated; border: 1px solid #0006; border-radius: 3px; }
+      .bom .nm { font-size: 0.82rem; line-height: 1.2; }
+      .bom .nm small { color: #7dd3fc; font: 11px ui-monospace, monospace; }
+      .bom .ct { text-align: right; font: 12px ui-monospace, monospace; color: #cfd3d8; }
+      .bom .ct small { display: block; color: #9aa0a6; }
     </style>
   </head>
   <body>
@@ -61,9 +81,15 @@
       </section>
       <section class="canvases">
         <figure><canvas id="src" width="256" height="256"></canvas><figcaption>source</figcaption></figure>
-        <figure><canvas id="out" width="256" height="256"></canvas><figcaption>block-art</figcaption></figure>
+        <figure><canvas id="out" width="256" height="256"></canvas><figcaption>block-art · hover to identify a block</figcaption></figure>
+      </section>
+      <section class="materials">
+        <h2>Blocks used</h2>
+        <label class="tex"><input id="useTextures" type="checkbox" /> use real block textures (CDN)</label>
+        <ul id="bom" class="bom"></ul>
       </section>
     </main>
+    <div id="tooltip" class="tooltip"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
