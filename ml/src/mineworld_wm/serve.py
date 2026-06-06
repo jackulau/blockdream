@@ -78,7 +78,7 @@ class WorldModelSession:
             self.reset()
         if hasattr(self.enc, "default_skill"):
             self.enc.default_skill = self.skill  # condition on the selected movement type
-        action = self.enc(buttons.view(1, -1), camera.view(1, 2))
+        action = self.enc(buttons.view(1, -1).to(self.device), camera.view(1, 2).to(self.device))
         if self.kind == "ar":
             nxt = self.trans.generate(self._prev, action)  # (1, N)
             grid = int(nxt.shape[1] ** 0.5)
@@ -162,13 +162,15 @@ def load_demo_session(demo: str, checkpoint: str | None = None, seed: int = 0, k
     return session
 
 
-def load_real_checkpoint(path: str) -> WorldModelSession:
+def load_real_checkpoint(path: str, device: str = "auto") -> WorldModelSession:
     """Load a checkpoint trained on real data (train_real.py / train_long.py)."""
     from .config import config_from_dict
     from .tokenizer import Tokenizer
     from .actions import ActionEncoder
     from .transition_ar import ARTransition
+    from .device import pick_device, device_name
 
+    dev = pick_device(device)
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     cfg = config_from_dict(ckpt["config"])
     tok = Tokenizer(cfg.tokenizer)
@@ -182,9 +184,10 @@ def load_real_checkpoint(path: str) -> WorldModelSession:
     tok.load_state_dict(ckpt["tokenizer"])
     enc.load_state_dict(ckpt["action"])
     trans.load_state_dict(ckpt["transition"])
-    session = WorldModelSession(cfg, tok, enc, trans)
+    session = WorldModelSession(cfg, tok, enc, trans, device=dev)
     if ckpt.get("init_frame") is not None:
         session.default_init = ckpt["init_frame"]
+    print(f"[serve] world model on {device_name(dev)} ({n} tokens/frame, KV-cached)")
     return session
 
 
@@ -199,10 +202,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     ap.add_argument("--kind", default="ar", choices=["ar", "diffusion"])
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
+    # CPU beats MPS for this sequential token-by-token decode — 256 tiny per-step kernel
+    # launches make GPU dispatch overhead dominate (measured 450ms CPU vs 1066ms MPS/frame).
+    ap.add_argument("--device", default="cpu")
     args = ap.parse_args(argv)
 
     if args.real:
-        session = load_real_checkpoint(args.real)
+        session = load_real_checkpoint(args.real, device=args.device)
     else:
         session = load_demo_session(args.demo, args.checkpoint, kind=args.kind)
     server = RolloutServer(session)
