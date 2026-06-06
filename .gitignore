@@ -30,3 +30,7 @@ out/
 *.mcstructure
 *.litematic
 map_*.dat
+
+# Minecraft block textures — extracted locally from the official client jar, NOT redistributed
+apps/web/public/blocks/
+apps/web/scripts/.cache/
