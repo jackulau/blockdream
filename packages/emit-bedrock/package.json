@@ -4,7 +4,9 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run"
@@ -12,7 +14,10 @@
   "dependencies": {
     "@mineworld/palette": "workspace:*",
     "@mineworld/color-core": "workspace:*",
-    "@mineworld/nbt": "workspace:*"
+    "@mineworld/nbt": "workspace:*",
+    "@mineworld/voxel": "workspace:*"
   },
-  "files": ["src"]
+  "files": [
+    "src"
+  ]
 }

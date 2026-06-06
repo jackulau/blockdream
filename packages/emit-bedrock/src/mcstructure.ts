@@ -1,5 +1,6 @@
 import type { QuantizedFrame } from "@mineworld/color-core";
 import type { BlockEntry } from "@mineworld/palette";
+import { EMPTY, getVoxel, type VoxelVolume } from "@mineworld/voxel";
 import {
   Compound,
   Int,
@@ -110,6 +111,65 @@ export function buildMcStructure(
     structure_world_origin: List(TAG.Int, [Int(0), Int(0), Int(0)]),
   });
 
+  return writeNbt("", root, "little");
+}
+
+/**
+ * Emit a REAL 3D Bedrock `.mcstructure` from a VoxelVolume (depth = volume.sz, not the
+ * flat 1-thick wall). Air voxels become the fill block. Bedrock index order is
+ * x outer → y → z; Y is taken as-is (the voxel engine already orients Y up).
+ */
+export function buildVoxelMcStructure(
+  volume: VoxelVolume,
+  blockFor: (mapColorId: number) => BlockRef | undefined,
+  opts: McStructureOptions = {},
+): Buffer {
+  const W = volume.sx;
+  const H = volume.sy;
+  const D = volume.sz;
+  const fill = opts.fill ?? { name: "minecraft:air" };
+  const blockVersion = opts.blockVersion ?? DEFAULT_BLOCK_VERSION;
+
+  const paletteIndex = new Map<string, number>();
+  const blockPalette: NbtValue[] = [];
+  const intern = (b: BlockRef): number => {
+    const key = `${b.name}|${JSON.stringify(b.states ?? {})}`;
+    let idx = paletteIndex.get(key);
+    if (idx === undefined) {
+      idx = blockPalette.length;
+      paletteIndex.set(key, idx);
+      blockPalette.push(Compound({ name: Str(b.name), states: statesCompound(b.states), version: Int(blockVersion) }));
+    }
+    return idx;
+  };
+  intern(fill);
+
+  const layer0: NbtValue[] = new Array(W * H * D);
+  const layer1: NbtValue[] = new Array(W * H * D);
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      for (let z = 0; z < D; z++) {
+        const idx = (x * H + y) * D + z;
+        const id = getVoxel(volume, x, y, z);
+        const block = id === EMPTY ? fill : (blockFor(id) ?? fill);
+        layer0[idx] = Int(intern(block));
+        layer1[idx] = Int(-1);
+      }
+    }
+  }
+
+  const root = Compound({
+    format_version: Int(1),
+    size: List(TAG.Int, [Int(W), Int(H), Int(D)]),
+    structure: Compound({
+      block_indices: List(TAG.List, [List(TAG.Int, layer0), List(TAG.Int, layer1)]),
+      entities: List(TAG.Compound, []),
+      palette: Compound({
+        default: Compound({ block_palette: List(TAG.Compound, blockPalette), block_position_data: Compound({}) }),
+      }),
+    }),
+    structure_world_origin: List(TAG.Int, [Int(0), Int(0), Int(0)]),
+  });
   return writeNbt("", root, "little");
 }
 

@@ -2,5 +2,7 @@ export * from "./delta";
 export * from "./chunk";
 export * from "./validate";
 export * from "./datapack";
+export * from "./datapack3d";
+export * from "./fill";
 export * from "./behaviorpack";
 export * from "./bedrock-script";
