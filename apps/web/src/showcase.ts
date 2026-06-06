@@ -129,6 +129,23 @@ const ba = createBlockArt({
 });
 ba.loadUrl("/test-assets/pixelart.png"); // preload sample so the section is alive on load
 
+// drag & drop an image onto the block-art canvases
+const baDrop = $<HTMLDivElement>("ba-drop");
+for (const e of ["dragenter", "dragover"]) {
+  baDrop.addEventListener(e, (ev) => {
+    ev.preventDefault();
+    baDrop.classList.add("drag");
+  });
+}
+for (const e of ["dragleave", "drop"]) {
+  baDrop.addEventListener(e, () => baDrop.classList.remove("drag"));
+}
+baDrop.addEventListener("drop", (ev) => {
+  ev.preventDefault();
+  const f = (ev as DragEvent).dataTransfer?.files?.[0];
+  if (f && f.type.startsWith("image/")) ba.loadUrl(URL.createObjectURL(f));
+});
+
 // Download a vanilla datapack that builds the current image as a block-wall.
 $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
   const q = ba.getFrame();
@@ -272,6 +289,7 @@ async function setup3dViewer(): Promise<void> {
     current3d = spin(imageToVolume(q, { mode: "flat", depth: Number(depth.value) }), 24, "y");
     viewer.setFrames(current3d);
     scrub.max = String(current3d.length - 1);
+    $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
     playBtn.textContent = "pause";
     hud.textContent = `${current3d.length} frames · drag to orbit`;
@@ -295,6 +313,7 @@ async function setup3dViewer(): Promise<void> {
     current3d = frames;
     viewer.setFrames(frames);
     scrub.max = String(frames.length - 1);
+    $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
     playBtn.textContent = "pause";
     hud.textContent = `${label} · ${frames.length} frame${frames.length > 1 ? "s" : ""} · drag to orbit`;
@@ -304,6 +323,8 @@ async function setup3dViewer(): Promise<void> {
   $<HTMLInputElement>("v3-import").addEventListener("change", async (ev) => {
     const file = (ev.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    viewer.pause(); // stop the render loop overwriting the status line
+    playBtn.textContent = "play";
     hud.textContent = `importing ${file.name}…`;
     try {
       if (/\.obj$/i.test(file.name)) {

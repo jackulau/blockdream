@@ -61,7 +61,11 @@
       select, input[type="range"], input[type="file"], button.ui {
         background: #0f1217; color: var(--ink); border: 1px solid #2b3038; border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.85rem;
       }
-      button.ui { cursor: pointer; }
+      button.ui { cursor: pointer; transition: border-color 0.15s, opacity 0.15s; }
+      button.ui:hover:not(:disabled) { border-color: var(--acc); }
+      button.ui:disabled { opacity: 0.45; cursor: not-allowed; }
+      :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+      #ba-drop.drag { outline: 2px dashed var(--acc); outline-offset: 6px; border-radius: 10px; }
       .hud { font: 12px/1.5 ui-monospace, monospace; color: #9be7a6; white-space: pre; margin-top: 0.5rem; min-height: 3em; }
       .pill { font: 11px ui-monospace, monospace; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); }
       .pill.ok { color: #69f0ae; border-color: #1e5e3a; } .pill.err { color: #ff8a80; border-color: #5e2320; } .pill.idle { color: var(--dim); }
@@ -175,8 +179,8 @@
             </label>
             <div id="ba-stats" style="font-size:.78rem;color:var(--dim)"></div>
           </div>
-          <div class="canvases">
-            <figure><canvas id="ba-src" width="220" height="220"></canvas><figcaption>source</figcaption></figure>
+          <div class="canvases" id="ba-drop">
+            <figure><canvas id="ba-src" width="220" height="220"></canvas><figcaption>source · drag &amp; drop an image</figcaption></figure>
             <figure><canvas id="ba-out" width="128" height="128"></canvas><figcaption>block-art · hover to identify a block</figcaption></figure>
           </div>
           <div class="materials">
@@ -208,7 +212,7 @@
               <input id="v3-depth" type="range" min="1" max="8" step="1" value="3" />
             </label>
             <button id="v3-rebuild" class="ui">build 3D from image</button>
-            <button id="v3-download" class="ui">Download 3D datapack</button>
+            <button id="v3-download" class="ui" disabled>Download 3D datapack</button>
           </div>
           <div class="row">
             <label class="ui" style="cursor:pointer">import .obj / .gif → blocks
