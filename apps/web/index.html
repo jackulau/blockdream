@@ -53,7 +53,7 @@
       .card h3 { margin: 0 0 0.1rem; font-size: 1.02rem; display: flex; align-items: center; gap: 0.5rem; }
       .card .sub { color: var(--dim); font-size: 0.82rem; margin: 0 0 0.8rem; }
       .stage { display: flex; gap: 0.9rem; align-items: flex-start; flex-wrap: wrap; }
-      canvas { image-rendering: pixelated; background: #000; border: 1px solid var(--line); border-radius: 8px; }
+      canvas { image-rendering: pixelated; background: #000; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; }
       .mc-canvas { width: 320px; height: 320px; }
       .dr-rgb { width: 260px; height: 260px; }
       .dr-bev { width: 150px; height: 150px; }
@@ -196,7 +196,7 @@
         <p class="desc">The custom voxel engine extrudes the image into a 3D block build and spins it into an animation — the same volumes the command-block builder emits as a vanilla datapack. Drag to orbit; play/scrub the spin. Real block textures.</p>
         <div class="card" style="max-width:720px">
           <div class="stage">
-            <canvas id="v3-canvas" style="width:480px;height:360px;border-radius:8px"></canvas>
+            <canvas id="v3-canvas" style="width:480px;max-width:100%;aspect-ratio:4/3;height:auto;border-radius:8px"></canvas>
           </div>
           <div class="row">
             <button id="v3-play" class="ui">play</button>
