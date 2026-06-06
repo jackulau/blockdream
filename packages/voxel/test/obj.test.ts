@@ -40,4 +40,19 @@ describe("objToVolume", () => {
   it("throws on an empty/invalid .obj", () => {
     expect(() => objToVolume("# nothing here")).toThrow();
   });
+
+  it("throws on a malformed (non-numeric) vertex instead of producing NaN voxels", () => {
+    expect(() => parseObj("v 0 0 0\nv nan x 1\nf 1 2 1")).toThrow(/malformed vertex/);
+    expect(() => objToVolume("v 0 0 0\nv 1 oops 0\nv 0 1 1\nf 1 2 3")).toThrow(/malformed vertex/);
+  });
+
+  it("solid:true fills the interior (no hollow centre)", () => {
+    const hollow = objToVolume(CUBE, { resolution: 8, mapColorId: 5 });
+    const solid = objToVolume(CUBE, { resolution: 8, mapColorId: 5, solid: true });
+    expect(getVoxel(hollow, 4, 4, 4)).toBe(EMPTY); // shell only
+    expect(getVoxel(solid, 4, 4, 4)).toBe(5); // interior filled
+    expect(countSolid(solid)).toBeGreaterThan(countSolid(hollow));
+    // boundary stays open (it's "outside", never filled)
+    expect(getVoxel(solid, 0, 0, 0)).toBe(5); // corner is on the shell, so still solid
+  });
 });

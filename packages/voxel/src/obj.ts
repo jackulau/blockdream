@@ -2,11 +2,12 @@
 // grid (a voxel shell of the mesh). Pure TS: parse `v`/`f`, normalize the mesh into a
 // resolution³ box, and densely sample every triangle so no crossed voxel is missed.
 
-import { createVolume, setVoxel, type VoxelVolume } from "./volume";
+import { createVolume, getVoxel, setVoxel, EMPTY, type VoxelVolume } from "./volume";
 
 export interface ObjVoxelizeOptions {
   resolution?: number; // cube grid size (default 32)
   mapColorId?: number; // block colour id to fill the shell with (default 0)
+  solid?: boolean; // fill the interior too (flood-fill from outside), not just the surface shell
 }
 
 type V3 = [number, number, number];
@@ -17,7 +18,11 @@ export function parseObj(obj: string): { verts: V3[]; tris: [number, number, num
   for (const line of obj.split(/\r?\n/)) {
     const t = line.trim().split(/\s+/);
     if (t[0] === "v" && t.length >= 4) {
-      verts.push([Number(t[1]), Number(t[2]), Number(t[3])]);
+      const x = Number(t[1]), y = Number(t[2]), z = Number(t[3]);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+        throw new Error(`malformed vertex in .obj (non-numeric coordinate): "${line.trim()}"`);
+      }
+      verts.push([x, y, z]);
     } else if (t[0] === "f" && t.length >= 4) {
       const idx = t.slice(1).map((s) => {
         const n = parseInt(s.split("/")[0]!, 10);
@@ -68,5 +73,41 @@ export function objToVolume(obj: string, opts: ObjVoxelizeOptions = {}): VoxelVo
       }
     }
   }
+  if (opts.solid) solidify(vol, color);
   return vol;
+}
+
+/**
+ * Fill a watertight shell's interior. Flood-fills EMPTY from the grid boundary (6-connected)
+ * to mark "outside"; every EMPTY cell the flood never reaches is interior → set to `color`.
+ * Robust to a one-cell border because the rasterized shell is normalized to fit inside the
+ * grid (it never touches all six faces), so the boundary is reliably outside.
+ */
+function solidify(vol: VoxelVolume, color: number): void {
+  const { sx, sy, sz } = vol;
+  const outside = new Uint8Array(sx * sy * sz);
+  const at = (x: number, y: number, z: number) => (z * sy + y) * sx + x;
+  const stack: number[] = [];
+  const pushIfOpen = (x: number, y: number, z: number) => {
+    if (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) return;
+    const i = at(x, y, z);
+    if (outside[i] || getVoxel(vol, x, y, z) !== EMPTY) return;
+    outside[i] = 1;
+    stack.push(x, y, z);
+  };
+  // seed from every boundary cell
+  for (let z = 0; z < sz; z++)
+    for (let y = 0; y < sy; y++)
+      for (let x = 0; x < sx; x++)
+        if (x === 0 || y === 0 || z === 0 || x === sx - 1 || y === sy - 1 || z === sz - 1) pushIfOpen(x, y, z);
+  while (stack.length) {
+    const z = stack.pop()!, y = stack.pop()!, x = stack.pop()!;
+    pushIfOpen(x + 1, y, z); pushIfOpen(x - 1, y, z);
+    pushIfOpen(x, y + 1, z); pushIfOpen(x, y - 1, z);
+    pushIfOpen(x, y, z + 1); pushIfOpen(x, y, z - 1);
+  }
+  for (let z = 0; z < sz; z++)
+    for (let y = 0; y < sy; y++)
+      for (let x = 0; x < sx; x++)
+        if (getVoxel(vol, x, y, z) === EMPTY && !outside[at(x, y, z)]) setVoxel(vol, x, y, z, color);
 }
