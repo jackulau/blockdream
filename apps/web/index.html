@@ -182,6 +182,10 @@
           <div class="materials">
             <h3>Blocks used</h3>
             <label class="tex"><input id="ba-useTextures" type="checkbox" /> use real block textures</label>
+            <div class="row" style="margin-bottom:.5rem">
+              <button id="ba-download" class="ui" disabled>Download datapack (.zip)</button>
+            </div>
+            <div id="ba-export" style="font-size:.74rem;color:var(--dim);margin-bottom:.5rem"></div>
             <ul id="ba-bom" class="bom"></ul>
           </div>
         </div>
@@ -199,7 +203,15 @@
             <input id="v3-scrub" type="range" min="0" max="0" value="0" style="flex:1;min-width:160px" />
             <label style="font-size:.8rem;color:var(--dim)"><input id="v3-spin" type="checkbox" checked /> spin</label>
           </div>
+          <div class="row">
+            <label style="font-size:.78rem;color:var(--dim)">auto-3D depth
+              <input id="v3-depth" type="range" min="1" max="8" step="1" value="3" />
+            </label>
+            <button id="v3-rebuild" class="ui">build 3D from image</button>
+            <button id="v3-download" class="ui">Download 3D datapack</button>
+          </div>
           <div id="v3-hud" class="hud">building…</div>
+          <div id="v3-export" style="font-size:.74rem;color:var(--dim)"></div>
         </div>
       </section>
 

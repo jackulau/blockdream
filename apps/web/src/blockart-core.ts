@@ -27,7 +27,14 @@ export interface BlockArtEls {
   useTextures: HTMLInputElement;
 }
 
-export function createBlockArt(els: BlockArtEls): { loadUrl: (url: string) => void } {
+export interface BlockArtOpts {
+  onRender?: (q: QuantizedFrame) => void; // fired after each (re)quantize — e.g. enable export / rebuild 3D
+}
+
+export function createBlockArt(
+  els: BlockArtEls,
+  opts: BlockArtOpts = {},
+): { loadUrl: (url: string) => void; getFrame: () => QuantizedFrame | null } {
   const pal: PreparedPalette = preparePalette(javaMapPalette as unknown as MapPalette);
   let lastImage: HTMLImageElement | null = null;
   let lastQ: QuantizedFrame | null = null;
@@ -124,6 +131,7 @@ export function createBlockArt(els: BlockArtEls): { loadUrl: (url: string) => vo
     const distinct = new Set(q.mapColorId).size;
     els.stats.textContent = `${q.width}×${q.height} · ${counts.size} blocks · ${distinct} colors · ${dt.toFixed(1)} ms`;
     renderBom(counts, q.width * q.height);
+    opts.onRender?.(q);
   }
 
   function loadImage(img: HTMLImageElement): void {
@@ -192,5 +200,5 @@ export function createBlockArt(els: BlockArtEls): { loadUrl: (url: string) => vo
     img.onload = () => loadImage(img);
     img.src = url;
   }
-  return { loadUrl };
+  return { loadUrl, getFrame: () => lastQ };
 }

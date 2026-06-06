@@ -9,9 +9,14 @@ import { createBlockArt } from "./blockart-core";
 import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-core";
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@mineworld/palette";
-import { imageToVolume, spin } from "@mineworld/voxel";
+import { imageToVolume, spin, type VoxelVolume } from "@mineworld/voxel";
+import { generateJavaDatapack, generateVoxelDatapack, fillBatch } from "@mineworld/emit-commands";
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, loadTextureManifest } from "./blocks";
+import { downloadDatapack } from "./datapack-export";
+
+// map-colour id → Minecraft block id (baseId = id>>2); air for unmapped
+const resolveBlock = (mapColorId: number) => blockForBase(mapColorId >> 2)?.id ?? "minecraft:air";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const MC_URL = "ws://127.0.0.1:8765";
@@ -115,8 +120,23 @@ const ba = createBlockArt({
   bom: $<HTMLUListElement>("ba-bom"),
   tooltip: $<HTMLDivElement>("ba-tooltip"),
   useTextures: $<HTMLInputElement>("ba-useTextures"),
+}, {
+  onRender: (q) => {
+    const dl = $<HTMLButtonElement>("ba-download");
+    dl.disabled = false;
+    $<HTMLDivElement>("ba-export").textContent = `${q.width}×${q.height} = ${q.width * q.height} blocks · 1 frame`;
+  },
 });
 ba.loadUrl("/test-assets/pixelart.png"); // preload sample so the section is alive on load
+
+// Download a vanilla datapack that builds the current image as a block-wall.
+$<HTMLButtonElement>("ba-download").addEventListener("click", () => {
+  const q = ba.getFrame();
+  if (!q) return;
+  const pack = generateJavaDatapack([q], resolveBlock, { namespace: "mineworld_art" });
+  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function mineworld_art:setup`;
+  downloadDatapack("mineworld-blockart-datapack", pack.files);
+});
 
 // auto-connect both world models so the page "just works"
 mcViewer.connect();
@@ -170,17 +190,62 @@ async function setup3dViewer(): Promise<void> {
     },
   });
 
-  const img = new Image();
-  img.onload = () => {
-    const rgb = rgbImageFromImg(img, 28);
-    const q = quantizeFrame(rgb, pal3d, { method: "none" });
-    const frames = spin(imageToVolume(q, { mode: "flat", depth: 3 }), 24, "y");
-    viewer.setFrames(frames);
-    scrub.max = String(frames.length - 1);
+  const depth = $<HTMLInputElement>("v3-depth");
+  let current3d: VoxelVolume[] = [];
+  let lastSource: ReturnType<typeof quantizeFrame> | null = null;
+
+  // nearest-downscale a quantized frame so the voxel volume stays light (3D = W×H×depth × frames)
+  function downscale(q: ReturnType<typeof quantizeFrame>, maxW: number) {
+    if (q.width <= maxW) return q;
+    const s = q.width / maxW;
+    const w = maxW;
+    const h = Math.max(1, Math.round(q.height / s));
+    const mapColorId = new Uint8Array(w * h);
+    const paletteIndex = new Int32Array(w * h);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const p = Math.min(q.height - 1, Math.floor(y * s)) * q.width + Math.min(q.width - 1, Math.floor(x * s));
+        mapColorId[y * w + x] = q.mapColorId[p]!;
+        paletteIndex[y * w + x] = q.paletteIndex[p]!;
+      }
+    return { width: w, height: h, mapColorId, paletteIndex };
+  }
+
+  function build3d(q: ReturnType<typeof quantizeFrame>): void {
+    lastSource = q;
+    current3d = spin(imageToVolume(q, { mode: "flat", depth: Number(depth.value) }), 24, "y");
+    viewer.setFrames(current3d);
+    scrub.max = String(current3d.length - 1);
     viewer.play();
     playBtn.textContent = "pause";
-  };
+    hud.textContent = `${current3d.length} frames · drag to orbit`;
+  }
+
+  // initial source = the preloaded sample image
+  const img = new Image();
+  img.onload = () => build3d(quantizeFrame(rgbImageFromImg(img, 28), pal3d, { method: "none" }));
   img.src = "/test-assets/pixelart.png";
+
+  // "build 3D from image" voxelizes the CURRENT block-art image (downscaled) one-click
+  $<HTMLButtonElement>("v3-rebuild").addEventListener("click", () => {
+    const q = ba.getFrame();
+    build3d(q ? downscale(q, 32) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 28), pal3d, { method: "none" }));
+  });
+  depth.addEventListener("input", () => {
+    if (lastSource) build3d(lastSource);
+  });
+
+  // Download a vanilla datapack that builds the 3D spin animation (fill-batched)
+  $<HTMLButtonElement>("v3-download").addEventListener("click", () => {
+    if (!current3d.length) return;
+    const pack = generateVoxelDatapack(current3d, resolveBlock, {
+      namespace: "mineworld_3d",
+      optimize: (cells, r) => fillBatch(cells, r),
+    });
+    $<HTMLDivElement>("v3-export").textContent =
+      `3D datapack: ${pack.totalSetblocks} blocks · ${pack.frameCount} frames · /function mineworld_3d:setup`;
+    downloadDatapack("mineworld-3d-datapack", pack.files);
+  });
 
   playBtn.addEventListener("click", () => {
     if (viewer.isPlaying) {
