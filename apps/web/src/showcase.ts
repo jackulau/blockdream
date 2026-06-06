@@ -9,7 +9,7 @@ import { createBlockArt } from "./blockart-core";
 import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-core";
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@mineworld/palette";
-import { imageToVolume, spin, type VoxelVolume } from "@mineworld/voxel";
+import { imageToVolume, spin, objToVolume, type VoxelVolume } from "@mineworld/voxel";
 import { generateJavaDatapack, generateVoxelDatapack, fillBatch } from "@mineworld/emit-commands";
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, loadTextureManifest } from "./blocks";
@@ -150,6 +150,62 @@ for (const e of pal3d.entries) {
   hexByMap.set(c.mapColorId, (c.r << 16) | (c.g << 8) | c.b);
 }
 
+// a neutral mid-gray solid block id for monochrome .obj imports (low channel spread, mid brightness)
+let grayId = 0;
+{
+  let best = Infinity;
+  for (const e of pal3d.entries) {
+    const { r, g, b, mapColorId } = e.color;
+    const mean = (r + g + b) / 3;
+    const spread = Math.abs(r - mean) + Math.abs(g - mean) + Math.abs(b - mean);
+    const score = spread + Math.abs(mean - 130);
+    if (score < best && blockForBase(mapColorId >> 2)) {
+      best = score;
+      grayId = mapColorId;
+    }
+  }
+}
+
+// downscale any canvas to an RgbImage for quantization
+function rgbImageFromCanvas(src: HTMLCanvasElement, gridW: number): RgbImage {
+  const aspect = src.height / src.width || 1;
+  const w = Math.min(gridW, src.width);
+  const h = Math.max(1, Math.round(w * aspect));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(src, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const out = new Uint8Array(w * h * 3);
+  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    out[j] = data[i]!;
+    out[j + 1] = data[i + 1]!;
+    out[j + 2] = data[i + 2]!;
+  }
+  return { width: w, height: h, data: out };
+}
+
+// decode an animated GIF to per-frame canvases via the browser ImageDecoder API
+async function decodeGif(file: File): Promise<HTMLCanvasElement[]> {
+  const Dec = (window as unknown as { ImageDecoder?: any }).ImageDecoder;
+  if (!Dec) throw new Error("ImageDecoder unsupported in this browser");
+  const dec = new Dec({ data: await file.arrayBuffer(), type: file.type || "image/gif" });
+  await dec.tracks.ready;
+  const count = dec.tracks.selectedTrack?.frameCount ?? 1;
+  const out: HTMLCanvasElement[] = [];
+  for (let i = 0; i < count; i++) {
+    const { image } = await dec.decode({ frameIndex: i });
+    const c = document.createElement("canvas");
+    c.width = image.displayWidth;
+    c.height = image.displayHeight;
+    c.getContext("2d")!.drawImage(image, 0, 0);
+    out.push(c);
+    image.close();
+  }
+  return out;
+}
+
 function rgbImageFromImg(img: HTMLImageElement, gridW: number): RgbImage {
   const aspect = img.naturalHeight / img.naturalWidth || 1;
   const w = gridW;
@@ -233,6 +289,35 @@ async function setup3dViewer(): Promise<void> {
   });
   depth.addEventListener("input", () => {
     if (lastSource) build3d(lastSource);
+  });
+
+  function showFrames(frames: VoxelVolume[], label: string): void {
+    current3d = frames;
+    viewer.setFrames(frames);
+    scrub.max = String(frames.length - 1);
+    viewer.play();
+    playBtn.textContent = "pause";
+    hud.textContent = `${label} · ${frames.length} frame${frames.length > 1 ? "s" : ""} · drag to orbit`;
+  }
+
+  // import a .obj model (→ voxel shell) or an animated .gif (→ block animation)
+  $<HTMLInputElement>("v3-import").addEventListener("change", async (ev) => {
+    const file = (ev.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    hud.textContent = `importing ${file.name}…`;
+    try {
+      if (/\.obj$/i.test(file.name)) {
+        showFrames([objToVolume(await file.text(), { resolution: 32, mapColorId: grayId })], `model ${file.name}`);
+      } else {
+        const canvases = await decodeGif(file);
+        const frames = canvases.map((c) =>
+          imageToVolume(quantizeFrame(rgbImageFromCanvas(c, 28), pal3d, { method: "none" }), { mode: "flat", depth: 2 }),
+        );
+        showFrames(frames, `gif ${file.name}`);
+      }
+    } catch (err) {
+      hud.textContent = `import failed: ${(err as Error).message}`;
+    }
   });
 
   // Download a vanilla datapack that builds the 3D spin animation (fill-batched)
