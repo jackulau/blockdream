@@ -12,7 +12,7 @@ import {
 } from "@mineworld/color-core";
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@mineworld/palette";
-import { blockForBase, swatchDataUrl, textureUrl } from "./blocks";
+import { blockForBase, swatchDataUrl, localTextureUrl, loadTextureManifest } from "./blocks";
 
 export interface BlockArtEls {
   file: HTMLInputElement;
@@ -73,14 +73,15 @@ export function createBlockArt(els: BlockArtEls): { loadUrl: (url: string) => vo
       ic.className = "ic";
       ic.alt = info.name;
       const swatch = swatchDataUrl(info);
-      if (useTex) {
-        ic.src = textureUrl(info.id);
+      const real = useTex ? localTextureUrl(info.id) : null;
+      if (real) {
+        ic.src = real;
         ic.onerror = () => {
           ic.onerror = null;
-          ic.src = swatch;
+          ic.src = swatch; // graceful fallback if a texture file is missing
         };
       } else {
-        ic.src = swatch;
+        ic.src = swatch; // no local texture (or toggle off) → generated swatch
       }
       const nm = document.createElement("div");
       nm.className = "nm";
@@ -175,6 +176,14 @@ export function createBlockArt(els: BlockArtEls): { loadUrl: (url: string) => vo
   els.dither.addEventListener("change", render);
   els.useTextures.addEventListener("change", render);
   els.gridVal.textContent = `${els.grid.value} px`;
+
+  // load the local real-texture manifest; default the toggle ON when textures are present,
+  // and re-render so the BOM swaps swatches for real block textures.
+  els.useTextures.checked = true;
+  loadTextureManifest().then((ok) => {
+    if (!ok) els.useTextures.checked = false; // no textures fetched yet → swatches
+    if (lastImage) render();
+  });
 
   // let callers seed an image (e.g. the showcase preloads sample pixel art)
   function loadUrl(url: string): void {

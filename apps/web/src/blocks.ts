@@ -54,9 +54,38 @@ export function swatchDataUrl(info: BlockInfo, size = 26): string {
   return c.toDataURL();
 }
 
-/** Real block texture from an open minecraft-assets mirror (behind a toggle; the caller
- *  should onerror-fallback to swatchDataUrl since this needs network + the name to exist). */
-export function textureUrl(id: string): string {
-  const name = id.replace(/^minecraft:/, "");
-  return `https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21/assets/minecraft/textures/block/${name}.png`;
+// --- real local textures (extracted from the official jar by scripts/fetch-block-textures.py) ---
+// Served from /blocks/<file>.png with /blocks/manifest.json mapping id -> file. Gitignored,
+// local-only. Absent until the fetch script is run → callers fall back to swatchDataUrl.
+
+let MANIFEST: Record<string, string> | null = null;
+let manifestVersion = "";
+
+/** Fetch the local texture manifest once. Resolves even if it's missing (→ no textures). */
+export async function loadTextureManifest(): Promise<boolean> {
+  if (MANIFEST) return true;
+  try {
+    const r = await fetch("/blocks/manifest.json", { cache: "no-cache" });
+    if (!r.ok) return false;
+    const j = (await r.json()) as { textures?: Record<string, string>; version?: string };
+    MANIFEST = j.textures ?? {};
+    manifestVersion = j.version ?? "";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function hasLocalTextures(): boolean {
+  return !!MANIFEST && Object.keys(MANIFEST).length > 0;
+}
+
+export function textureVersion(): string {
+  return manifestVersion;
+}
+
+/** Local real-texture URL for a block id, or null if we have no texture for it. */
+export function localTextureUrl(id: string): string | null {
+  const file = MANIFEST?.[id];
+  return file ? `/blocks/${file}` : null;
 }
