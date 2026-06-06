@@ -17,6 +17,10 @@ dependencies {
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    // Live world-model bridge: a plain WebSocket client. `include` jar-in-jars it so the
+    // built mod is self-contained. (Gson ships with Minecraft; ImageIO is in the JDK.)
+    include implementation('org.java-websocket:Java-WebSocket:1.5.7')
 }
 
 java {

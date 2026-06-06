@@ -22,10 +22,15 @@ import java.nio.file.Path;
  */
 public class MapWallRenderer {
     private FramePool pool;
-    private MapState[] tileStates; // length == pool.tileCount()
+    private MapState[] tileStates; // length == pool.tileCount() (or cols*rows in live mode)
     private int tickCounter;
     private int frameIndex;
     private boolean active;
+
+    // live mode: frames stream in from the world-model bridge (WorldModelClient) instead of
+    // cycling a static frames.bin. The latest frame is applied every tick.
+    private boolean liveMode;
+    private volatile byte[][] liveFrame; // [tile] -> 16384 colours; written off-thread by the WS client
 
     public void load(MinecraftServer server) {
         try {
@@ -34,11 +39,11 @@ public class MapWallRenderer {
                     .resolve("mineworld");
             Path framesPath = worldDir.resolve("frames.bin");
             if (!Files.exists(framesPath)) {
-                MineworldMod.LOGGER.info("[mineworld] no frames.bin found at {} — renderer idle", framesPath);
+                MineworldMod.LOGGER.info("[mineworld] no frames.bin found at {} — static renderer idle", framesPath);
                 return;
             }
             this.pool = FramePool.read(framesPath);
-            this.tileStates = resolveTileStates(overworld, worldDir);
+            this.tileStates = resolveTileStates(overworld, worldDir, pool.tileCount());
             this.active = tileStates != null;
             MineworldMod.LOGGER.info(
                     "[mineworld] loaded {} frames over {}x{} maps @ {} ticks/frame",
@@ -50,20 +55,46 @@ public class MapWallRenderer {
     }
 
     /**
-     * Resolve the MapState for each wall tile. The companion {@code maps.txt}
-     * lists one integer map id per tile (row-major); the operator creates these
-     * maps (e.g. via /give) and frames them on the wall. Returns null if the
-     * mapping is missing so the renderer stays idle rather than crashing.
+     * Enter LIVE mode: bind the wall's maps and accept streamed frames from the world-model
+     * bridge (no frames.bin). The wall is cols×rows maps; maps.txt must list cols*rows ids.
+     * Returns true if the wall bound successfully.
      */
-    private MapState[] resolveTileStates(ServerWorld world, Path worldDir) throws Exception {
+    public boolean loadLive(MinecraftServer server, int cols, int rows) {
+        try {
+            ServerWorld overworld = server.getOverworld();
+            Path worldDir = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT).resolve("mineworld");
+            this.tileStates = resolveTileStates(overworld, worldDir, cols * rows);
+            this.liveMode = tileStates != null;
+            this.active = this.liveMode;
+            MineworldMod.LOGGER.info("[mineworld] live mode {} for {}x{} map wall",
+                    liveMode ? "ready" : "FAILED (check maps.txt)", cols, rows);
+            return liveMode;
+        } catch (Exception e) {
+            MineworldMod.LOGGER.error("[mineworld] failed to enter live mode", e);
+            return false;
+        }
+    }
+
+    /** Off-thread sink for the bridge: store the latest streamed frame ([tile][16384]). */
+    public void pushLiveFrame(byte[][] tiles) {
+        this.liveFrame = tiles;
+    }
+
+    /**
+     * Resolve the MapState for each wall tile. The companion {@code maps.txt} lists one integer
+     * map id per tile (row-major); the operator creates these maps (e.g. via /give) and frames
+     * them on the wall. Returns null if the mapping is missing/mismatched so the renderer stays
+     * idle rather than crashing.
+     */
+    private MapState[] resolveTileStates(ServerWorld world, Path worldDir, int expectedCount) throws Exception {
         Path mapsTxt = worldDir.resolve("maps.txt");
         if (!Files.exists(mapsTxt)) {
             MineworldMod.LOGGER.warn("[mineworld] maps.txt missing — cannot bind maps to the wall");
             return null;
         }
         String[] ids = Files.readString(mapsTxt).trim().split("\\s+");
-        if (ids.length != pool.tileCount()) {
-            MineworldMod.LOGGER.warn("[mineworld] maps.txt has {} ids, expected {}", ids.length, pool.tileCount());
+        if (ids.length != expectedCount) {
+            MineworldMod.LOGGER.warn("[mineworld] maps.txt has {} ids, expected {}", ids.length, expectedCount);
             return null;
         }
         MapState[] states = new MapState[ids.length];
@@ -81,20 +112,24 @@ public class MapWallRenderer {
 
     /** Called every server tick from {@link MineworldMod}. */
     public void tick(MinecraftServer server) {
-        if (!active || pool == null) return;
+        if (!active) return;
+        if (liveMode) {
+            byte[][] frame = liveFrame; // volatile read
+            if (frame != null) applyTiles(frame); // apply the newest streamed frame every tick
+            return;
+        }
+        if (pool == null) return;
         if (++tickCounter < pool.speedTicks) return;
         tickCounter = 0;
         frameIndex = (frameIndex + 1) % pool.frameCount;
-        applyFrame(frameIndex);
+        applyTiles(pool.frames[frameIndex]);
     }
 
-    private void applyFrame(int frame) {
-        byte[][] tiles = pool.frames[frame];
-        for (int t = 0; t < tileStates.length; t++) {
+    private void applyTiles(byte[][] tiles) {
+        for (int t = 0; t < tileStates.length && t < tiles.length; t++) {
             MapState state = tileStates[t];
-            byte[] colors = tiles[t];
             // Copy the precomputed color array into the live map and flag for resend.
-            System.arraycopy(colors, 0, state.colors, 0, FramePool.MAP_AREA);
+            System.arraycopy(tiles[t], 0, state.colors, 0, FramePool.MAP_AREA);
             state.markDirty();
         }
     }
