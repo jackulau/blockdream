@@ -26,12 +26,18 @@ importers:
       '@mineworld/color-core':
         specifier: workspace:*
         version: link:../../packages/color-core
+      '@mineworld/emit-commands':
+        specifier: workspace:*
+        version: link:../../packages/emit-commands
       '@mineworld/palette':
         specifier: workspace:*
         version: link:../../packages/palette
       '@mineworld/voxel':
         specifier: workspace:*
         version: link:../../packages/voxel
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       three:
         specifier: ^0.184.0
         version: 0.184.0

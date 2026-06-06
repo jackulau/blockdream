@@ -11,8 +11,10 @@
   "dependencies": {
     "@mineworld/color-core": "workspace:*",
     "@mineworld/palette": "workspace:*",
+    "@mineworld/voxel": "workspace:*",
+    "fflate": "^0.8.3",
     "three": "^0.184.0",
-    "@mineworld/voxel": "workspace:*"
+    "@mineworld/emit-commands": "workspace:*"
   },
   "devDependencies": {
     "@types/three": "^0.184.1",
