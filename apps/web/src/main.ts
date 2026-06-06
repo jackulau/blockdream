@@ -6,6 +6,7 @@ import {
   type PreparedPalette,
 } from "@mineworld/color-core";
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
+import type { MapPalette } from "@mineworld/palette";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -17,7 +18,7 @@ const stats = $<HTMLDivElement>("stats");
 const srcCanvas = $<HTMLCanvasElement>("src");
 const outCanvas = $<HTMLCanvasElement>("out");
 
-const pal: PreparedPalette = preparePalette(javaMapPalette);
+const pal: PreparedPalette = preparePalette(javaMapPalette as unknown as MapPalette);
 let lastImage: HTMLImageElement | null = null;
 
 /** Draw an image into an offscreen canvas at gridW×gridH and read RGB pixels. */
