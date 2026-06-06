@@ -1,5 +1,3 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import type { QuantizedFrame } from "@mineworld/color-core";
 import { computeDeltas, type FrameDelta } from "./delta";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
@@ -174,13 +172,4 @@ export function generateJavaDatapack(
   );
 
   return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks };
-}
-
-/** Write a generated pack's file map to disk under destDir. */
-export function writePack(pack: GeneratedPack, destDir: string): void {
-  for (const [rel, content] of pack.files) {
-    const abs = join(destDir, rel);
-    mkdirSync(dirname(abs), { recursive: true });
-    writeFileSync(abs, content);
-  }
 }

@@ -17,12 +17,12 @@ import {
 import { extractFrames } from "@mineworld/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@mineworld/emit-java";
 import { buildMcStructure } from "@mineworld/emit-bedrock";
+import { generateJavaDatapack } from "@mineworld/emit-commands";
 import {
-  generateJavaDatapack,
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
   writePack,
-} from "@mineworld/emit-commands";
+} from "@mineworld/emit-commands/node";
 
 export type RenderTarget =
   | "map"
