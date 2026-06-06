@@ -187,6 +187,22 @@
         </div>
       </section>
 
+      <section class="block">
+        <h2><span class="num">03</span>3D voxel builder + replay</h2>
+        <p class="desc">The custom voxel engine extrudes the image into a 3D block build and spins it into an animation — the same volumes the command-block builder emits as a vanilla datapack. Drag to orbit; play/scrub the spin. Real block textures.</p>
+        <div class="card" style="max-width:720px">
+          <div class="stage">
+            <canvas id="v3-canvas" style="width:480px;height:360px;border-radius:8px"></canvas>
+          </div>
+          <div class="row">
+            <button id="v3-play" class="ui">play</button>
+            <input id="v3-scrub" type="range" min="0" max="0" value="0" style="flex:1;min-width:160px" />
+            <label style="font-size:.8rem;color:var(--dim)"><input id="v3-spin" type="checkbox" checked /> spin</label>
+          </div>
+          <div id="v3-hud" class="hud">building…</div>
+        </div>
+      </section>
+
       <footer>
         <span>mineworld — neural Minecraft &amp; driving world models + block-art · runs locally</span>
         <span><a href="https://github.com/jackulau" target="_blank" rel="noopener">GitHub</a> · <a href="https://www.linkedin.com/in/-jacklau/" target="_blank" rel="noopener">LinkedIn</a></span>

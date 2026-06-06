@@ -6,6 +6,12 @@ import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt } from "./blockart-core";
+import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-core";
+import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
+import type { MapPalette } from "@mineworld/palette";
+import { imageToVolume, spin } from "@mineworld/voxel";
+import { Viewer3D } from "./viewer3d";
+import { blockForBase, localTextureUrl, loadTextureManifest } from "./blocks";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const MC_URL = "ws://127.0.0.1:8765";
@@ -115,3 +121,81 @@ ba.loadUrl("/test-assets/pixelart.png"); // preload sample so the section is ali
 // auto-connect both world models so the page "just works"
 mcViewer.connect();
 drViewer.connect();
+
+// --- 3D voxel builder + replay -------------------------------------------------
+const pal3d = preparePalette(javaMapPalette as unknown as MapPalette);
+const hexByMap = new Map<number, number>();
+for (const e of pal3d.entries) {
+  const c = e.color;
+  hexByMap.set(c.mapColorId, (c.r << 16) | (c.g << 8) | c.b);
+}
+
+function rgbImageFromImg(img: HTMLImageElement, gridW: number): RgbImage {
+  const aspect = img.naturalHeight / img.naturalWidth || 1;
+  const w = gridW;
+  const h = Math.max(1, Math.round(gridW * aspect));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const out = new Uint8Array(w * h * 3);
+  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    out[j] = data[i]!;
+    out[j + 1] = data[i + 1]!;
+    out[j + 2] = data[i + 2]!;
+  }
+  return { width: w, height: h, data: out };
+}
+
+async function setup3dViewer(): Promise<void> {
+  const canvas = $<HTMLCanvasElement>("v3-canvas");
+  const playBtn = $<HTMLButtonElement>("v3-play");
+  const scrub = $<HTMLInputElement>("v3-scrub");
+  const spinCb = $<HTMLInputElement>("v3-spin");
+  const hud = $<HTMLDivElement>("v3-hud");
+  await loadTextureManifest();
+
+  const viewer = new Viewer3D({
+    canvas,
+    textureFor: (id) => {
+      const info = blockForBase(id >> 2); // mapColorId → baseId
+      return info ? localTextureUrl(info.id) : null;
+    },
+    colorFor: (id) => hexByMap.get(id) ?? 0x808080,
+    onFrame: (i, n) => {
+      scrub.value = String(i);
+      hud.textContent = `frame ${i + 1}/${n} · drag to orbit`;
+    },
+  });
+
+  const img = new Image();
+  img.onload = () => {
+    const rgb = rgbImageFromImg(img, 28);
+    const q = quantizeFrame(rgb, pal3d, { method: "none" });
+    const frames = spin(imageToVolume(q, { mode: "flat", depth: 3 }), 24, "y");
+    viewer.setFrames(frames);
+    scrub.max = String(frames.length - 1);
+    viewer.play();
+    playBtn.textContent = "pause";
+  };
+  img.src = "/test-assets/pixelart.png";
+
+  playBtn.addEventListener("click", () => {
+    if (viewer.isPlaying) {
+      viewer.pause();
+      playBtn.textContent = "play";
+    } else {
+      viewer.play();
+      playBtn.textContent = "pause";
+    }
+  });
+  scrub.addEventListener("input", () => {
+    viewer.pause();
+    playBtn.textContent = "play";
+    viewer.setFrame(Number(scrub.value));
+  });
+  spinCb.addEventListener("change", () => viewer.setSpin(spinCb.checked));
+}
+void setup3dViewer();
