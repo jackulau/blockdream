@@ -17,7 +17,7 @@ import {
 import { extractFrames } from "@mineworld/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@mineworld/emit-java";
 import { buildMcStructure } from "@mineworld/emit-bedrock";
-import { generateJavaDatapack } from "@mineworld/emit-commands";
+import { generateJavaDatapack, packageJavaDatapack, packageMcpack } from "@mineworld/emit-commands";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -165,7 +165,10 @@ export function render(opts: RenderOptions): RenderResult {
     const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: opts.speedTicks });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
-    notes.push(`Bedrock Script-API behavior pack: import behavior_pack/, then in chat: !mw start.`);
+    const mcpack = join(opts.out, "mineworld-script.mcpack");
+    writeFile(mcpack, Buffer.from(packageMcpack(pack.files, { stripPrefix: "behavior_pack/" })));
+    filesWritten.push(mcpack);
+    notes.push(`Bedrock Script-API addon: double-click mineworld-script.mcpack to import, then in chat: !mw start.`);
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
@@ -173,7 +176,10 @@ export function render(opts: RenderOptions): RenderResult {
     const pack = generateJavaDatapack(q, resolveBlock, { speedTicks: opts.speedTicks });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
-    notes.push(`Vanilla Java datapack: drop in world/datapacks/, run /function ${pack.namespace}:setup then /function ${pack.namespace}:start.`);
+    const zip = join(opts.out, `${pack.namespace}.zip`);
+    writeFile(zip, Buffer.from(packageJavaDatapack(pack)));
+    filesWritten.push(zip);
+    notes.push(`Vanilla Java datapack: drop ${pack.namespace}.zip (or the folder) into world/datapacks/, run /function ${pack.namespace}:setup then /function ${pack.namespace}:start.`);
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
@@ -181,6 +187,9 @@ export function render(opts: RenderOptions): RenderResult {
   const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: opts.speedTicks });
   writePack(pack, opts.out);
   filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
-  notes.push(`Vanilla Bedrock behavior pack: import the folder, /function ${pack.namespace}/setup then /function ${pack.namespace}/start.`);
+  const mcpack = join(opts.out, "mineworld.mcpack");
+  writeFile(mcpack, Buffer.from(packageMcpack(pack.files)));
+  filesWritten.push(mcpack);
+  notes.push(`Vanilla Bedrock behavior pack: double-click mineworld.mcpack to import (or copy the folder to behavior_packs/), /function ${pack.namespace}/setup then /function ${pack.namespace}/start.`);
   return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
 }
