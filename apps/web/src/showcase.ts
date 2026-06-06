@@ -56,8 +56,8 @@ const mcViewer = new Viewer({
     return { buttons: a.buttons, camera: a.camera, skill: mcSkill.value };
   },
   buildReset: () => ({ skill: mcSkill.value }),
-  onStats: ({ displayFps, genFps }) => {
-    mcHud.textContent = `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(1)} fps\nmovement: ${mcSkill.value}`;
+  onStats: ({ displayFps, genFps, latencyMs }) => {
+    mcHud.textContent = `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(1)} fps · ${latencyMs.toFixed(0)} ms\nmovement: ${mcSkill.value}`;
   },
   onStatus: (t, cls) => pill(mcStatus, cls === "ok" ? `live · ${mcSkill.value}` : t, cls),
 });
@@ -100,9 +100,9 @@ const drViewer = new Viewer({
     drawBev((msg.lidar as number[]) ?? []);
     drTel = (msg.telemetry as number[]) ?? drTel;
   },
-  onStats: ({ displayFps, genFps }) => {
+  onStats: ({ displayFps, genFps, latencyMs }) => {
     drHud.textContent =
-      `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(0)} fps\n` +
+      `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(0)} fps · ${latencyMs.toFixed(0)} ms\n` +
       `speed ${((drTel[3] ?? 0) * 30).toFixed(1)} m/s · yaw-rate ${(drTel[2] ?? 0).toFixed(2)}`;
   },
   onStatus: (t, cls) => pill(drStatus, cls === "ok" ? "live" : t, cls),
