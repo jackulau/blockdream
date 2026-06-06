@@ -21,12 +21,16 @@ describe("chunk()", () => {
   });
 });
 
+// These tests isolate the per-function SPLIT machinery (writeSplitFunction), so they
+// disable the fill optimizer — otherwise greedy box-merging collapses the deliberately-
+// oversized frames under the budget and there is nothing to split. The optimizer ×
+// splitter composition is covered separately in greedy.test.ts / roundtrip tests.
 describe("command-budget splitting", () => {
   const frame = checker(10, 10); // 100 setblocks in the keyframe
   const limit = 30;
 
   it("java: oversized frame splits into a parent that calls ≤limit-sized parts", () => {
-    const pack = generateJavaDatapack([frame], resolve, { maxCommandsPerFunction: limit });
+    const pack = generateJavaDatapack([frame], resolve, { maxCommandsPerFunction: limit, optimizeFills: false });
     const parent = pack.files.get("data/mineworld/function/frames/0.mcfunction")!;
     // parent should call parts, not contain setblocks
     expect(parent).not.toContain("setblock");
@@ -42,16 +46,28 @@ describe("command-budget splitting", () => {
 
   it("java: small frame stays a single function (no parts)", () => {
     const small = checker(4, 4); // 16 < 30
-    const pack = generateJavaDatapack([small], resolve, { maxCommandsPerFunction: limit });
+    const pack = generateJavaDatapack([small], resolve, { maxCommandsPerFunction: limit, optimizeFills: false });
     expect(pack.files.get("data/mineworld/function/frames/0.mcfunction")!).toContain("setblock");
     expect([...pack.files.keys()].some((k) => k.includes("/frames/0/part"))).toBe(false);
   });
 
   it("bedrock: oversized frame splits into chained sub-functions too", () => {
-    const pack = generateBedrockBehaviorPack([frame], resolve, { maxCommandsPerFunction: limit });
+    const pack = generateBedrockBehaviorPack([frame], resolve, { maxCommandsPerFunction: limit, optimizeFills: false });
     const parent = pack.files.get("functions/mineworld/frames/0.mcfunction")!;
     expect(parent).toContain("function mineworld/frames/0/part0");
     const parts = [...pack.files.keys()].filter((k) => k.startsWith("functions/mineworld/frames/0/part"));
     expect(parts.length).toBe(4);
+  });
+
+  it("optimizer × splitter compose: a truly unmergeable frame still splits with optimization ON", () => {
+    // genuine 2D checkerboard (x+y)%2 — no two neighbours share a block, so greedy
+    // emits one /setblock per cell and the budget split still triggers.
+    const flat = new Uint8Array(10 * 10);
+    for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) flat[y * 10 + x] = (x + y) % 2;
+    const checker2d: QuantizedFrame = { width: 10, height: 10, paletteIndex: new Int32Array(100), mapColorId: flat };
+    const pack = generateJavaDatapack([checker2d], resolve, { maxCommandsPerFunction: limit }); // optimize ON (default)
+    expect(pack.totalCommands).toBe(100); // unmergeable → 100 commands
+    const partPaths = [...pack.files.keys()].filter((k) => k.startsWith("data/mineworld/function/frames/0/part"));
+    expect(partPaths.length).toBe(4);
   });
 });

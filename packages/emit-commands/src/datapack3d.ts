@@ -90,6 +90,7 @@ export function generateVoxelDatapack(
   const fnDir = `data/${ns}/function`;
 
   let totalSetblocks = 0;
+  let totalCommands = 0;
   for (const d of deltas) {
     const resolve = (id: number) => blockOf(id, resolveBlock, fallback, air);
     let lines: string[];
@@ -104,6 +105,7 @@ export function generateVoxelDatapack(
       );
     }
     totalSetblocks += d.cells.length;
+    totalCommands += lines.length;
     const header = `# frame ${d.index}${d.keyframe ? " (keyframe)" : ` (Δ ${d.cells.length})`}`;
     writeSplitFunction(files, `${fnDir}/frames/${d.index}`, lines, limit, (k) => `function ${ns}:frames/${d.index}/part${k}`, header);
   }
@@ -160,5 +162,5 @@ export function generateVoxelDatapack(
     ) + "\n",
   );
 
-  return { files, namespace: ns, frameCount: volumes.length, width: sx, height: sy, totalSetblocks };
+  return { files, namespace: ns, frameCount: volumes.length, width: sx, height: sy, totalSetblocks, totalCommands };
 }

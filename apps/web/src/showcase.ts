@@ -10,7 +10,7 @@ import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-c
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@mineworld/palette";
 import { imageToVolume, spin, objToVolume, type VoxelVolume } from "@mineworld/voxel";
-import { generateJavaDatapack, generateVoxelDatapack, fillBatch } from "@mineworld/emit-commands";
+import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@mineworld/emit-commands";
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, loadTextureManifest } from "./blocks";
 import { downloadDatapack } from "./datapack-export";
@@ -346,10 +346,11 @@ async function setup3dViewer(): Promise<void> {
     if (!current3d.length) return;
     const pack = generateVoxelDatapack(current3d, resolveBlock, {
       namespace: "mineworld_3d",
-      optimize: (cells, r) => fillBatch(cells, r),
+      optimize: (cells, r) => greedyBoxes(cells, r),
     });
+    const cmds = pack.totalCommands ?? pack.totalSetblocks;
     $<HTMLDivElement>("v3-export").textContent =
-      `3D datapack: ${pack.totalSetblocks} blocks · ${pack.frameCount} frames · /function mineworld_3d:setup`;
+      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames · /function mineworld_3d:setup`;
     downloadDatapack("mineworld-3d-datapack", pack.files);
   });
 

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { QuantizedFrame } from "@mineworld/color-core";
 import { computeDeltas, type FrameDelta } from "./delta";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
+import { greedyBoxes, type PlacedCell } from "./fill";
 import type { GeneratedPack } from "./datapack";
 
 export interface BehaviorPackOptions {
@@ -18,6 +19,8 @@ export interface BehaviorPackOptions {
   uuids?: [string, string];
   /** max setblock commands per function before splitting into sub-functions. */
   maxCommandsPerFunction?: number;
+  /** collapse same-block runs into /fill via greedy box-merging (lossless). Default true. */
+  optimizeFills?: boolean;
 }
 
 /** Deterministic UUID (v4-shaped) from a seed string — reproducible packs/tests. */
@@ -44,6 +47,20 @@ function frameSetblockLines(
     lines.push(setblockLine(origin.x + c.x, origin.y + (height - 1 - c.y), origin.z, resolveBlock(c.mapColorId) ?? fallback));
   }
   return lines;
+}
+
+/** Map a 2D delta's cells to WORLD-coordinate placed cells (image row 0 at top of wall). */
+function framePlacedCells(
+  delta: FrameDelta,
+  height: number,
+  origin: { x: number; y: number; z: number },
+): PlacedCell[] {
+  return delta.cells.map((c) => ({
+    x: origin.x + c.x,
+    y: origin.y + (height - 1 - c.y),
+    z: origin.z,
+    mapColorId: c.mapColorId,
+  }));
 }
 
 /**
@@ -99,13 +116,18 @@ export function generateBedrockBehaviorPack(
   const fallback = opts.fallbackBlock ?? "minecraft:air";
   const { width: W, height: H } = frames[0]!;
   const limit = Math.max(1, Math.floor(opts.maxCommandsPerFunction ?? DEFAULT_MAX_COMMANDS));
+  const optimizeFills = opts.optimizeFills ?? true;
   const deltas = computeDeltas(frames);
   const files = new Map<string, string>();
 
   let totalSetblocks = 0;
+  let totalCommands = 0;
   for (const d of deltas) {
     totalSetblocks += d.cells.length;
-    const lines = frameSetblockLines(d, H, origin, resolveBlock, fallback);
+    const lines = optimizeFills
+      ? greedyBoxes(framePlacedCells(d, H, origin), (id) => resolveBlock(id) ?? fallback)
+      : frameSetblockLines(d, H, origin, resolveBlock, fallback);
+    totalCommands += lines.length;
     const header = `# frame ${d.index}${d.keyframe ? " (keyframe)" : ` (Δ ${d.cells.length})`}`;
     writeSplitFunction(
       files,
@@ -182,5 +204,5 @@ export function generateBedrockBehaviorPack(
     ) + "\n",
   );
 
-  return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks };
+  return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks, totalCommands };
 }

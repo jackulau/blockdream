@@ -1,6 +1,7 @@
 import type { QuantizedFrame } from "@mineworld/color-core";
 import { computeDeltas, type FrameDelta } from "./delta";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
+import { greedyBoxes, type PlacedCell } from "./fill";
 
 export interface DatapackOptions {
   /** datapack namespace (a..z0-9_-). Default "mineworld". */
@@ -18,6 +19,8 @@ export interface DatapackOptions {
   autoplay?: boolean;
   /** max setblock commands per function before splitting into sub-functions. */
   maxCommandsPerFunction?: number;
+  /** collapse same-block runs into /fill via greedy box-merging (lossless). Default true. */
+  optimizeFills?: boolean;
 }
 
 export interface GeneratedPack {
@@ -27,8 +30,10 @@ export interface GeneratedPack {
   frameCount: number;
   width: number;
   height: number;
-  /** total setblock commands across all frames (delta-encoded) */
+  /** total changed cells across all frames (delta-encoded) */
   totalSetblocks: number;
+  /** total emitted commands after fill optimization (≤ totalSetblocks). */
+  totalCommands?: number;
 }
 
 const RESERVED = new Set(["minecraft"]);
@@ -65,6 +70,20 @@ function frameSetblockLines(
   return lines;
 }
 
+/** Map a 2D delta's cells to WORLD-coordinate placed cells (image row 0 at top of wall). */
+function framePlacedCells(
+  delta: FrameDelta,
+  height: number,
+  origin: { x: number; y: number; z: number },
+): PlacedCell[] {
+  return delta.cells.map((c) => ({
+    x: origin.x + c.x,
+    y: origin.y + (height - 1 - c.y),
+    z: origin.z,
+    mapColorId: c.mapColorId,
+  }));
+}
+
 /**
  * Generate a 100%-vanilla Java datapack that plays a block-art video as a wall
  * of solid blocks, driven entirely by command content (no mod / FAWE).
@@ -88,15 +107,20 @@ export function generateJavaDatapack(
   const { width: W, height: H } = frames[0]!;
 
   const limit = Math.max(1, Math.floor(opts.maxCommandsPerFunction ?? DEFAULT_MAX_COMMANDS));
+  const optimizeFills = opts.optimizeFills ?? true;
   const deltas = computeDeltas(frames);
   const files = new Map<string, string>();
   const fnDir = `data/${ns}/function`;
 
   // per-frame functions (split into sub-functions if over the command budget)
   let totalSetblocks = 0;
+  let totalCommands = 0;
   for (const d of deltas) {
     totalSetblocks += d.cells.length;
-    const lines = frameSetblockLines(d, H, origin, resolveBlock, fallback);
+    const lines = optimizeFills
+      ? greedyBoxes(framePlacedCells(d, H, origin), (id) => resolveBlock(id) ?? fallback)
+      : frameSetblockLines(d, H, origin, resolveBlock, fallback);
+    totalCommands += lines.length;
     const header = `# frame ${d.index}${d.keyframe ? " (keyframe)" : ` (Δ ${d.cells.length})`}`;
     writeSplitFunction(
       files,
@@ -171,5 +195,5 @@ export function generateJavaDatapack(
     ) + "\n",
   );
 
-  return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks };
+  return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks, totalCommands };
 }
