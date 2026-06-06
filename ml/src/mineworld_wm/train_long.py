@@ -47,7 +47,7 @@ def _log(out: Path, row: dict) -> None:
 
 def _dump_sample(tok: Tokenizer, frames: torch.Tensor, val_idx: np.ndarray, out: Path, tag: str, dev) -> None:
     sel = val_idx[:4] if len(val_idx) >= 4 else np.arange(min(4, frames.shape[0]))
-    x = frames[sel].to(dev)
+    x = frames[sel].to(dev).float().div(255)  # frames stored uint8 — cast at use
     with torch.no_grad():
         recon = tok(x).recon.clamp(0, 1)
     def row(t):
@@ -82,7 +82,9 @@ def main(argv: list[str] | None = None) -> int:
     # data (one or more movement-type-tagged pools)
     dirs = args.pools.split(",") if args.pools else [args.pool]
     frames_np, actions_np, pairs, skills_np = load_pools(dirs)
-    frames = torch.from_numpy(frames_np).float().permute(0, 3, 1, 2) / 255.0  # (N,3,H,W) on CPU
+    # Keep frames as uint8 on CPU and cast per-batch — float32 here would be ~4x the RAM
+    # (e.g. ~16 GB for 79k 128px frames) and OOM a 24 GB unified-memory Mac mid-run.
+    frames = torch.from_numpy(frames_np).permute(0, 3, 1, 2).contiguous()  # (N,3,H,W) uint8 on CPU
     buttons = torch.from_numpy(actions_np[:, :9]).float()
     camera = torch.from_numpy(actions_np[:, 9:]).float()
     skills = torch.from_numpy(skills_np).long()
@@ -123,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
                       "tok": tok.state_dict(), "enc": enc.state_dict(), "ar": ar.state_dict(),
                       "tok_opt": tok_opt.state_dict(), "ar_opt": ar_opt.state_dict(),
                       "tokenizer": tok.state_dict(), "action": enc.state_dict(), "transition": ar.state_dict(),
-                      "init_frame": frames[0].clone()}, latest)
+                      "init_frame": frames[0].float().div(255).clone()}, latest)
         _log(out, {"t": int(time.time()), "phase": phase, "step": tok_step if phase == "tok" else ar_step,
                    "loss": round(loss, 4), "val": round(val, 4), "mins": round((time.time() - t0) / 60, 1)})
         _dump_sample(tok, frames, val_frames_idx, out, tag, dev)
@@ -143,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     # ---- PHASE 1: tokenizer ----
     while phase == "tok" and tok_step < args.tok_steps and not time_up():
         idx = torch.randint(0, frames.shape[0], (args.batch,))
-        out_t = tok(frames[idx].to(dev))
+        out_t = tok(frames[idx].to(dev).float().div(255))
         tok_opt.zero_grad(); out_t.loss.backward(); tok_opt.step()
         tok_step += 1
         maybe_ckpt(out_t.recon_loss.item(), 0.0)
@@ -165,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         toks = []
         with torch.no_grad():
             for i in range(0, frames.shape[0], 64):
-                toks.append(tok.tokenize(frames[i:i + 64].to(dev)).flatten(1).cpu())
+                toks.append(tok.tokenize(frames[i:i + 64].to(dev).float().div(255)).flatten(1).cpu())
         tokens = torch.cat(toks)
         _atomic_save(tokens, tokens_path)
 

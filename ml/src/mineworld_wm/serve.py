@@ -44,11 +44,12 @@ class StepResult:
 class WorldModelSession:
     """Stateful single-stream rollout engine."""
 
-    def __init__(self, cfg: Config, tok: Tokenizer, enc: ActionEncoder, trans):
+    def __init__(self, cfg: Config, tok: Tokenizer, enc: ActionEncoder, trans, device: str | torch.device = "cpu"):
         self.cfg = cfg
-        self.tok = tok
-        self.enc = enc
-        self.trans = trans
+        self.device = torch.device(device)
+        self.tok = tok.to(self.device)
+        self.enc = enc.to(self.device)
+        self.trans = trans.to(self.device)
         self.kind = cfg.dynamics.kind
         self.size = cfg.tokenizer.image_size
         self.step_idx = 0
@@ -63,7 +64,7 @@ class WorldModelSession:
     def reset(self, init_frame: torch.Tensor | None = None) -> StepResult:
         if init_frame is None:
             init_frame = self.default_init if self.default_init is not None else torch.zeros(3, self.size, self.size)
-        x = init_frame.unsqueeze(0)
+        x = init_frame.unsqueeze(0).to(self.device)
         if self.kind == "ar":
             self._prev = self.tok.tokenize(x).flatten(1)  # (1, N)
         else:

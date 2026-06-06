@@ -1,0 +1,206 @@
+"""Resumable long-run trainer for the multimodal driving world model.
+
+Two-phase (RGB tokenizer -> multimodal transition), atomic time-based checkpoints,
+train/val loss logging, a --max-minutes wall-clock budget, and automatic resume from
+out/latest.pt. The checkpoint it writes is serve-compatible: `mineworld_wm.drive.serve
+--checkpoint <out>/latest.pt` loads it directly. Built to survive overnight MPS runs
+that get interrupted by sleep/crash (re-run the same command to continue).
+
+    python -m mineworld_wm.drive.train_long --pool ml/data/drive_pool --out ml/runs/drive \
+        --tok-steps 4000 --ar-steps 200000 --ckpt-every-min 20 --max-minutes 75
+
+Stop early: touch <out>/STOP  (or Ctrl-C; the last checkpoint is intact).
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import os
+import time
+from pathlib import Path
+
+import numpy as np
+import torch
+
+from ..config import TokenizerConfig, DynamicsConfig
+from ..tokenizer import Tokenizer
+from ..device import pick_device, device_name
+from .transition import DriveTransition
+from .collect import prepare_pool, load_pool
+
+IMAGE = 64
+DOWNSAMPLE = 8          # 64/8 = 8 -> 64 tokens
+CODEBOOK = 256
+N_LIDAR = 32
+N_TEL = 6
+
+
+def _atomic_save(obj, path: Path) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    torch.save(obj, tmp)
+    os.replace(tmp, path)  # atomic — a crash mid-write can't corrupt latest.pt
+
+
+def _log(out: Path, row: dict) -> None:
+    f = out / "log.csv"
+    new = not f.exists()
+    with open(f, "a", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=["t", "phase", "step", "loss", "val", "mins"])
+        if new:
+            w.writeheader()
+        w.writerow(row)
+
+
+def build(dev):
+    tcfg = TokenizerConfig(image_size=IMAGE, base_channels=32, latent_channels=4, downsample=DOWNSAMPLE, vq_codebook_size=CODEBOOK)
+    dcfg = DynamicsConfig(kind="ar", dim=128, depth=3, heads=4)
+    n_tokens = (IMAGE // DOWNSAMPLE) ** 2
+    tok = Tokenizer(tcfg).to(dev)
+    trans = DriveTransition(dcfg, n_tokens=n_tokens, codebook_size=CODEBOOK, n_lidar=N_LIDAR, n_telemetry=N_TEL).to(dev)
+    return tcfg, dcfg, tok, trans
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser("mineworld_wm.drive.train_long")
+    ap.add_argument("--pool", default="ml/data/drive_pool")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--rollouts", type=int, default=160, help="collected only if pool is empty")
+    ap.add_argument("--steps", type=int, default=220, help="steps per rollout if collecting")
+    ap.add_argument("--tok-steps", type=int, default=4000)
+    ap.add_argument("--ar-steps", type=int, default=200000)
+    ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--lr", type=float, default=2e-3)
+    ap.add_argument("--ckpt-every-min", type=float, default=20.0)
+    ap.add_argument("--max-minutes", type=float, default=0.0)  # 0 = until step targets
+    ap.add_argument("--val-frac", type=float, default=0.05)
+    ap.add_argument("--device", default="auto")
+    ap.add_argument("--seed", type=int, default=0)
+    args = ap.parse_args(argv)
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    dev = pick_device(args.device)
+    torch.manual_seed(args.seed)
+
+    if not list(Path(args.pool).glob("roll_*.npz")):
+        prepare_pool(args.rollouts, args.steps, args.pool)
+    rgb_np, lidar_np, tel_np, ctl_np, pairs = load_pool(args.pool)
+    rgb = torch.from_numpy(rgb_np).to(torch.uint8)              # CPU (N,3,S,S) — moved per-batch
+    lidar = torch.from_numpy(lidar_np).float().to(dev)
+    tel = torch.from_numpy(tel_np).float().to(dev)
+    ctl = torch.from_numpy(ctl_np).float().to(dev)
+    N = rgb.shape[0]
+
+    rng = np.random.default_rng(args.seed)
+    perm = rng.permutation(len(pairs))
+    n_val = max(1, int(len(pairs) * args.val_frac))
+    val_pairs, train_pairs = pairs[perm[:n_val]], pairs[perm[n_val:]]
+
+    tcfg, dcfg, tok, trans = build(dev)
+    tok_opt = torch.optim.Adam(tok.parameters(), lr=args.lr)
+    tr_opt = torch.optim.Adam(trans.parameters(), lr=args.lr)
+
+    # resume
+    phase, tok_step, ar_step = "tok", 0, 0
+    latest = out / "latest.pt"
+    if latest.exists():
+        ck = torch.load(latest, map_location=dev, weights_only=False)
+        tok.load_state_dict(ck["tokenizer"]); trans.load_state_dict(ck["transition"])
+        if "tok_opt" in ck:
+            tok_opt.load_state_dict(ck["tok_opt"])
+        if "tr_opt" in ck:
+            tr_opt.load_state_dict(ck["tr_opt"])
+        phase, tok_step, ar_step = ck.get("phase", "tok"), ck.get("tok_step", 0), ck.get("ar_step", 0)
+        print(f"[drive.train_long] RESUMED phase={phase} tok_step={tok_step} ar_step={ar_step}")
+
+    print(f"[drive.train_long] {N} frames, {len(pairs)} pairs  device={device_name(dev)}")
+    t0 = time.time()
+    last_ckpt = t0
+
+    def rgb_batch(idx):
+        return rgb[idx].to(dev).float().div(255)
+
+    def save(loss: float, val: float):
+        with torch.no_grad():
+            init_tok = tok.tokenize(rgb[0:1].to(dev).float().div(255)).flatten(1)[0]
+        _atomic_save({
+            "phase": phase, "tok_step": tok_step, "ar_step": ar_step,
+            "tokenizer_cfg": vars(tcfg), "dynamics_cfg": vars(dcfg),
+            "n_lidar": N_LIDAR, "n_telemetry": N_TEL, "image": IMAGE, "downsample": DOWNSAMPLE, "codebook": CODEBOOK,
+            "tokenizer": tok.state_dict(), "transition": trans.state_dict(),
+            "tok_opt": tok_opt.state_dict(), "tr_opt": tr_opt.state_dict(),
+            "init_tokens": init_tok.cpu(), "init_lidar": lidar[0].cpu(), "init_telemetry": tel[0].cpu(),
+            "init_rgb": rgb[0].clone(),
+        }, latest)
+        _log(out, {"t": int(time.time()), "phase": phase, "step": tok_step if phase == "tok" else ar_step,
+                   "loss": round(loss, 4), "val": round(val, 4), "mins": round((time.time() - t0) / 60, 1)})
+
+    def time_up() -> bool:
+        if (out / "STOP").exists():
+            return True
+        return args.max_minutes > 0 and (time.time() - t0) / 60 >= args.max_minutes
+
+    def maybe_ckpt(loss: float, val: float):
+        nonlocal last_ckpt
+        if (time.time() - last_ckpt) / 60 >= args.ckpt_every_min:
+            save(loss, val)
+            last_ckpt = time.time()
+            if dev.type == "mps":
+                torch.mps.empty_cache()
+
+    # ---- PHASE 1: RGB tokenizer ----
+    while phase == "tok" and tok_step < args.tok_steps and not time_up():
+        idx = torch.randint(0, N, (args.batch,))
+        o = tok(rgb_batch(idx))
+        tok_opt.zero_grad(); o.loss.backward(); tok_opt.step()
+        tok_step += 1
+        maybe_ckpt(o.recon_loss.item(), 0.0)
+    if phase == "tok" and tok_step >= args.tok_steps:
+        phase = "ar"
+        save(0.0, 0.0)
+        last_ckpt = time.time()
+
+    if time_up():
+        save(0.0, 0.0)
+        print("[drive.train_long] time budget reached — checkpoint saved, resume to continue")
+        return 0
+
+    # precompute pool tokens with the (now frozen) tokenizer; cached across resumes
+    tokens_path = out / "tokens.pt"
+    if tokens_path.exists():
+        tokens = torch.load(tokens_path, map_location=dev)
+    else:
+        chunks = []
+        with torch.no_grad():
+            for i in range(0, N, 64):
+                chunks.append(tok.tokenize(rgb[i:i + 64].to(dev).float().div(255)).flatten(1))
+        tokens = torch.cat(chunks)
+        _atomic_save(tokens.cpu(), tokens_path)
+        tokens = tokens.to(dev)
+
+    def ar_batch(parr):
+        b = parr[np.random.randint(0, len(parr), args.batch)]
+        i0 = torch.from_numpy(b[:, 0]).to(dev)
+        i1 = torch.from_numpy(b[:, 1]).to(dev)
+        return i0, i1
+
+    # ---- PHASE 2: multimodal transition ----
+    while phase == "ar" and ar_step < args.ar_steps and not time_up():
+        i0, i1 = ar_batch(train_pairs)
+        loss, _ = trans.loss(tokens[i0], tokens[i1], lidar[i0], tel[i0], ctl[i0], lidar[i1], tel[i1])
+        tr_opt.zero_grad(); loss.backward(); tr_opt.step()
+        ar_step += 1
+        if ar_step % 50 == 0 or (time.time() - last_ckpt) / 60 >= args.ckpt_every_min:
+            with torch.no_grad():
+                vi0, vi1 = ar_batch(val_pairs)
+                vloss, _ = trans.loss(tokens[vi0], tokens[vi1], lidar[vi0], tel[vi0], ctl[vi0], lidar[vi1], tel[vi1])
+            maybe_ckpt(loss.item(), vloss.item())
+
+    save(0.0, 0.0)
+    print(f"[drive.train_long] done: phase={phase} tok_step={tok_step} ar_step={ar_step}  → {latest}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
