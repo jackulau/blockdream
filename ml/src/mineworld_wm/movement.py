@@ -45,7 +45,7 @@ class SkillRealEncoder(nn.Module):
         self.n_skills = n_skills
         self.default_skill = 0
 
-    def forward(self, buttons: torch.Tensor, camera: torch.Tensor, skill=None) -> torch.Tensor:
+    def forward(self, buttons: torch.Tensor, camera: torch.Tensor, skill=None, orientation=None) -> torch.Tensor:
         b = buttons.shape[0]
         if skill is None:
             ids = torch.full((b,), self.default_skill, dtype=torch.long, device=buttons.device)
@@ -53,4 +53,4 @@ class SkillRealEncoder(nn.Module):
             ids = torch.full((b,), skill, dtype=torch.long, device=buttons.device)
         else:
             ids = skill.to(buttons.device)
-        return self.base(buttons, camera) + self.skill(ids)
+        return self.base(buttons, camera, orientation) + self.skill(ids)

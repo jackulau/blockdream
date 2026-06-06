@@ -73,12 +73,13 @@ class WorldModelSession:
         return StepResult(0, init_frame)
 
     @torch.no_grad()
-    def step(self, buttons: torch.Tensor, camera: torch.Tensor) -> StepResult:
+    def step(self, buttons: torch.Tensor, camera: torch.Tensor, orientation: torch.Tensor | None = None) -> StepResult:
         if self._prev is None:
             self.reset()
         if hasattr(self.enc, "default_skill"):
             self.enc.default_skill = self.skill  # condition on the selected movement type
-        action = self.enc(buttons.view(1, -1).to(self.device), camera.view(1, 2).to(self.device))
+        ori = orientation.view(1, -1).to(self.device) if orientation is not None else None
+        action = self.enc(buttons.view(1, -1).to(self.device), camera.view(1, 2).to(self.device), orientation=ori)
         if self.kind == "ar":
             nxt = self.trans.generate(self._prev, action)  # (1, N)
             grid = int(nxt.shape[1] ** 0.5)
@@ -115,7 +116,9 @@ class RolloutServer:
         elif t == "action":
             buttons = torch.tensor(msg.get("buttons", [0] * self.session.cfg.action.n_buttons), dtype=torch.float32)
             camera = torch.tensor(msg.get("camera", [0.0, 0.0]), dtype=torch.float32)
-            r = self.session.step(buttons, camera)
+            ori_list = msg.get("orientation")  # optional [yaw, pitch, roll] in [-1, 1]
+            orientation = torch.tensor(ori_list, dtype=torch.float32) if ori_list is not None else None
+            r = self.session.step(buttons, camera, orientation)
         else:
             return {"type": "error", "message": f"unknown message type {t!r}"}
         return {

@@ -31,6 +31,12 @@ class ActionConfig:
     camera_bins: int = 11         # per-axis discrete camera bins (AR path)
     camera_continuous: bool = True  # browser/diffusion path uses continuous camera
     embed_dim: int = 64
+    # Full control representation: condition on absolute look ORIENTATION (yaw, pitch, roll),
+    # each normalized to [-1, 1]. Off by default for backward compatibility with existing
+    # checkpoints (camera alone is a relative look-delta; orientation is the absolute pose,
+    # which matters for boat steering / elytra glide / mounts where heading is part of dynamics).
+    orientation: bool = False
+    n_orientation: int = 3        # yaw, pitch, roll
 
 
 @dataclass

@@ -27,7 +27,12 @@ def unbin_camera(idx: torch.Tensor, bins: int) -> torch.Tensor:
 
 
 class ActionEncoder(nn.Module):
-    """Encode (buttons, camera) → a fixed-width action embedding."""
+    """Encode (buttons, camera[, orientation]) → a fixed-width action embedding.
+
+    Orientation (absolute yaw/pitch/roll, normalized [-1,1]) is an OPTIONAL channel enabled
+    by `cfg.orientation`. When off, behaviour and parameters are identical to the original
+    encoder (so existing checkpoints load unchanged). When on, an absolute-pose vector is
+    projected and summed in alongside buttons + relative camera."""
 
     def __init__(self, cfg: ActionConfig):
         super().__init__()
@@ -39,17 +44,29 @@ class ActionEncoder(nn.Module):
             # two axes, each embedded then summed
             self.camera_emb = nn.Embedding(cfg.camera_bins, cfg.embed_dim)
             self.camera_proj = nn.Identity()
+        if getattr(cfg, "orientation", False):
+            self.orient_proj: nn.Module = nn.Linear(cfg.n_orientation, cfg.embed_dim)
         self.out = nn.Linear(cfg.embed_dim, cfg.embed_dim)
 
-    def forward(self, buttons: torch.Tensor, camera: torch.Tensor) -> torch.Tensor:
-        # buttons: (B, n_buttons) float multi-hot; camera: (B, 2) continuous
+    def forward(
+        self,
+        buttons: torch.Tensor,
+        camera: torch.Tensor,
+        orientation: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        # buttons: (B, n_buttons) float multi-hot; camera: (B, 2) continuous; orientation: (B, 3)
         b = self.button_proj(buttons)
         if self.cfg.camera_continuous:
             c = self.camera_proj(camera)
         else:
             idx = bin_camera(camera, self.cfg.camera_bins)  # (B, 2)
             c = self.camera_emb(idx).sum(dim=1)
-        return self.out(F.gelu(b + c))
+        h = b + c
+        if getattr(self.cfg, "orientation", False):
+            if orientation is None:
+                orientation = camera.new_zeros((buttons.shape[0], self.cfg.n_orientation))
+            h = h + self.orient_proj(orientation)
+        return self.out(F.gelu(h))
 
 
 def mask_inactive_buttons(buttons: torch.Tensor, active: list[int]) -> torch.Tensor:
