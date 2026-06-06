@@ -12,20 +12,55 @@ import numpy as np
 from .physics import CarParams, CarState, step
 
 
-def make_oval_track(rx: float = 60.0, ry: float = 40.0, width: float = 12.0, n: int = 80):
-    """Two concentric ellipses → a closed road corridor. Returns (walls (M,4), centerline (n,2))."""
-    th = np.linspace(0, 2 * np.pi, n, endpoint=False)
-    def ellipse(ax, by):
-        return np.stack([ax * np.cos(th), by * np.sin(th)], axis=1)
-    outer = ellipse(rx + width / 2, ry + width / 2)
-    inner = ellipse(rx - width / 2, ry - width / 2)
-    centerline = ellipse(rx, ry)
+def _walls_from_centerline(cl: np.ndarray, width: float) -> np.ndarray:
+    """Build inner+outer corridor walls by offsetting a closed centerline along its normals.
+    Works for any smooth, non-self-intersecting closed curve (not just an ellipse)."""
+    n = len(cl)
+    nxt = np.roll(cl, -1, axis=0)
+    prv = np.roll(cl, 1, axis=0)
+    tang = nxt - prv
+    tlen = np.linalg.norm(tang, axis=1, keepdims=True)
+    tang = tang / np.where(tlen > 1e-9, tlen, 1.0)
+    normal = np.stack([-tang[:, 1], tang[:, 0]], axis=1)  # left normal
+    outer = cl + normal * (width / 2)
+    inner = cl - normal * (width / 2)
     segs = []
     for ring in (outer, inner):
         for i in range(n):
             a, b = ring[i], ring[(i + 1) % n]
             segs.append([a[0], a[1], b[0], b[1]])
-    return np.asarray(segs, dtype=np.float64), centerline
+    return np.asarray(segs, dtype=np.float64)
+
+
+# track shapes — all closed, non-self-intersecting, so the offset corridor is well-defined.
+TRACK_KINDS = ("oval", "circle", "wavy", "peanut")
+
+
+def make_track(kind: str = "oval", width: float = 12.0, n: int = 80):
+    """A driving track by name → (walls (M,4), centerline (n,2)). More curvature variety than
+    a single oval, so the model learns more than one corridor."""
+    th = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    cos, sin = np.cos(th), np.sin(th)
+    if kind == "oval":
+        cl = np.stack([60.0 * cos, 40.0 * sin], axis=1)
+    elif kind == "circle":
+        cl = np.stack([50.0 * cos, 50.0 * sin], axis=1)
+    elif kind == "wavy":
+        r = 50.0 + 12.0 * np.sin(3 * th)  # 3-lobed gentle waves
+        cl = np.stack([r * cos, r * sin], axis=1)
+    elif kind == "peanut":
+        r = 50.0 + 16.0 * np.cos(2 * th)  # two-lobe (non-self-intersecting)
+        cl = np.stack([r * cos, r * sin], axis=1)
+    else:
+        raise ValueError(f"unknown track kind {kind!r} (known: {TRACK_KINDS})")
+    return _walls_from_centerline(cl, width), cl
+
+
+def make_oval_track(rx: float = 60.0, ry: float = 40.0, width: float = 12.0, n: int = 80):
+    """Two concentric ellipses → a closed road corridor. Returns (walls (M,4), centerline (n,2))."""
+    th = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    cl = np.stack([rx * np.cos(th), ry * np.sin(th)], axis=1)
+    return _walls_from_centerline(cl, width), cl
 
 
 @dataclass
@@ -35,13 +70,14 @@ class DriveConfig:
     img_size: int = 64
     view_range: float = 45.0   # meters shown around the car (half-extent)
     dt: float = 1.0 / 15.0
+    track: str = "oval"        # track shape (see TRACK_KINDS) — vary across rollouts for richer data
 
 
 class DriveSim:
     def __init__(self, cfg: DriveConfig | None = None, params: CarParams | None = None, seed: int = 0):
         self.cfg = cfg or DriveConfig()
         self.p = params or CarParams()
-        self.walls, self.centerline = make_oval_track()
+        self.walls, self.centerline = make_track(self.cfg.track)
         self.rng = np.random.default_rng(seed)
         self.state = CarState()
         self.reset()

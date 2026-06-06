@@ -78,8 +78,14 @@ class WorldModelSession:
             self.reset()
         if hasattr(self.enc, "default_skill"):
             self.enc.default_skill = self.skill  # condition on the selected movement type
-        ori = orientation.view(1, -1).to(self.device) if orientation is not None else None
-        action = self.enc(buttons.view(1, -1).to(self.device), camera.view(1, 2).to(self.device), orientation=ori)
+        bt = buttons.view(1, -1).to(self.device)
+        cam = camera.view(1, 2).to(self.device)
+        # only pass orientation when present, so encoders without an orientation channel
+        # (e.g. DemoEncoder) keep working unchanged.
+        if orientation is not None:
+            action = self.enc(bt, cam, orientation=orientation.view(1, -1).to(self.device))
+        else:
+            action = self.enc(bt, cam)
         if self.kind == "ar":
             nxt = self.trans.generate(self._prev, action)  # (1, N)
             grid = int(nxt.shape[1] ** 0.5)

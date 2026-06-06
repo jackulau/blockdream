@@ -60,10 +60,10 @@ class DemoEncoder(nn.Module):
             mask[i] = 1.0
         self.register_buffer("button_mask", mask)
 
-    def forward(self, buttons: torch.Tensor, camera: torch.Tensor) -> torch.Tensor:
+    def forward(self, buttons: torch.Tensor, camera: torch.Tensor, orientation: torch.Tensor | None = None) -> torch.Tensor:
         b = buttons * self.button_mask
         skill = self.skill(torch.full((buttons.shape[0],), self.skill_id, dtype=torch.long, device=buttons.device))
-        return self.base(b, camera) + skill
+        return self.base(b, camera, orientation) + skill
 
 
 def demo_config(spec: DemoSpec, image_size: int = 32, kind: str | None = None) -> Config:

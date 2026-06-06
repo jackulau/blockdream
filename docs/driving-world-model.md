@@ -52,6 +52,30 @@ drift-sim recipe — per-modality encoders → fused conditioning → recursive 
 Trained model **obeys physics** (steer-left → higher predicted yaw-rate than
 steer-right) and stays stable over recursive rollout — verified in `test_drive_world`.
 
+## Making it better — what changed
+
+The model was trained on a single oval with single-step conditioning and only a summed
+loss for "quality". Improvements:
+
+- **Multi-track world** (`drive/sim.py make_track`): `oval, circle, wavy, peanut` — varied
+  curvature (normal-offset corridors), so it learns more than one track. `collect.py` spans
+  the shapes across rollouts.
+- **Temporal context** (`DriveTransition(n_history=k)`): the transition optionally conditions
+  on a window of the last *k* (control, telemetry) frames, so it sees momentum/lag instead of
+  one step — single-step telemetry prediction drifts over long rollouts. Backward compatible
+  (`n_history=0` = original).
+- **Real evaluation** (`scripts/eval_drive.py`): per-modality validation error (RGB token
+  accuracy, LiDAR MSE, telemetry MSE) **+ closed-loop drift** (roll the model forward feeding
+  its own predictions back, compare the telemetry trajectory to the simulator). Measured:
+  temporal context roughly **halves telemetry MSE** and reduces closed-loop drift vs
+  single-step (`tests/test_eval_drive.py`).
+- **Real-data path**: `drive/commavq.py` ingests comma's tokenized real driving video for
+  scale-up beyond the synthetic sim (table above).
+
+```bash
+python scripts/eval_drive.py            # per-modality + closed-loop drift, single vs temporal
+```
+
 Reference open models to deepen toward: **MUVO** (RGB+LiDAR+occupancy, open code+weights),
 **Vista** (RGB action-conditioned, Apache-2.0), **OccWorld/Copilot4D** (LiDAR-as-tokens),
 plus **Oasis/MineWorld** for stable real-time recursive rollout.

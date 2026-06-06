@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .sim import DriveSim, DriveConfig
+from .sim import DriveSim, DriveConfig, TRACK_KINDS
 
 
 def _pursuit_action(sim: DriveSim, rng: np.random.Generator, target_speed: float = 11.0) -> tuple[float, float, float]:
@@ -57,9 +57,10 @@ def prepare_pool(rollouts: int, steps: int, out: str, seed: int = 0) -> int:
         f = out_dir / f"roll_{i:05d}.npz"
         if f.exists():
             continue
-        r = collect_rollout(steps, seed + i)
+        track = TRACK_KINDS[i % len(TRACK_KINDS)]  # span track shapes for richer dynamics
+        r = collect_rollout(steps, seed + i, DriveConfig(track=track))
         np.savez_compressed(f, **r)
-        print(f"[drive.collect] {i + 1}/{rollouts}: {steps} steps")
+        print(f"[drive.collect] {i + 1}/{rollouts}: {steps} steps ({track})")
     n = len(list(out_dir.glob("roll_*.npz")))
     print(f"[drive.collect] {n} rollouts in {out_dir}")
     return n
