@@ -4,5 +4,6 @@ export * from "./validate";
 export * from "./datapack";
 export * from "./datapack3d";
 export * from "./fill";
+export * from "./parallel";
 export * from "./behaviorpack";
 export * from "./bedrock-script";
