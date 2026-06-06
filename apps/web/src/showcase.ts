@@ -265,18 +265,28 @@ async function setup3dViewer(): Promise<void> {
     return { width: w, height: h, mapColorId, paletteIndex };
   }
 
+  // map a quantized cell → 0..1 perceptual brightness (for relief depth), via the palette
+  const brightnessOf = (mapColorId: number): number => {
+    const hex = hexByMap.get(mapColorId) ?? 0x808080;
+    const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  };
+
   function build3d(q: ReturnType<typeof quantizeFrame>): void {
     lastSource = q;
-    // 24 pre-rotated frames ARE the turntable motion → setFrames defaults continuous spin
-    // off so the two don't compound into a double-speed wobble.
-    current3d = spin(imageToVolume(q, { mode: "flat", depth: Number(depth.value) }), 24, "y");
+    // Front-facing bas-RELIEF (not a flat slab): the picture stays readable on the front face
+    // and each pixel extrudes back by its brightness, so it reads as 3D from every spin angle
+    // (a flat slab vanishes to a sliver edge-on). 24 pre-rotated frames ARE the turntable, so
+    // setFrames defaults continuous spin off (no double-rotation).
+    const maxDepth = Math.max(4, Number(depth.value));
+    current3d = spin(imageToVolume(q, { mode: "relief", depth: maxDepth, heightOf: brightnessOf }), 24, "y");
     viewer.setFrames(current3d);
     spinCb.checked = viewer.isSpinning;
     scrub.max = String(current3d.length - 1);
     $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
     playBtn.textContent = "pause";
-    hud.textContent = `${current3d.length} frames · drag to orbit`;
+    hud.textContent = `${current3d.length} frames · bas-relief · drag to orbit`;
   }
 
   // initial source = the preloaded sample image
