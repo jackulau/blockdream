@@ -6,14 +6,18 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EMPTY, type VoxelVolume } from "@mineworld/voxel";
+import { buildSchedule, uniformSchedule, frameAtElapsed, startOfFrame, type FrameSchedule } from "./anim";
 
 export interface Viewer3DConfig {
   canvas: HTMLCanvasElement;
   textureFor: (mapColorId: number) => string | null; // local /blocks/<file>.png, or null
   colorFor: (mapColorId: number) => number; // 0xRRGGBB fallback when no texture
-  fps?: number; // playback frames/sec (default 8)
+  fps?: number; // fallback playback fps when frames carry no per-frame durations (default 8)
   onFrame?: (index: number, count: number) => void;
 }
+
+/** Continuous turntable-spin rate, radians/second (delta-time scaled → refresh-rate independent). */
+const SPIN_RAD_PER_SEC = 0.6;
 
 export class Viewer3D {
   private readonly renderer: THREE.WebGLRenderer;
@@ -28,7 +32,9 @@ export class Viewer3D {
   private index = 0;
   private playing = false;
   private spinning = true;
-  private lastAdvance = 0;
+  private schedule: FrameSchedule = uniformSchedule(1, 8);
+  private playStart = 0;
+  private lastT = 0;
   private readonly fps: number;
   private raf = 0;
 
@@ -115,11 +121,21 @@ export class Viewer3D {
     return g;
   }
 
-  setFrames(frames: VoxelVolume[]): void {
+  /**
+   * Load a frame sequence. `opts.durationsMs` (e.g. a GIF's real per-frame delays) makes
+   * playback honor the source cadence; without it, playback falls back to a fixed fps.
+   * Turntable-spin is DECOUPLED from frame playback: a multi-frame animation defaults
+   * spin OFF (the frames ARE the motion — spinning on top double-rotates), a single static
+   * volume defaults spin ON (turntable showcase).
+   */
+  setFrames(frames: VoxelVolume[], opts: { durationsMs?: Array<number | undefined | null> } = {}): void {
     this.root.clear();
     this.groups = new Array(frames.length).fill(null);
     this.frames = frames;
     this.index = 0;
+    this.schedule = opts.durationsMs ? buildSchedule(opts.durationsMs) : uniformSchedule(frames.length, this.fps);
+    this.spinning = frames.length <= 1;
+    this.playStart = performance.now();
     // frame the camera to the volume
     const v = frames[0];
     if (v) {
@@ -148,10 +164,13 @@ export class Viewer3D {
 
   setFrame(i: number): void {
     this.showFrame(i);
+    // re-anchor the clock so a subsequent play() resumes from the scrubbed frame
+    this.playStart = performance.now() - startOfFrame(this.schedule, this.index);
   }
   play(): void {
     this.playing = true;
-    this.lastAdvance = performance.now();
+    // resume from the current frame rather than restarting at 0
+    this.playStart = performance.now() - startOfFrame(this.schedule, this.index);
   }
   pause(): void {
     this.playing = false;
@@ -162,16 +181,21 @@ export class Viewer3D {
   setSpin(on: boolean): void {
     this.spinning = on;
   }
+  get isSpinning(): boolean {
+    return this.spinning;
+  }
   get frameCount(): number {
     return this.frames.length;
   }
 
   private loop = (t: number): void => {
     this.raf = requestAnimationFrame(this.loop);
-    if (this.spinning) this.root.rotation.y += 0.01;
-    if (this.playing && this.frames.length > 1 && t - this.lastAdvance >= 1000 / this.fps) {
-      this.lastAdvance = t;
-      this.showFrame(this.index + 1);
+    const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
+    this.lastT = t;
+    if (this.spinning) this.root.rotation.y += SPIN_RAD_PER_SEC * dt; // delta-time → refresh-rate independent
+    if (this.playing && this.frames.length > 1) {
+      const idx = frameAtElapsed(this.schedule, t - this.playStart, true);
+      if (idx !== this.index) this.showFrame(idx);
     }
     this.controls.update();
     this.renderer.render(this.scene, this.camera);

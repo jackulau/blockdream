@@ -13,6 +13,12 @@ import {
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@mineworld/palette";
 import { blockForBase, swatchDataUrl, localTextureUrl, loadTextureManifest } from "./blocks";
+import { decodeGif, isGif } from "./gif";
+import { buildSchedule, frameAtElapsed, type FrameSchedule } from "./anim";
+
+type Source = HTMLImageElement | HTMLCanvasElement;
+const srcW = (s: Source) => (s instanceof HTMLImageElement ? s.naturalWidth : s.width);
+const srcH = (s: Source) => (s instanceof HTMLImageElement ? s.naturalHeight : s.height);
 
 export interface BlockArtEls {
   file: HTMLInputElement;
@@ -34,13 +40,20 @@ export interface BlockArtOpts {
 export function createBlockArt(
   els: BlockArtEls,
   opts: BlockArtOpts = {},
-): { loadUrl: (url: string) => void; getFrame: () => QuantizedFrame | null } {
+): { loadUrl: (url: string) => void; loadFile: (file: File) => Promise<void>; getFrame: () => QuantizedFrame | null } {
   const pal: PreparedPalette = preparePalette(javaMapPalette as unknown as MapPalette);
-  let lastImage: HTMLImageElement | null = null;
+  let lastImage: Source | null = null;
   let lastQ: QuantizedFrame | null = null;
+  // animated-GIF playback (single-image path is unchanged when frames is empty)
+  let frames: HTMLCanvasElement[] = [];
+  let schedule: FrameSchedule | null = null;
+  let curFrame = 0;
+  let animStart = 0;
+  let animRaf = 0;
+  const currentSource = (): Source | null => (frames.length ? frames[curFrame]! : lastImage);
 
-  function toRgbImage(img: HTMLImageElement, gridW: number): RgbImage {
-    const aspect = img.naturalHeight / img.naturalWidth || 1;
+  function toRgbImage(img: Source, gridW: number): RgbImage {
+    const aspect = srcH(img) / srcW(img) || 1;
     const w = gridW;
     const h = Math.max(1, Math.round(gridW * aspect));
     const c = document.createElement("canvas");
@@ -59,11 +72,11 @@ export function createBlockArt(
     return { width: w, height: h, data: out };
   }
 
-  function drawSource(img: HTMLImageElement): void {
+  function drawSource(img: Source): void {
     const ctx = els.src.getContext("2d")!;
-    const scale = Math.min(256 / img.naturalWidth, 256 / img.naturalHeight, 1);
-    els.src.width = Math.round(img.naturalWidth * scale);
-    els.src.height = Math.round(img.naturalHeight * scale);
+    const scale = Math.min(256 / srcW(img), 256 / srcH(img), 1);
+    els.src.width = Math.round(srcW(img) * scale);
+    els.src.height = Math.round(srcH(img) * scale);
     ctx.drawImage(img, 0, 0, els.src.width, els.src.height);
   }
 
@@ -102,11 +115,13 @@ export function createBlockArt(
   }
 
   function render(): void {
-    if (!lastImage) return;
+    const src = currentSource();
+    if (!src) return;
+    drawSource(src); // keep the source preview in sync (also shows the animated frame)
     const gridW = Number(els.grid.value);
     const method = els.dither.value as DitherMethod;
     const t0 = performance.now();
-    const rgb = toRgbImage(lastImage, gridW);
+    const rgb = toRgbImage(src, gridW);
     const q = quantizeFrame(rgb, pal, { method });
     lastQ = q;
     const dt = performance.now() - t0;
@@ -129,15 +144,68 @@ export function createBlockArt(
     els.out.style.width = `${Math.min(512, q.width * 4)}px`;
 
     const distinct = new Set(q.mapColorId).size;
-    els.stats.textContent = `${q.width}×${q.height} · ${counts.size} blocks · ${distinct} colors · ${dt.toFixed(1)} ms`;
+    const anim = frames.length > 1 ? ` · frame ${curFrame + 1}/${frames.length}` : "";
+    els.stats.textContent = `${q.width}×${q.height} · ${counts.size} blocks · ${distinct} colors · ${dt.toFixed(1)} ms${anim}`;
     renderBom(counts, q.width * q.height);
     opts.onRender?.(q);
   }
 
-  function loadImage(img: HTMLImageElement): void {
+  function stopAnim(): void {
+    if (animRaf) cancelAnimationFrame(animRaf);
+    animRaf = 0;
+  }
+
+  function loadImage(img: Source): void {
+    stopAnim();
+    frames = [];
+    schedule = null;
+    curFrame = 0;
     lastImage = img;
-    drawSource(img);
     render();
+  }
+
+  // Animated block-art: quantize each GIF frame and play them back on the same canvas at
+  // the GIF's REAL cadence (per-frame durations), looping. Hover + BOM track the live frame.
+  function loadFrames(canvases: HTMLCanvasElement[], durationsMs: Array<number | undefined>): void {
+    stopAnim();
+    lastImage = null;
+    frames = canvases;
+    schedule = buildSchedule(durationsMs);
+    curFrame = 0;
+    render();
+    if (frames.length > 1) {
+      animStart = performance.now();
+      const tick = (): void => {
+        const idx = frameAtElapsed(schedule!, performance.now() - animStart, true);
+        if (idx !== curFrame) {
+          curFrame = idx;
+          render();
+        }
+        animRaf = requestAnimationFrame(tick);
+      };
+      animRaf = requestAnimationFrame(tick);
+    }
+  }
+
+  // Route a dropped/selected file: animated GIF → frame-by-frame; otherwise a still image.
+  async function loadFile(file: File): Promise<void> {
+    if (isGif(file)) {
+      try {
+        const { canvases, durationsMs } = await decodeGif(file);
+        if (canvases.length > 1) {
+          loadFrames(canvases, durationsMs);
+          return;
+        }
+      } catch {
+        // ImageDecoder unsupported or decode failed → fall back to the static path below
+      }
+    }
+    const img = new Image();
+    img.onload = () => {
+      loadImage(img);
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
   }
 
   els.out.addEventListener("mousemove", (e) => {
@@ -169,13 +237,7 @@ export function createBlockArt(
 
   els.file.addEventListener("change", () => {
     const file = els.file.files?.[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = () => {
-      loadImage(img);
-      URL.revokeObjectURL(img.src);
-    };
-    img.src = URL.createObjectURL(file);
+    if (file) void loadFile(file);
   });
   els.grid.addEventListener("input", () => {
     els.gridVal.textContent = `${els.grid.value} px`;
@@ -190,7 +252,7 @@ export function createBlockArt(
   els.useTextures.checked = true;
   loadTextureManifest().then((ok) => {
     if (!ok) els.useTextures.checked = false; // no textures fetched yet → swatches
-    if (lastImage) render();
+    if (currentSource()) render();
   });
 
   // let callers seed an image (e.g. the showcase preloads sample pixel art)
@@ -200,5 +262,5 @@ export function createBlockArt(
     img.onload = () => loadImage(img);
     img.src = url;
   }
-  return { loadUrl, getFrame: () => lastQ };
+  return { loadUrl, loadFile, getFrame: () => lastQ };
 }

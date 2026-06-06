@@ -14,6 +14,7 @@ import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@minew
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, loadTextureManifest } from "./blocks";
 import { downloadDatapack } from "./datapack-export";
+import { decodeGif } from "./gif";
 
 // map-colour id → Minecraft block id (baseId = id>>2); air for unmapped
 const resolveBlock = (mapColorId: number) => blockForBase(mapColorId >> 2)?.id ?? "minecraft:air";
@@ -143,7 +144,7 @@ for (const e of ["dragleave", "drop"]) {
 baDrop.addEventListener("drop", (ev) => {
   ev.preventDefault();
   const f = (ev as DragEvent).dataTransfer?.files?.[0];
-  if (f && f.type.startsWith("image/")) ba.loadUrl(URL.createObjectURL(f));
+  if (f && f.type.startsWith("image/")) void ba.loadFile(f); // GIF → animated, else static
 });
 
 // Download a vanilla datapack that builds the current image as a block-wall.
@@ -201,26 +202,6 @@ function rgbImageFromCanvas(src: HTMLCanvasElement, gridW: number): RgbImage {
     out[j + 2] = data[i + 2]!;
   }
   return { width: w, height: h, data: out };
-}
-
-// decode an animated GIF to per-frame canvases via the browser ImageDecoder API
-async function decodeGif(file: File): Promise<HTMLCanvasElement[]> {
-  const Dec = (window as unknown as { ImageDecoder?: any }).ImageDecoder;
-  if (!Dec) throw new Error("ImageDecoder unsupported in this browser");
-  const dec = new Dec({ data: await file.arrayBuffer(), type: file.type || "image/gif" });
-  await dec.tracks.ready;
-  const count = dec.tracks.selectedTrack?.frameCount ?? 1;
-  const out: HTMLCanvasElement[] = [];
-  for (let i = 0; i < count; i++) {
-    const { image } = await dec.decode({ frameIndex: i });
-    const c = document.createElement("canvas");
-    c.width = image.displayWidth;
-    c.height = image.displayHeight;
-    c.getContext("2d")!.drawImage(image, 0, 0);
-    out.push(c);
-    image.close();
-  }
-  return out;
 }
 
 function rgbImageFromImg(img: HTMLImageElement, gridW: number): RgbImage {
@@ -286,8 +267,11 @@ async function setup3dViewer(): Promise<void> {
 
   function build3d(q: ReturnType<typeof quantizeFrame>): void {
     lastSource = q;
+    // 24 pre-rotated frames ARE the turntable motion → setFrames defaults continuous spin
+    // off so the two don't compound into a double-speed wobble.
     current3d = spin(imageToVolume(q, { mode: "flat", depth: Number(depth.value) }), 24, "y");
     viewer.setFrames(current3d);
+    spinCb.checked = viewer.isSpinning;
     scrub.max = String(current3d.length - 1);
     $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
@@ -309,9 +293,10 @@ async function setup3dViewer(): Promise<void> {
     if (lastSource) build3d(lastSource);
   });
 
-  function showFrames(frames: VoxelVolume[], label: string): void {
+  function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>): void {
     current3d = frames;
-    viewer.setFrames(frames);
+    viewer.setFrames(frames, { durationsMs });
+    spinCb.checked = viewer.isSpinning; // spin defaults off for multi-frame animations
     scrub.max = String(frames.length - 1);
     $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
@@ -330,11 +315,11 @@ async function setup3dViewer(): Promise<void> {
       if (/\.obj$/i.test(file.name)) {
         showFrames([objToVolume(await file.text(), { resolution: 32, mapColorId: grayId })], `model ${file.name}`);
       } else {
-        const canvases = await decodeGif(file);
+        const { canvases, durationsMs } = await decodeGif(file);
         const frames = canvases.map((c) =>
           imageToVolume(quantizeFrame(rgbImageFromCanvas(c, 28), pal3d, { method: "none" }), { mode: "flat", depth: 2 }),
         );
-        showFrames(frames, `gif ${file.name}`);
+        showFrames(frames, `gif ${file.name}`, durationsMs);
       }
     } catch (err) {
       hud.textContent = `import failed: ${(err as Error).message}`;
