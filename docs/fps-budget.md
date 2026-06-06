@@ -52,8 +52,11 @@ gets both by joining the Java server through Geyser.
 ## Where "≥30 fps everywhere" actually lands
 
 - **Browser display:** yes, today (≥ refresh, decoupled).
-- **Browser Minecraft *content*:** not yet — gated on fast inference (parallel/diagonal AR decode
-  or the few-step diffusion/ONNX path), which is goal 019. Driving content already clears 30.
+- **Browser Minecraft *content*:** the few-step **diffusion** path is the >=30 fps answer
+  (parallel over space, fps ~independent of resolution) — `ml/scripts/bench_inference.py` measures
+  ~47 fps for it even on a CPU floor vs ~4 fps for sequential 256-token AR (the current served
+  model). Operator step: train + serve/export a diffusion MC checkpoint (the AR path is what's
+  trained today). Driving content already clears 30.
 - **In-world:** no, and not claimed — vanilla caps ~10 fps, the map-wall mod targets ~20 fps.
   30 fps full-screen in real Minecraft is not physically available; we render smooth in the
   browser and stream to the map wall at map-resend speed.
