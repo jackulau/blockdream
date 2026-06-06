@@ -1,0 +1,17 @@
+{
+  "name": "@mineworld/voxel",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mineworld/color-core": "workspace:*",
+    "@mineworld/palette": "workspace:*"
+  },
+  "files": ["src"]
+}
