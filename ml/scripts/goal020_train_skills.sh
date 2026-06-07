@@ -28,11 +28,16 @@ POOLS=""
 for s in ${SKILLS//,/ }; do POOLS="${POOLS:+$POOLS,}data/pool_synth_$s"; done
 log "pools = $POOLS"
 
-# 2. train skill-conditioned model, bounded
-log "training skill-conditioned model -> runs/skills (bounded ~50min)…"
+# 2. train skill-conditioned model, bounded.
+# preset=quick → 256 tokens/frame at 64px (downsample 4) — 4x the spatial detail of m4's 64
+# tokens, so the per-skill colour cast/scroll actually render; smaller dim192 net converges faster.
+# Strong tokenizer (8k steps) is essential: the first run gave the tokenizer ~1min → mushy decode
+# that collapsed all skills to the same blur. Fresh run (preset change → can't resume old state).
+rm -f runs/skills/latest.pt runs/skills/log.csv
+log "training skill-conditioned model -> runs/skills (preset=quick, bounded ~55min)…"
 "$PY" -m mineworld_wm.train_long --pools "$POOLS" --out runs/skills \
-  --preset m4 --device mps --tok-steps 3000 --ar-steps 18000 \
-  --ckpt-every-min 5 --batch 16 --max-minutes 50 2>&1 | tee -a "$LOG"
+  --preset quick --device mps --tok-steps 8000 --ar-steps 30000 \
+  --ckpt-every-min 5 --batch 16 --max-minutes 55 2>&1 | tee -a "$LOG"
 rc=$?
 log "D6 training exit rc=$rc (checkpoint: runs/skills/latest.pt)"
 exit $rc
