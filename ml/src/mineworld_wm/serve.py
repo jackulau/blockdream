@@ -23,6 +23,9 @@ from .tokenizer import Tokenizer
 from .actions import ActionEncoder
 from .transition_ar import ARTransition
 from .transition_diffusion import LatentDiffusionTransition
+from .logutil import get_logger, timed
+
+LOG = get_logger("serve")
 
 
 def frame_to_png_b64(img: torch.Tensor) -> str:
@@ -86,15 +89,16 @@ class WorldModelSession:
             action = self.enc(bt, cam, orientation=orientation.view(1, -1).to(self.device))
         else:
             action = self.enc(bt, cam)
-        if self.kind == "ar":
-            nxt = self.trans.generate(self._prev, action)  # (1, N)
-            grid = int(nxt.shape[1] ** 0.5)
-            frame = self.tok.decode_tokens(nxt.view(1, grid, grid))[0]
-            self._prev = nxt
-        else:
-            nxt = self.trans.sample(self._prev, action)  # (1, C, h, w)
-            frame = self.tok.decode(nxt)[0]
-            self._prev = nxt
+        with timed(LOG, f"step[{self.kind}]"):  # per-step latency at DEBUG (off the hot path otherwise)
+            if self.kind == "ar":
+                nxt = self.trans.generate(self._prev, action)  # (1, N)
+                grid = int(nxt.shape[1] ** 0.5)
+                frame = self.tok.decode_tokens(nxt.view(1, grid, grid))[0]
+                self._prev = nxt
+            else:
+                nxt = self.trans.sample(self._prev, action)  # (1, C, h, w)
+                frame = self.tok.decode(nxt)[0]
+                self._prev = nxt
         self.step_idx += 1
         return StepResult(self.step_idx, frame)
 
@@ -149,7 +153,7 @@ async def run_ws(server: RolloutServer, host: str = "127.0.0.1", port: int = 876
         async for raw in ws:
             await ws.send(json.dumps(server.handle(json.loads(raw))))
 
-    print(f"[serve] mineworld world-model on ws://{host}:{port}  (demo={server.session.cfg.demo.name})")
+    LOG.info("world-model serving on ws://%s:%d (demo=%s)", host, port, server.session.cfg.demo.name)
     async with websockets.serve(handler, host, port):
         await asyncio.Future()
 
@@ -196,7 +200,7 @@ def load_real_checkpoint(path: str, device: str = "auto") -> WorldModelSession:
     session = WorldModelSession(cfg, tok, enc, trans, device=dev)
     if ckpt.get("init_frame") is not None:
         session.default_init = ckpt["init_frame"]
-    print(f"[serve] world model on {device_name(dev)} ({n} tokens/frame, KV-cached)")
+    LOG.info("world model on %s (%d tokens/frame, KV-cached)", device_name(dev), n)
     return session
 
 
@@ -224,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     try:
         asyncio.run(run_ws(server, args.host, args.port))
     except KeyboardInterrupt:
-        print("\n[serve] stopped")
+        LOG.info("stopped")
     return 0
 
 

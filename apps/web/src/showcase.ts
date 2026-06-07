@@ -21,6 +21,7 @@ import {
   type VoxelVolume,
 } from "@mineworld/voxel";
 import { rgbFramesToAnimated3d } from "./video3d";
+import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@mineworld/emit-commands";
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
@@ -300,7 +301,8 @@ async function setup3dViewer(): Promise<void> {
       depthMap && depthMap.length === q.width * q.height
         ? (x: number, y: number) => depthMap![y * q.width + x]!
         : undefined;
-    const vol = imageToSolid(q, { maxDepth, depthOf });
+    const vol = log.time("imageToSolid", () => imageToSolid(q, { maxDepth, depthOf }));
+    log.debug("build3d", { dims: [vol.sx, vol.sy, vol.sz], depthMapped: !!depthOf });
     baseVolume = vol;
     current3d = [vol];
     viewer.setFrames(current3d); // single solid → live transform animation (no baked frames)
@@ -388,6 +390,7 @@ async function setup3dViewer(): Promise<void> {
         hud.textContent = "unsupported file — use .gltf/.glb, .obj (one or many), or .gif";
       }
     } catch (err) {
+      log.warn("3D import failed", err);
       hud.textContent = `import failed: ${(err as Error).message}`;
     }
   });
