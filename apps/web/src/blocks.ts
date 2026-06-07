@@ -59,6 +59,7 @@ export function swatchDataUrl(info: BlockInfo, size = 26): string {
 // local-only. Absent until the fetch script is run → callers fall back to swatchDataUrl.
 
 let MANIFEST: Record<string, string> | null = null;
+let FACES: Record<string, { top?: string; side?: string; bottom?: string }> = {};
 let manifestVersion = "";
 
 /** Fetch the local texture manifest once. Resolves even if it's missing (→ no textures). */
@@ -67,13 +68,27 @@ export async function loadTextureManifest(): Promise<boolean> {
   try {
     const r = await fetch("/blocks/manifest.json", { cache: "no-cache" });
     if (!r.ok) return false;
-    const j = (await r.json()) as { textures?: Record<string, string>; version?: string };
+    const j = (await r.json()) as {
+      textures?: Record<string, string>;
+      faces?: Record<string, { top?: string; side?: string; bottom?: string }>;
+      version?: string;
+    };
     MANIFEST = j.textures ?? {};
+    FACES = j.faces ?? {};
     manifestVersion = j.version ?? "";
     return true;
   } catch {
     return false;
   }
+}
+
+/** Per-face texture URL for a block (grass top vs side, log end-grain), or null if the block has no
+ *  distinct face texture — the caller then falls back to the single localTextureUrl. Only returns a
+ *  URL the manifest verified exists, so it never 404s. */
+export function faceTextureUrl(id: string, face: "top" | "side" | "bottom"): string | null {
+  const f = FACES[id];
+  const file = f?.[face] ?? (face === "bottom" ? f?.top : undefined); // bottom defaults to top when absent
+  return file ? `/blocks/${file}` : null;
 }
 
 export function hasLocalTextures(): boolean {

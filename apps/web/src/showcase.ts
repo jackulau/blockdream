@@ -12,7 +12,7 @@ import type { MapPalette } from "@mineworld/palette";
 import { imageToVolume, imageToSolid, objToVolume, type VoxelVolume } from "@mineworld/voxel";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@mineworld/emit-commands";
 import { Viewer3D } from "./viewer3d";
-import { blockForBase, localTextureUrl, loadTextureManifest } from "./blocks";
+import { blockForBase, localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
 import { downloadDatapack } from "./datapack-export";
 import { decodeGif } from "./gif";
 
@@ -236,6 +236,13 @@ async function setup3dViewer(): Promise<void> {
     textureFor: (id) => {
       const info = blockForBase(id >> 2); // mapColorId → baseId
       return info ? localTextureUrl(info.id) : null;
+    },
+    // per-face textures: dir 2 = +Y (top), dir 3 = -Y (bottom), else side. null → falls back to textureFor.
+    faceTextureFor: (id, dir) => {
+      const info = blockForBase(id >> 2);
+      if (!info) return null;
+      const face = dir === 2 ? "top" : dir === 3 ? "bottom" : "side";
+      return faceTextureUrl(info.id, face);
     },
     colorFor: (id) => hexByMap.get(id) ?? 0x808080,
     onFrame: (i, n) => {

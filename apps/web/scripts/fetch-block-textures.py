@@ -163,6 +163,52 @@ def best_texture(block_id: str, available: set[str]) -> str | None:
     return r
 
 
+# Blocks whose faces differ but don't follow the generic <name>_top/_side convention.
+_SPECIAL_FACES = {
+    "grass_block": ("grass_block_top.png", "grass_block_side.png", "dirt.png"),
+    "podzol": ("podzol_top.png", "podzol_side.png", "dirt.png"),
+    "mycelium": ("mycelium_top.png", "mycelium_side.png", "dirt.png"),
+    "crimson_nylium": ("crimson_nylium.png", "crimson_nylium_side.png", "netherrack.png"),
+    "warped_nylium": ("warped_nylium.png", "warped_nylium_side.png", "netherrack.png"),
+    "bookshelf": ("oak_planks.png", "bookshelf.png", "oak_planks.png"),
+    "tnt": ("tnt_top.png", "tnt_side.png", "tnt_bottom.png"),
+    "pumpkin": ("pumpkin_top.png", "pumpkin_side.png", "pumpkin_top.png"),
+    "melon": ("melon_top.png", "melon_side.png", "melon_top.png"),
+}
+
+
+def _face_textures(block_id: str, available: set[str]) -> dict[str, str] | None:
+    """Per-face {top,side,bottom} for a block with distinct faces (grass, logs, pillars, sandstone…),
+    using ONLY files present in `available` so the manifest never points at a missing PNG. Returns
+    None for single-texture blocks (the viewer then uses the one `textures[id]` entry on all faces)."""
+    name = block_id.split(":", 1)[-1]
+
+    def pick(*cands: str) -> str | None:
+        return next((c for c in cands if c in available), None)
+
+    # logs / stems / pillars: bark on the side, end-grain on top+bottom
+    if name.endswith(("_log", "_stem")):
+        side, top = pick(f"{name}.png"), pick(f"{name}_top.png")
+        if side and top:
+            return {"top": top, "side": side, "bottom": top}
+    if name.endswith("_wood") or name.endswith("_hyphae"):  # all-bark: same texture every face
+        base = name.rsplit("_", 1)[0] + ("_log" if name.endswith("_wood") else "_stem")
+        side = pick(f"{base}.png")
+        if side:
+            return {"top": side, "side": side, "bottom": side}
+
+    sf = _SPECIAL_FACES.get(name)
+    if sf and all(f in available for f in sf):
+        return {"top": sf[0], "side": sf[1], "bottom": sf[2]}
+
+    # generic: a distinct _top plus a side (either <name>_side or the bare <name> e.g. sandstone)
+    top = pick(f"{name}_top.png")
+    side = pick(f"{name}_side.png", f"{name}.png")
+    if top and side and top != side:
+        return {"top": top, "side": side, "bottom": pick(f"{name}_bottom.png") or top}
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("fetch-block-textures")
     ap.add_argument("--version", default="latest", help="Minecraft version, or 'latest' (most coverage)")
@@ -173,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ids = palette_block_ids()
     mapping: dict[str, str] = {}
+    faces: dict[str, dict[str, str]] = {}
     unmapped: list[str] = []
     for bid in ids:
         tex = best_texture(bid, available)
@@ -180,6 +227,9 @@ def main(argv: list[str] | None = None) -> int:
             mapping[bid] = tex
         else:
             unmapped.append(bid)
+        ft = _face_textures(bid, available)
+        if ft:
+            faces[bid] = ft
 
     manifest = {
         "version": version,
@@ -188,7 +238,9 @@ def main(argv: list[str] | None = None) -> int:
         "mapped": len(mapping),
         "unmapped": sorted(unmapped),  # block-art falls back to a generated swatch for these
         "textures": mapping,
+        "faces": faces,  # per-face textures for the 3D viewer (grass top/side, log end-grain, …)
     }
+    print(f"[textures] per-face textures for {len(faces)} multi-face blocks (grass, logs, sandstone…)")
     (BLOCKS_DIR / "manifest.json").write_text(json.dumps(manifest, indent=0))
     print(f"[textures] manifest: {len(mapping)}/{len(ids)} palette blocks mapped "
           f"({100 * len(mapping) / max(1, len(ids)):.1f}%), {len(unmapped)} → swatch fallback")

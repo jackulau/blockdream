@@ -5,12 +5,15 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { EMPTY, type VoxelVolume } from "@mineworld/voxel";
+import { type VoxelVolume } from "@mineworld/voxel";
+import { meshByMaterial, type FaceDir } from "./mesh3d";
 import { buildSchedule, uniformSchedule, frameAtElapsed, startOfFrame, type FrameSchedule } from "./anim";
 
 export interface Viewer3DConfig {
   canvas: HTMLCanvasElement;
   textureFor: (mapColorId: number) => string | null; // local /blocks/<file>.png, or null
+  /** Optional per-FACE texture (grass top vs side, log end-grain). Falls back to textureFor when null. */
+  faceTextureFor?: (mapColorId: number, dir: FaceDir) => string | null;
   colorFor: (mapColorId: number) => number; // 0xRRGGBB fallback when no texture
   fps?: number; // fallback playback fps when frames carry no per-frame durations (default 8)
   onFrame?: (index: number, count: number) => void;
@@ -71,52 +74,40 @@ export class Viewer3D {
       t = new THREE.TextureLoader().load(url);
       t.magFilter = THREE.NearestFilter;
       t.minFilter = THREE.NearestFilter;
+      t.wrapS = THREE.RepeatWrapping; // greedy quads UV-tile (0..W) → repeat the texture per cell
+      t.wrapT = THREE.RepeatWrapping;
       t.colorSpace = THREE.SRGBColorSpace;
       this.texCache.set(url, t);
     }
     return t;
   }
 
-  private material(id: number): THREE.Material {
-    const url = this.cfg.textureFor(id);
-    const key = url ?? `c${id}`;
+  // material key: the texture URL, or a `__color_<id>` sentinel for the untextured colour fallback.
+  private keyOf = (id: number, dir: FaceDir): string =>
+    (this.cfg.faceTextureFor?.(id, dir) ?? this.cfg.textureFor(id)) ?? `__color_${id}`;
+
+  private materialForKey(key: string): THREE.Material {
     let m = this.matCache.get(key);
     if (!m) {
-      m = url
-        ? new THREE.MeshLambertMaterial({ map: this.texture(url) })
-        : new THREE.MeshLambertMaterial({ color: this.cfg.colorFor(id) });
+      m = key.startsWith("__color_")
+        ? new THREE.MeshLambertMaterial({ color: this.cfg.colorFor(Number(key.slice(8))) })
+        : new THREE.MeshLambertMaterial({ map: this.texture(key) });
       this.matCache.set(key, m);
     }
     return m;
   }
 
+  // Greedy-meshed group: interior/occluded faces culled, coplanar same-material faces merged into
+  // big quads, grouped by material key (one mesh per texture; faces of a block can differ).
   private buildGroup(v: VoxelVolume): THREE.Group {
     const g = new THREE.Group();
-    const box = new THREE.BoxGeometry(1, 1, 1);
-    const byBlock = new Map<number, number[]>(); // mapColorId → flat [x,y,z,...]
-    let i = 0;
-    for (let z = 0; z < v.sz; z++)
-      for (let y = 0; y < v.sy; y++)
-        for (let x = 0; x < v.sx; x++) {
-          const c = v.data[i++]!;
-          if (c === EMPTY) continue;
-          let arr = byBlock.get(c);
-          if (!arr) byBlock.set(c, (arr = []));
-          arr.push(x, y, z);
-        }
-    const ox = (v.sx - 1) / 2;
-    const oy = (v.sy - 1) / 2;
-    const oz = (v.sz - 1) / 2;
-    const m4 = new THREE.Matrix4();
-    for (const [id, pos] of byBlock) {
-      const count = pos.length / 3;
-      const inst = new THREE.InstancedMesh(box, this.material(id), count);
-      for (let k = 0; k < count; k++) {
-        m4.makeTranslation(pos[k * 3]! - ox, pos[k * 3 + 1]! - oy, pos[k * 3 + 2]! - oz);
-        inst.setMatrixAt(k, m4);
-      }
-      inst.instanceMatrix.needsUpdate = true;
-      g.add(inst);
+    for (const [key, md] of meshByMaterial(v, this.keyOf)) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(md.positions, 3));
+      geo.setAttribute("normal", new THREE.BufferAttribute(md.normals, 3));
+      geo.setAttribute("uv", new THREE.BufferAttribute(md.uvs, 2));
+      geo.setIndex(new THREE.BufferAttribute(md.indices, 1));
+      g.add(new THREE.Mesh(geo, this.materialForKey(key)));
     }
     return g;
   }
