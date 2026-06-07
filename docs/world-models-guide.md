@@ -61,6 +61,20 @@ contractor data is walking/general only, so the other skills need their own grad
   every type out from the same seed and asserts the rollouts diverge (the embedding actually steers
   the world). Real per-skill footage drops into the same pool layout to scale up.
 
+## Real data (Mineflayer) — the comma.ai path
+
+The synthetic per-skill pools (above) *prove* the conditioning mechanism but don't look like real
+Minecraft. For photoreal-and-conditioned dynamics, collect **real** per-movement-type footage the
+way comma trains on fleet driving: `tools/mineflayer-collector/collect.mjs` drives a Mineflayer bot
+through each movement type on a real server and records its first-person view (mp4 via
+`prismarine-viewer` headless) plus, every physics tick, the **action** and **physics telemetry**
+(position, velocity, yaw/pitch, on-ground, in-water, speed). `scripts/import_mineflayer.py` aligns
+frames with the action+physics logs into `data/pool_real_<skill>/` (the trainer's pool format +
+`physics.npy`). Then `train_long --pools data/pool_real_*` learns real per-skill dynamics, and
+`physics.npy` is there for a physics-conditioned multimodal variant (like the driving model's
+RGB+LiDAR+telemetry stack). Operator-gated (needs a server); the importer's resampling core is unit
+tested (`tests/test_import_mineflayer.py`). See `tools/mineflayer-collector/README.md`.
+
 ## Browser diffusion
 
 The server-free, in-browser engine (`ml/web/rollout.js`, onnxruntime-web). Pipeline:

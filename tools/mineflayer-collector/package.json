@@ -1,0 +1,13 @@
+{
+  "name": "@blockdream/mineflayer-collector",
+  "private": true,
+  "type": "module",
+  "description": "Collect real per-movement-type Minecraft footage + physics telemetry for the Blockdream world model (comma.ai-style fleet data).",
+  "scripts": {
+    "collect": "node collect.mjs"
+  },
+  "dependencies": {
+    "mineflayer": "^4.20.0",
+    "prismarine-viewer": "^1.28.0"
+  }
+}
