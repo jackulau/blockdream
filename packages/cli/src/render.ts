@@ -4,6 +4,9 @@ import {
   getJavaMapPalette,
   getBedrockMapPalette,
   getSolidBlockMapPalette,
+  resolveMcVersion,
+  JAVA_DATAPACK_SUPPORTED,
+  BEDROCK_BLOCK_VERSION,
 } from "@blockdream/palette";
 import {
   preparePalette,
@@ -87,6 +90,9 @@ function quantizeAll(
  */
 export function render(opts: RenderOptions): RenderResult {
   const edition: Edition = opts.edition ?? "java";
+  // Resolve the target MC version once → format stamps for every emitted artifact.
+  // Throws a helpful error for an unsupported version (vs. a deep ENOENT later).
+  const mc = resolveMcVersion(opts.paletteVersion);
   const notes: string[] = [];
   const filesWritten: string[] = [];
 
@@ -116,11 +122,11 @@ export function render(opts: RenderOptions): RenderResult {
       for (const t of tiles) {
         const name = tiles.length > 1 ? `map_${fi}_c${t.col}_r${t.row}.dat` : `map_${fi}.dat`;
         const path = join(opts.out, name);
-        writeFile(path, buildMapDat(t.frame));
+        writeFile(path, buildMapDat(t.frame, { dataVersion: mc.dataVersion }));
         filesWritten.push(path);
       }
     });
-    notes.push(`${edition} filled-map .dat (${frames.length} frame(s)); load with an NBT/world tool or the datapack item-frame wall.`);
+    notes.push(`${edition} filled-map .dat (${frames.length} frame(s), DataVersion ${mc.dataVersion}; older stamps auto-upgrade on load); load with an NBT/world tool or the datapack item-frame wall.`);
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
@@ -155,6 +161,8 @@ export function render(opts: RenderOptions): RenderResult {
     const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
     const pack = generateVoxelDatapack(volumes, resolveBlock, {
       namespace: "blockdream_3d",
+      packFormat: mc.packFormat,
+      supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
     });
     writePack(pack, opts.out);
@@ -173,7 +181,7 @@ export function render(opts: RenderOptions): RenderResult {
       const buf = buildMcStructure(frame, (id) => {
         const b = blockByMapColorId.get(id);
         return b ? { name: b.id, states: {} } : undefined;
-      });
+      }, { blockVersion: BEDROCK_BLOCK_VERSION });
       const path = join(opts.out, q.length > 1 ? `frame_${fi}.mcstructure` : `art.mcstructure`);
       writeFile(path, buf);
       filesWritten.push(path);
@@ -194,13 +202,17 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   if (opts.target === "datapack") {
-    const pack = generateJavaDatapack(q, resolveBlock, { speedTicks: opts.speedTicks });
+    const pack = generateJavaDatapack(q, resolveBlock, {
+      speedTicks: opts.speedTicks,
+      packFormat: mc.packFormat,
+      supportedFormats: JAVA_DATAPACK_SUPPORTED,
+    });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const zip = join(opts.out, `${pack.namespace}.zip`);
     writeFile(zip, Buffer.from(packageJavaDatapack(pack)));
     filesWritten.push(zip);
-    notes.push(`Vanilla Java datapack: drop ${pack.namespace}.zip (or the folder) into world/datapacks/, run /function ${pack.namespace}:setup then /function ${pack.namespace}:start.`);
+    notes.push(`Vanilla Java datapack (pack_format ${mc.packFormat}; loads on MC ${JAVA_DATAPACK_SUPPORTED.min_inclusive}..${JAVA_DATAPACK_SUPPORTED.max_inclusive} via supported_formats): drop ${pack.namespace}.zip (or the folder) into world/datapacks/, run /function ${pack.namespace}:setup then /function ${pack.namespace}:start.`);
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 

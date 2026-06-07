@@ -153,14 +153,16 @@ export function generateVoxelDatapack(
     ].join("\n"),
   );
   files.set(`data/minecraft/tags/function/tick.json`, JSON.stringify({ values: [`${ns}:driver`] }, null, 2) + "\n");
-  files.set(
-    "pack.mcmeta",
-    JSON.stringify(
-      { pack: { pack_format: packFormat, description: opts.description ?? `blockdream 3D voxel build (${sx}x${sy}x${sz}, ${volumes.length} frames)` } },
-      null,
-      2,
-    ) + "\n",
-  );
+  const packMeta: {
+    pack_format: number;
+    description: string;
+    supported_formats?: { min_inclusive: number; max_inclusive: number };
+  } = {
+    pack_format: packFormat,
+    description: opts.description ?? `blockdream 3D voxel build (${sx}x${sy}x${sz}, ${volumes.length} frames)`,
+  };
+  if (opts.supportedFormats) packMeta.supported_formats = opts.supportedFormats;
+  files.set("pack.mcmeta", JSON.stringify({ pack: packMeta }, null, 2) + "\n");
 
   return { files, namespace: ns, frameCount: volumes.length, width: sx, height: sy, totalSetblocks, totalCommands };
 }

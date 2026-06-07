@@ -20,7 +20,10 @@ Options:
                        (default: bayer for video, floyd-steinberg for stills)
   --temporal <n>     temporal-coherence threshold for video (e.g. 0.002)
   --speed <ticks>    ticks/frame for datapack/behaviorpack playback (default: 2 = 10fps)
-  --version <ver>    palette version (default: 1.21.9 java / 1.21 bedrock)
+  --version <ver>    target Minecraft version: 1.21 .. 1.21.10 (default: 1.21).
+                       Sets pack_format / DataVersion / block stamps. Java datapacks
+                       also declare supported_formats so one pack loads across the
+                       whole 1.21.x line; Bedrock packs use a 1.21.0 floor (forward-compatible).
   --out <path>       output directory (default: ./out/<target>)
   -h, --help
 `;
