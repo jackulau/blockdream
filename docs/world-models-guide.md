@@ -38,8 +38,13 @@ stops cleanly on `--max-minutes` or a `<out>/STOP` file.
 ## Serve
 
 ```bash
-# Minecraft AR over WebSocket (CPU beats MPS for sequential token decode)
-.venv/bin/python -m blockdream_wm.serve --real runs/m4/latest.pt --device cpu   # :8765
+# One command for the whole demo (MC + driving servers + web, correct checkpoints):
+bash ml/scripts/serve_demo.sh
+
+# …or individually. Minecraft AR over WebSocket (CPU beats MPS for sequential token decode).
+# Serve runs/skills (skill-conditioned) so the movement dropdown works — NOT runs/m4, whose skill
+# embeddings are dead (real-VPT walking-only → every movement type renders identical).
+.venv/bin/python -m blockdream_wm.serve --real runs/skills/latest.pt --device cpu  # :8765
 # Driving
 .venv/bin/python -m blockdream_wm.drive.serve --checkpoint runs/drive/latest.pt # :8766
 ```

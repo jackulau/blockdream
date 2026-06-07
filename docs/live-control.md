@@ -41,8 +41,11 @@ command blocks cannot open a socket or paint map pixels, and Bedrock can do neit
 
 1. **Run the world-model server** (from `ml/`):
    ```bash
-   python -m blockdream_wm.serve --checkpoint runs/m4/latest.pt   # ws://127.0.0.1:8765
+   python -m blockdream_wm.serve --real runs/skills/latest.pt   # ws://127.0.0.1:8765
    ```
+   Serve `runs/skills` (skill-conditioned), **not** `runs/m4`: m4 is real-VPT walking-only, so its
+   skill embeddings are dead and every movement type renders identically. For the whole browser demo
+   run `ml/scripts/serve_demo.sh` — it starts the MC + driving servers + web with the right checkpoints.
 2. **Build + install the mod** (JDK 21):
    ```bash
    cd mods/java-fabric && ./gradlew build      # → build/libs/*.jar
