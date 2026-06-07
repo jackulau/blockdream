@@ -42,6 +42,9 @@ importers:
         specifier: ^0.184.0
         version: 0.184.0
     devDependencies:
+      '@mineworld/video':
+        specifier: workspace:*
+        version: link:../../packages/video
       '@types/three':
         specifier: ^0.184.1
         version: 0.184.1
