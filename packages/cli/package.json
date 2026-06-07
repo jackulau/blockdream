@@ -15,7 +15,8 @@
     "@mineworld/video": "workspace:*",
     "@mineworld/emit-java": "workspace:*",
     "@mineworld/emit-bedrock": "workspace:*",
-    "@mineworld/emit-commands": "workspace:*"
+    "@mineworld/emit-commands": "workspace:*",
+    "@mineworld/voxel": "workspace:*"
   },
   "files": ["src"]
 }

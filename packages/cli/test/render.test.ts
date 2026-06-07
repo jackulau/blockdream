@@ -36,6 +36,16 @@ d("render() end-to-end", () => {
     expect(countFrameFunctions(out, "mineworld")).toBe(4);
   });
 
+  it("voxel3d: emits an animated 3D voxel datapack + zip from video frames", () => {
+    const out = join(dir, "v3d");
+    const res = render({ input: gif, out, target: "voxel3d", width: 16, height: 16, maxFrames: 3, depth: 6 });
+    expect(res.frameCount).toBe(3);
+    expect(existsSync(join(out, "pack.mcmeta"))).toBe(true);
+    expect(existsSync(join(out, "mineworld_3d.zip"))).toBe(true);
+    const meta = JSON.parse(readFileSync(join(out, "pack.mcmeta"), "utf8"));
+    expect(meta.pack.pack_format).toBeGreaterThan(0);
+  });
+
   it("behaviorpack: emits a valid manifest.json", () => {
     const out = join(dir, "bp");
     const res = render({ input: gif, out, target: "behaviorpack", width: 16, height: 16, maxFrames: 3 });

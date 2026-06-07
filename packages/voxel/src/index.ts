@@ -3,6 +3,7 @@ export * from "./voxelize";
 export * from "./depth";
 export * from "./animate";
 export * from "./gltf";
+export * from "./video3d";
 export * from "./spin";
 export * from "./project";
 export * from "./obj";

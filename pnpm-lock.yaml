@@ -72,6 +72,9 @@ importers:
       '@mineworld/video':
         specifier: workspace:*
         version: link:../video
+      '@mineworld/voxel':
+        specifier: workspace:*
+        version: link:../voxel
 
   packages/color-core:
     dependencies:

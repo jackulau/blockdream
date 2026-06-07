@@ -17,7 +17,8 @@ import {
 import { extractFrames } from "@mineworld/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@mineworld/emit-java";
 import { buildMcStructure } from "@mineworld/emit-bedrock";
-import { generateJavaDatapack, packageJavaDatapack, packageMcpack } from "@mineworld/emit-commands";
+import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack } from "@mineworld/emit-commands";
+import { framesToAnimated3d } from "@mineworld/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -30,7 +31,8 @@ export type RenderTarget =
   | "datapack"
   | "behaviorpack"
   | "bedrock-script"
-  | "mwframes";
+  | "mwframes"
+  | "voxel3d";
 export type Edition = "java" | "bedrock";
 
 export interface RenderOptions {
@@ -46,6 +48,7 @@ export interface RenderOptions {
   temporalThreshold?: number;
   speedTicks?: number;
   paletteVersion?: string;
+  depth?: number; // voxel3d: max build depth in blocks (default 8)
 }
 
 export interface RenderResult {
@@ -146,6 +149,24 @@ export function render(opts: RenderOptions): RenderResult {
   const pal = preparePalette(palette);
   const q = quantizeAll(frames, pal, dither, opts.temporalThreshold);
   const resolveBlock = (id: number) => blockByMapColorId.get(id)?.id;
+
+  if (opts.target === "voxel3d") {
+    // video → temporally-stable animated 3D block build → vanilla datapack (delta-encoded, fill-batched)
+    const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
+    const pack = generateVoxelDatapack(volumes, resolveBlock, {
+      namespace: "mineworld_3d",
+      optimize: (cells, r) => greedyBoxes(cells, r),
+    });
+    writePack(pack, opts.out);
+    filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
+    const zip = join(opts.out, `${pack.namespace}.zip`);
+    writeFile(zip, Buffer.from(packageJavaDatapack(pack)));
+    filesWritten.push(zip);
+    notes.push(
+      `3D voxel datapack (${volumes.length} frame(s), ${pack.totalCommands ?? pack.totalSetblocks} cmds): drop ${pack.namespace}.zip into world/datapacks/, /function ${pack.namespace}:setup then :start.`,
+    );
+    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
 
   if (opts.target === "mcstructure") {
     q.forEach((frame, fi) => {

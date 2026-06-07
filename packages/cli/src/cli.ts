@@ -10,7 +10,7 @@ mineworld preview <input> --out preview.png   (side-by-side source | block-art P
 Convert a GIF/video into Minecraft block-art.
 
 Options:
-  --target <t>       map | mcstructure | datapack | behaviorpack | mwframes
+  --target <t>       map | mcstructure | datapack | behaviorpack | mwframes | voxel3d
                        (default: datapack; mwframes = Fabric map-wall mod pool)
   --edition <e>      java | bedrock                                (map target only; default: java)
   --grid <WxH>       block grid size      (default: 128x128 for map, 64x64 otherwise)
@@ -32,6 +32,7 @@ const TARGETS = new Set<RenderTarget>([
   "behaviorpack",
   "bedrock-script",
   "mwframes",
+  "voxel3d",
 ]);
 const DITHERS = new Set<DitherMethod>(["floyd-steinberg", "bayer", "none"]);
 
@@ -48,6 +49,7 @@ export function runCli(argv: string[]): number {
       dither: { type: "string" },
       temporal: { type: "string" },
       speed: { type: "string" },
+      depth: { type: "string" },
       version: { type: "string" },
       out: { type: "string" },
       palette: { type: "string" },
@@ -122,6 +124,7 @@ export function runCli(argv: string[]): number {
     dither,
     temporalThreshold: values.temporal ? Number(values.temporal) : undefined,
     speedTicks: values.speed ? Number(values.speed) : undefined,
+    depth: values.depth ? Number(values.depth) : undefined,
     paletteVersion: values.version,
   };
 

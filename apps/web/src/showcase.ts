@@ -10,7 +10,6 @@ import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-c
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@mineworld/palette";
 import {
-  imageToVolume,
   imageToSolid,
   objToVolume,
   objSequenceToFrames,
@@ -21,6 +20,7 @@ import {
   type SequenceAnimName,
   type VoxelVolume,
 } from "@mineworld/voxel";
+import { rgbFramesToAnimated3d } from "./video3d";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@mineworld/emit-commands";
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
@@ -379,11 +379,11 @@ async function setup3dViewer(): Promise<void> {
       } else if (objs.length === 1) {
         showFrames([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true })], `model ${objs[0]!.name}`);
       } else if (gif) {
+        // animated GIF → temporally-stable 3D block animation (subject-isolated solids, not flat slabs)
         const { canvases, durationsMs } = await decodeGif(gif);
-        const frames = canvases.map((c) =>
-          imageToVolume(quantizeFrame(rgbImageFromCanvas(c, 28), pal3d, { method: "none" }), { mode: "flat", depth: 2 }),
-        );
-        showFrames(frames, `gif ${gif.name}`, durationsMs);
+        const rgb = canvases.map((c) => rgbImageFromCanvas(c, 40));
+        const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
+        showFrames(frames, `gif ${gif.name} · 3D`, durationsMs);
       } else {
         hud.textContent = "unsupported file — use .gltf/.glb, .obj (one or many), or .gif";
       }
