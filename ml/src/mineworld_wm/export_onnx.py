@@ -13,7 +13,7 @@ from pathlib import Path
 import torch
 from torch import nn
 
-from .config import load_config
+from .config import Config, _merge, load_config
 from .tokenizer import Tokenizer
 from .transition_diffusion import LatentDiffusionTransition
 
@@ -29,13 +29,24 @@ class DecoderWrapper(nn.Module):
         return self.tok.decode(z)
 
 
-def export(config: str | None, out_dir: str) -> list[Path]:
-    cfg = load_config(config)
+def export(config: str | None, out_dir: str, checkpoint: str | None = None) -> list[Path]:
+    # A checkpoint gives REAL trained weights (the whole point — without one the browser engine would
+    # run random noise). Its saved config defines the architecture; fall back to a config file otherwise.
+    ckpt = None
+    if checkpoint:
+        ckpt = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        cfg = _merge(Config(), ckpt["config"]) if "config" in ckpt else load_config(config)
+    else:
+        cfg = load_config(config)
     cfg.dynamics.kind = "diffusion"
     cfg.tokenizer.vq_codebook_size = 0  # continuous latents
 
     tok = Tokenizer(cfg.tokenizer).eval()
     trans = LatentDiffusionTransition(cfg.dynamics, latent_channels=cfg.tokenizer.latent_channels, action_dim=cfg.action.embed_dim).eval()
+    if ckpt is not None:
+        tok.load_state_dict(ckpt["tokenizer"])
+        trans.load_state_dict(ckpt["transition"])
+        print(f"[export_onnx] loaded trained weights from {checkpoint}")
 
     C = cfg.tokenizer.latent_channels
     h = cfg.latent_size
@@ -80,8 +91,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("mineworld_wm.export_onnx")
     ap.add_argument("--config", type=str, default=None)
     ap.add_argument("--out", type=str, default="onnx")
+    ap.add_argument("--checkpoint", type=str, default=None, help="trained diffusion checkpoint (real weights)")
     args = ap.parse_args(argv)
-    written = export(args.config, args.out)
+    written = export(args.config, args.out, args.checkpoint)
     for p in written:
         print(f"[export_onnx] wrote {p} ({p.stat().st_size} bytes)")
     print(f"[export_onnx] {len(written)} ONNX models exported → {args.out}")
