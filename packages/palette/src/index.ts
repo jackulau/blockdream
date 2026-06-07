@@ -61,7 +61,7 @@ function loadJson<T>(fileKey: string): T {
  * Because we author that array ourselves, the game does NOT biome-tint them — all
  * 244 ids (61 bases × 4 shades) are usable verbatim on both Java and Bedrock.
  */
-export function getJavaMapPalette(version = PALETTE_DATA.javaMap): MapPalette {
+export function getJavaMapPalette(version: string = PALETTE_DATA.javaMap): MapPalette {
   const fileKey = resolveFileKey("java-map-colors", version, PALETTE_DATA.javaMap);
   const hit = cache.get(fileKey);
   if (hit) return hit;
@@ -80,7 +80,7 @@ export function indexByMapColorId(p: MapPalette): Map<number, MapColor> {
  * editions, and direct-written maps are not biome-tinted on either edition, so
  * this is the same RGB table as Java — verified equal by test.
  */
-export function getBedrockMapPalette(version = PALETTE_DATA.bedrockMap): MapPalette {
+export function getBedrockMapPalette(version: string = PALETTE_DATA.bedrockMap): MapPalette {
   const fileKey = resolveFileKey("bedrock-map-colors", version, PALETTE_DATA.bedrockMap);
   const hit = cache.get(fileKey);
   if (hit) return hit;
@@ -163,7 +163,7 @@ export interface BlockColorPalette {
 }
 
 /** The wide-gamut biome-independent solid-block color set (~301 blocks). */
-export function getFullBlockColorPalette(version = PALETTE_DATA.block): BlockColorPalette {
+export function getFullBlockColorPalette(version: string = PALETTE_DATA.block): BlockColorPalette {
   const fileKey = resolveFileKey("java-block-colors", version, PALETTE_DATA.block);
   const hit = cache.get(fileKey) as unknown as BlockColorPalette | undefined;
   if (hit) return hit;
@@ -203,7 +203,7 @@ export function getFullBlockMapPalette(version = "1.21"): {
   };
 }
 
-export function getJavaBlockPalette(version = PALETTE_DATA.block): BlockPalette {
+export function getJavaBlockPalette(version: string = PALETTE_DATA.block): BlockPalette {
   const fileKey = resolveFileKey("java-block-palette", version, PALETTE_DATA.block);
   const hit = cache.get(fileKey) as unknown as BlockPalette | undefined;
   if (hit) return hit;
