@@ -30,6 +30,7 @@ ml/               # Workstream B — world model (Python / PyTorch)
 
 ## Documentation
 
+- [Technical writeup & results](./docs/results.md) — architecture diagram, methods, graphics, measured numbers
 - [Architecture](./docs/architecture.md) — whole-system map, packages, data flow
 - [3D builds & animation](./docs/3d-and-animation.md) — image→3D, greedy meshing, animation system
 - [Importing animations](./docs/video-import.md) — glTF / .glb / .obj-sequence / video → blocks

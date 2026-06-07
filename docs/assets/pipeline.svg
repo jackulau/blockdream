@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 380" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <rect width="860" height="380" fill="#0d0f13"/>
+  <style>
+    .box{fill:#14171d;stroke:#232730;stroke-width:1;rx:8}
+    .acc{fill:#56d364}.ink{fill:#e9eaee}.dim{fill:#9aa0a6}.link{fill:#7dd3fc}
+    .arr{stroke:#3a4150;stroke-width:1.6;marker-end:url(#a)}
+    .t{fill:#e9eaee}.s{fill:#9aa0a6;font-size:11px}
+  </style>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#3a4150"/></marker></defs>
+
+  <text x="24" y="34" class="acc" font-size="15" font-weight="700">Workstream A — block-art &amp; 3D</text>
+  <rect class="box" x="24" y="48" width="120" height="48" rx="8"/><text x="36" y="70" class="t">image / GIF</text><text x="36" y="86" class="s">video frames</text>
+  <rect class="box" x="178" y="48" width="130" height="48" rx="8"/><text x="190" y="70" class="t">OKLab quantize</text><text x="190" y="86" class="s">color-core</text>
+  <rect class="box" x="342" y="22" width="150" height="44" rx="8"/><text x="354" y="48" class="t">imageToSolid (3D)</text><text x="354" y="62" class="s">isolate+inflate+center</text>
+  <rect class="box" x="342" y="80" width="150" height="40" rx="8"/><text x="354" y="104" class="t">block-art (2D wall)</text>
+  <rect class="box" x="528" y="22" width="150" height="44" rx="8"/><text x="540" y="44" class="t">three.js viewer</text><text x="540" y="58" class="s">greedy mesh + anim</text>
+  <rect class="box" x="528" y="78" width="150" height="44" rx="8"/><text x="540" y="100" class="t">datapack / .mcstructure</text><text x="540" y="114" class="s">greedy fill, in-game</text>
+  <rect class="box" x="712" y="50" width="124" height="44" rx="8"/><text x="724" y="72" class="t">Minecraft</text><text x="724" y="86" class="s">Java + Bedrock</text>
+  <line class="arr" x1="144" y1="72" x2="178" y2="72"/><line class="arr" x1="308" y1="66" x2="342" y2="50"/><line class="arr" x1="308" y1="78" x2="342" y2="98"/>
+  <line class="arr" x1="492" y1="44" x2="528" y2="44"/><line class="arr" x1="492" y1="100" x2="528" y2="100"/>
+  <line class="arr" x1="678" y1="100" x2="712" y2="78"/>
+
+  <line x1="24" y1="150" x2="836" y2="150" stroke="#232730"/>
+  <text x="24" y="186" class="acc" font-size="15" font-weight="700">Workstream B — neural world model</text>
+  <rect class="box" x="24" y="200" width="150" height="60" rx="8"/><text x="36" y="222" class="t">data</text><text x="36" y="238" class="s">VPT · synthetic skills</text><text x="36" y="252" class="s">Mineflayer (real+physics)</text>
+  <rect class="box" x="208" y="208" width="120" height="44" rx="8"/><text x="220" y="230" class="t">tokenizer</text><text x="220" y="244" class="s">VQ / continuous</text>
+  <rect class="box" x="362" y="182" width="160" height="44" rx="8"/><text x="374" y="204" class="t">AR transition</text><text x="374" y="218" class="s">skill-conditioned, KV-cache</text>
+  <rect class="box" x="362" y="238" width="160" height="44" rx="8"/><text x="374" y="260" class="t">latent diffusion</text><text x="374" y="274" class="s">few-step Euler</text>
+  <rect class="box" x="556" y="182" width="150" height="44" rx="8"/><text x="568" y="204" class="t">WebSocket serve</text><text x="568" y="218" class="s">decoupled display fps</text>
+  <rect class="box" x="556" y="238" width="150" height="44" rx="8"/><text x="568" y="260" class="t">ONNX in-browser</text><text x="568" y="274" class="s">&gt;=30 fps, server-free</text>
+  <rect class="box" x="740" y="210" width="96" height="44" rx="8"/><text x="752" y="232" class="t">browser</text><text x="752" y="246" class="s">demo</text>
+  <line class="arr" x1="174" y1="230" x2="208" y2="230"/><line class="arr" x1="328" y1="226" x2="362" y2="204"/><line class="arr" x1="328" y1="238" x2="362" y2="260"/>
+  <line class="arr" x1="522" y1="204" x2="556" y2="204"/><line class="arr" x1="522" y1="260" x2="556" y2="260"/>
+  <line class="arr" x1="706" y1="204" x2="740" y2="228"/><line class="arr" x1="706" y1="260" x2="740" y2="236"/>
+</svg>
