@@ -75,7 +75,7 @@ function resolveBuffers(gltf: GltfJson, external?: ArrayBuffer[]): Uint8Array[] 
     if (b.uri) {
       const m = /^data:[^;]*;base64,(.*)$/.exec(b.uri);
       if (m) return b64ToBytes(m[1]!);
-      throw new Error(`glTF buffer ${i}: non-embedded URI "${b.uri}" — pass it via opts.buffers`);
+      throw new Error(`glTF buffer ${i}: non-embedded URI "${b.uri}"; pass it via opts.buffers`);
     }
     if (external?.[i]) return new Uint8Array(external[i]!);
     throw new Error(`glTF buffer ${i} has no uri and no external buffer supplied`);

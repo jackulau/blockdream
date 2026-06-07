@@ -162,7 +162,7 @@ export function generateJavaDatapack(
   files.set(
     `${fnDir}/driver.mcfunction`,
     [
-      `# advance + dispatch — runs every tick from #minecraft:tick`,
+      `# advance + dispatch, runs every tick from #minecraft:tick`,
       `execute unless score #play ma matches 1 run return 0`,
       `scoreboard players add #t ma 1`,
       `execute if score #t ma < #speed ma run return 0`,
