@@ -121,10 +121,13 @@ def main(argv: list[str] | None = None) -> int:
     def rgb_batch(idx):
         return rgb[idx].to(dev).float().div(255)
 
-    def save(loss: float, val: float):
+    best_val = [float("inf")]
+    best_path = out / "best.pt"
+
+    def _state():
         with torch.no_grad():
             init_tok = tok.tokenize(rgb[0:1].to(dev).float().div(255)).flatten(1)[0]
-        _atomic_save({
+        return {
             "phase": phase, "tok_step": tok_step, "ar_step": ar_step,
             "tokenizer_cfg": vars(tcfg), "dynamics_cfg": vars(dcfg),
             "n_lidar": N_LIDAR, "n_telemetry": N_TEL, "image": IMAGE, "downsample": DOWNSAMPLE, "codebook": CODEBOOK,
@@ -132,7 +135,13 @@ def main(argv: list[str] | None = None) -> int:
             "tok_opt": tok_opt.state_dict(), "tr_opt": tr_opt.state_dict(),
             "init_tokens": init_tok.cpu(), "init_lidar": lidar[0].cpu(), "init_telemetry": tel[0].cpu(),
             "init_rgb": rgb[0].clone(),
-        }, latest)
+        }
+
+    def save(loss: float, val: float):
+        _atomic_save(_state(), latest)
+        if val > 0 and val < best_val[0]:  # keep the best-by-val checkpoint (avoid the overfit tail)
+            best_val[0] = val
+            _atomic_save(_state(), best_path)
         _log(out, {"t": int(time.time()), "phase": phase, "step": tok_step if phase == "tok" else ar_step,
                    "loss": round(loss, 4), "val": round(val, 4), "mins": round((time.time() - t0) / 60, 1)})
 
@@ -195,6 +204,9 @@ def main(argv: list[str] | None = None) -> int:
             with torch.no_grad():
                 vi0, vi1 = ar_batch(val_pairs)
                 vloss, _ = trans.loss(tokens[vi0], tokens[vi1], lidar[vi0], tel[vi0], ctl[vi0], lidar[vi1], tel[vi1])
+            if vloss.item() < best_val[0]:  # track the peak at every val eval (avoid overfit tail)
+                best_val[0] = vloss.item()
+                _atomic_save(_state(), best_path)
             maybe_ckpt(loss.item(), vloss.item())
 
     save(0.0, 0.0)
