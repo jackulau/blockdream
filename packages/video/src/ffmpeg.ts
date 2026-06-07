@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 
-/** ffmpeg binary: override with env MINEWORLD_FFMPEG, else "ffmpeg" on PATH. */
+/** ffmpeg binary: override with env BLOCKDREAM_FFMPEG, else "ffmpeg" on PATH. */
 export function ffmpegBin(): string {
-  return process.env["MINEWORLD_FFMPEG"] || "ffmpeg";
+  return process.env["BLOCKDREAM_FFMPEG"] || "ffmpeg";
 }
 
 export function hasFfmpeg(): boolean {

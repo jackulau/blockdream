@@ -12,7 +12,7 @@ import {
 } from "@blockdream/color-core";
 import javaMapPalette from "@blockdream/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@blockdream/palette";
-import { blockForBase, swatchDataUrl, localTextureUrl, loadTextureManifest } from "./blocks";
+import { blockForBase, swatchDataUrl, localTextureUrl, hasLocalTextures, loadTextureManifest } from "./blocks";
 import { decodeGif, isGif } from "./gif";
 import { buildSchedule, frameAtElapsed, type FrameSchedule } from "./anim";
 
@@ -30,7 +30,6 @@ export interface BlockArtEls {
   out: HTMLCanvasElement;
   bom: HTMLElement;
   tooltip: HTMLElement;
-  useTextures: HTMLInputElement;
 }
 
 export interface BlockArtOpts {
@@ -85,7 +84,7 @@ export function createBlockArt(
       .map(([baseId, n]) => ({ info: blockForBase(baseId), n }))
       .filter((r): r is { info: NonNullable<ReturnType<typeof blockForBase>>; n: number } => !!r.info)
       .sort((a, b) => b.n - a.n);
-    const useTex = els.useTextures.checked;
+    const useTex = hasLocalTextures(); // always use real block textures when present (no toggle)
     els.bom.innerHTML = "";
     for (const { info, n } of rows) {
       const li = document.createElement("li");
@@ -244,14 +243,11 @@ export function createBlockArt(
     render();
   });
   els.dither.addEventListener("change", render);
-  els.useTextures.addEventListener("change", render);
   els.gridVal.textContent = `${els.grid.value} px`;
 
-  // load the local real-texture manifest; default the toggle ON when textures are present,
-  // and re-render so the BOM swaps swatches for real block textures.
-  els.useTextures.checked = true;
-  loadTextureManifest().then((ok) => {
-    if (!ok) els.useTextures.checked = false; // no textures fetched yet → swatches
+  // always use real block textures when present (auto-falls back to generated swatches only if the
+  // local texture manifest hasn't been fetched). Re-render once the manifest loads.
+  loadTextureManifest().then(() => {
     if (currentSource()) render();
   });
 

@@ -132,7 +132,6 @@ const ba = createBlockArt({
   out: $<HTMLCanvasElement>("ba-out"),
   bom: $<HTMLUListElement>("ba-bom"),
   tooltip: $<HTMLDivElement>("ba-tooltip"),
-  useTextures: $<HTMLInputElement>("ba-useTextures"),
 }, {
   onRender: (q) => {
     const dl = $<HTMLButtonElement>("ba-download");

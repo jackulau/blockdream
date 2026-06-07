@@ -13,5 +13,4 @@ createBlockArt({
   out: $<HTMLCanvasElement>("out"),
   bom: $<HTMLUListElement>("bom"),
   tooltip: $<HTMLDivElement>("tooltip"),
-  useTextures: $<HTMLInputElement>("useTextures"),
 });
