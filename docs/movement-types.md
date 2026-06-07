@@ -31,7 +31,7 @@ sprint 19%, attack 45%, **no elytra/boat/pig**). So each type needs its own foot
 **Pipeline to add a type:**
 1. Get clips of that movement (download to mp4 + actions, or YouTube + the VPT
    **IDM** to label actions — `docs/real-world-models.md`).
-2. Build a tagged pool: `python -m mineworld_wm.data_pool --segments N --skill elytra --out ml/data/pool_elytra`
+2. Build a tagged pool: `python -m blockdream_wm.data_pool --segments N --skill elytra --out ml/data/pool_elytra`
    (today this pulls from the VPT index; point it at your own clips for real elytra data).
 3. Train/extend: `train_long --pools ml/data/pool_m4,ml/data/pool_elytra …` — the
    conditioned model learns each type; resume keeps prior types.
@@ -48,7 +48,7 @@ the real trainer consumes — so real footage drops into the same layout to scal
 # 1. generate per-skill synthetic pools (trainer-compatible: frames + actions + skill.txt)
 python scripts/gen_movement_data.py --skills walk,boat,elytra,swim,pig --segments 8 --len 64 --size 64 --out data
 # 2. train one conditioned model across them (resume-safe)
-python -m mineworld_wm.train_long --pools data/pool_synth_walk,data/pool_synth_boat,data/pool_synth_elytra
+python -m blockdream_wm.train_long --pools data/pool_synth_walk,data/pool_synth_boat,data/pool_synth_elytra
 # 3. PROVE the skill actually changes the rollout (boat != walk):
 python scripts/prove_skill_conditioning.py        # → "verdict: DISTINCT", exit 0
 ```

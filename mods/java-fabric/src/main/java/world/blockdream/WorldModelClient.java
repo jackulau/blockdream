@@ -1,4 +1,4 @@
-package world.mineworld;
+package world.blockdream;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -13,7 +13,7 @@ import java.util.Base64;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * WebSocket bridge to the neural world-model server (ml/src/mineworld_wm/serve.py,
+ * WebSocket bridge to the neural world-model server (ml/src/blockdream_wm/serve.py,
  * ws://127.0.0.1:8765). Sends VPT-style action messages and receives generated frames:
  *
  *   send →  {"type":"action","buttons":[9],"camera":[cx,cy],"skill":"walk"}   (or {"type":"reset"})
@@ -47,7 +47,7 @@ public final class WorldModelClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake h) {
-        MineworldMod.LOGGER.info("[mineworld] world-model connected: {}", getURI());
+        BlockdreamMod.LOGGER.info("[blockdream] world-model connected: {}", getURI());
         send("{\"type\":\"reset\"}");
     }
 
@@ -68,7 +68,7 @@ public final class WorldModelClient extends WebSocketClient {
             BufferedImage img = ImageIO.read(new ByteArrayInputStream(Base64.getDecoder().decode(b64)));
             if (img != null) renderer.pushLiveFrame(toTiles(img));
         } catch (Exception e) {
-            MineworldMod.LOGGER.warn("[mineworld] bad frame message", e);
+            BlockdreamMod.LOGGER.warn("[blockdream] bad frame message", e);
         }
     }
 
@@ -96,11 +96,11 @@ public final class WorldModelClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        MineworldMod.LOGGER.info("[mineworld] world-model disconnected ({}): {}", code, reason);
+        BlockdreamMod.LOGGER.info("[blockdream] world-model disconnected ({}): {}", code, reason);
     }
 
     @Override
     public void onError(Exception ex) {
-        MineworldMod.LOGGER.warn("[mineworld] world-model socket error", ex);
+        BlockdreamMod.LOGGER.warn("[blockdream] world-model socket error", ex);
     }
 }

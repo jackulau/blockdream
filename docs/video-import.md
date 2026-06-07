@@ -35,7 +35,7 @@ A rendered video has no depth, so each frame is reconstructed with the same silh
   monocular depth model or a Blender depth-pass sidecar drive natural footage.
 - **Web:** `apps/web/src/video3d.ts` decodes a GIF, quantizes each frame, and calls the above →
   a real 3D block animation.
-- **CLI:** `mineworld render <video> --target voxel3d` extracts frames (ffmpeg), voxelizes them,
+- **CLI:** `blockdream render <video> --target voxel3d` extracts frames (ffmpeg), voxelizes them,
   and writes an animated 3D datapack (delta-encoded + greedy-fill optimized). `--depth N` sets the
   build thickness.
 

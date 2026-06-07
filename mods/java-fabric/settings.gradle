@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'mineworld-mapwall'
+rootProject.name = 'blockdream-mapwall'

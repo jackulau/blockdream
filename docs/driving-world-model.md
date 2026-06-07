@@ -2,7 +2,7 @@
 
 A browser-playable, **recursive**, **multimodal (RGB + LiDAR + telemetry)** neural
 driving world model with **good physics**, trained on driving rollouts, runs
-locally, fully open source. Built in `mineworld_wm.drive`.
+locally, fully open source. Built in `blockdream_wm.drive`.
 
 ## Datasets found (verified June 2026)
 
@@ -82,8 +82,8 @@ plus **Oasis/MineWorld** for stable real-time recursive rollout.
 
 ## Run it
 ```bash
-python -m mineworld_wm.drive.train --rollouts 40 --device mps --out ml/checkpoints/drive.pt
-python -m mineworld_wm.drive.serve --checkpoint ml/checkpoints/drive.pt --port 8766
+python -m blockdream_wm.drive.train --rollouts 40 --device mps --out ml/checkpoints/drive.pt
+python -m blockdream_wm.drive.serve --checkpoint ml/checkpoints/drive.pt --port 8766
 # open apps/web /driving.html → Connect → drive with arrows (RGB + LiDAR BEV + telemetry HUD)
 ```
 

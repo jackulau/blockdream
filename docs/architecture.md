@@ -25,7 +25,7 @@ The TypeScript monorepo (pnpm workspaces) under `packages/`:
 | `emit-java` / `emit-bedrock` | map `.dat` / `.mcstructure` writers |
 | `emit-commands` | vanilla datapacks + behaviour packs, 3D voxel datapacks, greedy fill optimizer |
 | `nbt` | NBT read/write |
-| `cli` | `mineworld render` — the end-to-end command-line renderer (incl. the `voxel3d` target) |
+| `cli` | `blockdream render` — the end-to-end command-line renderer (incl. the `voxel3d` target) |
 
 `apps/web` is the Vite single-page demo (three.js 3D viewer + the two world-model viewers). `ml/`
 is the Python world-model stack. `mods/` holds the Java (Fabric) + Bedrock in-game players.

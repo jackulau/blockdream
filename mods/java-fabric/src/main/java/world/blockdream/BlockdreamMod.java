@@ -1,4 +1,4 @@
-package world.mineworld;
+package world.blockdream;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -15,12 +15,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Entry point for the mineworld Map Wall mod. Two modes, auto-selected at server start:
+ * Entry point for the blockdream Map Wall mod. Two modes, auto-selected at server start:
  *
  *  1. STATIC playback — plays a precomputed block-art video on a wall of filled maps by
  *     rewriting each map's 16384-byte color array every {@code speedTicks} (frames.bin).
  *
- *  2. LIVE world-model control — if {@code <world>/mineworld/live.json} exists, the mod
+ *  2. LIVE world-model control — if {@code <world>/blockdream/live.json} exists, the mod
  *     connects to the neural world-model server over WebSocket, derives a VPT-style action
  *     from the controlling player's per-tick movement (a STOCK vanilla client — no client
  *     mod needed), sends it, and paints each returned frame onto the map wall. The player
@@ -30,8 +30,8 @@ import java.nio.file.Path;
  *
  *  live.json: {"url":"ws://127.0.0.1:8765","cols":4,"rows":2,"skill":"walk"}
  */
-public class MineworldMod implements ModInitializer {
-    public static final String MOD_ID = "mineworld_mapwall";
+public class BlockdreamMod implements ModInitializer {
+    public static final String MOD_ID = "blockdream_mapwall";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     private final MapWallRenderer renderer = new MapWallRenderer();
@@ -47,11 +47,11 @@ public class MineworldMod implements ModInitializer {
         ServerLifecycleEvents.SERVER_STOPPING.register(s -> { if (bridge != null) bridge.close(); });
         ServerTickEvents.END_SERVER_TICK.register(renderer::tick);
         ServerTickEvents.END_SERVER_TICK.register(this::driveLive);
-        LOGGER.info("[mineworld] map-wall renderer registered");
+        LOGGER.info("[blockdream] map-wall renderer registered");
     }
 
     private void onServerStarted(MinecraftServer server) {
-        Path live = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT).resolve("mineworld").resolve("live.json");
+        Path live = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT).resolve("blockdream").resolve("live.json");
         if (Files.exists(live)) {
             startLive(server, live);
         } else {
@@ -72,9 +72,9 @@ public class MineworldMod implements ModInitializer {
             MapColorMatcher matcher = MapColorMatcher.loadBundled();
             this.bridge = new WorldModelClient(new URI(url), cols, rows, matcher, renderer);
             bridge.connect();
-            LOGGER.info("[mineworld] live control: {} ({}x{} wall, skill={})", url, cols, rows, skill);
+            LOGGER.info("[blockdream] live control: {} ({}x{} wall, skill={})", url, cols, rows, skill);
         } catch (Exception e) {
-            LOGGER.error("[mineworld] failed to start live control", e);
+            LOGGER.error("[blockdream] failed to start live control", e);
         }
     }
 

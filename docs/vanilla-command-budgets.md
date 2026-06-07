@@ -1,7 +1,7 @@
 # Vanilla command-block playback — budgets
 
 The vanilla path places one solid block per pixel and animates via delta-encoded
-`.mcfunction` frames (see `@mineworld/emit-commands`). Two limits bound it:
+`.mcfunction` frames (see `@blockdream/emit-commands`). Two limits bound it:
 
 ## 1. Per-function command count
 A single function running thousands of `setblock`s in one tick stresses
@@ -32,7 +32,7 @@ The **sustained** cost is the *delta* size per advanced frame, not the keyframe.
 A talking-head / low-motion clip at 64×64 changes a few hundred cells/frame →
 trivially runs at 10 fps. High-motion full-frame change at 128×128 (16k setblocks
 every advance) will hitch — prefer lower resolution, lower fps, or the modded
-map-wall path (`@mineworld/emit-java`) for high-motion content.
+map-wall path (`@blockdream/emit-java`) for high-motion content.
 
 ## Rules of thumb
 - **Low motion, hero quality** → vanilla blocks, 64–128 wide, 5–10 fps.

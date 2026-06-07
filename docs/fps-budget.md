@@ -1,6 +1,6 @@
 # FPS budget — what runs at what frame rate, honestly
 
-"30 fps" means different things in different parts of mineworld. This page is the honest
+"30 fps" means different things in different parts of blockdream. This page is the honest
 per-technique breakdown so nobody over-claims. Two separate worlds:
 
 - **Browser demo** — the canvas the visitor sees. Display is locked smooth; *content* freshness

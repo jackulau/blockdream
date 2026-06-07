@@ -1,4 +1,4 @@
-package world.mineworld;
+package world.blockdream;
 
 import net.minecraft.item.map.MapState;
 import net.minecraft.server.MinecraftServer;
@@ -10,7 +10,7 @@ import java.nio.file.Path;
 /**
  * Per-tick map-wall renderer.
  *
- * On server start it loads {@code <world>/mineworld/frames.bin} and resolves the
+ * On server start it loads {@code <world>/blockdream/frames.bin} and resolves the
  * MapState for each configured map id (the operator places those filled maps in
  * a wall of item frames). Every {@code speedTicks} it copies the current frame's
  * color array into each map's {@link MapState#colors} and marks it dirty; the
@@ -36,20 +36,20 @@ public class MapWallRenderer {
         try {
             ServerWorld overworld = server.getOverworld();
             Path worldDir = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT)
-                    .resolve("mineworld");
+                    .resolve("blockdream");
             Path framesPath = worldDir.resolve("frames.bin");
             if (!Files.exists(framesPath)) {
-                MineworldMod.LOGGER.info("[mineworld] no frames.bin found at {} — static renderer idle", framesPath);
+                BlockdreamMod.LOGGER.info("[blockdream] no frames.bin found at {} — static renderer idle", framesPath);
                 return;
             }
             this.pool = FramePool.read(framesPath);
             this.tileStates = resolveTileStates(overworld, worldDir, pool.tileCount());
             this.active = tileStates != null;
-            MineworldMod.LOGGER.info(
-                    "[mineworld] loaded {} frames over {}x{} maps @ {} ticks/frame",
+            BlockdreamMod.LOGGER.info(
+                    "[blockdream] loaded {} frames over {}x{} maps @ {} ticks/frame",
                     pool.frameCount, pool.cols, pool.rows, pool.speedTicks);
         } catch (Exception e) {
-            MineworldMod.LOGGER.error("[mineworld] failed to load frame pool", e);
+            BlockdreamMod.LOGGER.error("[blockdream] failed to load frame pool", e);
             this.active = false;
         }
     }
@@ -62,15 +62,15 @@ public class MapWallRenderer {
     public boolean loadLive(MinecraftServer server, int cols, int rows) {
         try {
             ServerWorld overworld = server.getOverworld();
-            Path worldDir = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT).resolve("mineworld");
+            Path worldDir = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT).resolve("blockdream");
             this.tileStates = resolveTileStates(overworld, worldDir, cols * rows);
             this.liveMode = tileStates != null;
             this.active = this.liveMode;
-            MineworldMod.LOGGER.info("[mineworld] live mode {} for {}x{} map wall",
+            BlockdreamMod.LOGGER.info("[blockdream] live mode {} for {}x{} map wall",
                     liveMode ? "ready" : "FAILED (check maps.txt)", cols, rows);
             return liveMode;
         } catch (Exception e) {
-            MineworldMod.LOGGER.error("[mineworld] failed to enter live mode", e);
+            BlockdreamMod.LOGGER.error("[blockdream] failed to enter live mode", e);
             return false;
         }
     }
@@ -89,12 +89,12 @@ public class MapWallRenderer {
     private MapState[] resolveTileStates(ServerWorld world, Path worldDir, int expectedCount) throws Exception {
         Path mapsTxt = worldDir.resolve("maps.txt");
         if (!Files.exists(mapsTxt)) {
-            MineworldMod.LOGGER.warn("[mineworld] maps.txt missing — cannot bind maps to the wall");
+            BlockdreamMod.LOGGER.warn("[blockdream] maps.txt missing — cannot bind maps to the wall");
             return null;
         }
         String[] ids = Files.readString(mapsTxt).trim().split("\\s+");
         if (ids.length != expectedCount) {
-            MineworldMod.LOGGER.warn("[mineworld] maps.txt has {} ids, expected {}", ids.length, expectedCount);
+            BlockdreamMod.LOGGER.warn("[blockdream] maps.txt has {} ids, expected {}", ids.length, expectedCount);
             return null;
         }
         MapState[] states = new MapState[ids.length];
@@ -102,7 +102,7 @@ public class MapWallRenderer {
             int mapId = Integer.parseInt(ids[i]);
             MapState state = world.getMapState(new net.minecraft.component.type.MapIdComponent(mapId));
             if (state == null) {
-                MineworldMod.LOGGER.warn("[mineworld] map id {} has no MapState yet — create/hold it once first", mapId);
+                BlockdreamMod.LOGGER.warn("[blockdream] map id {} has no MapState yet — create/hold it once first", mapId);
                 return null;
             }
             states[i] = state;
@@ -110,7 +110,7 @@ public class MapWallRenderer {
         return states;
     }
 
-    /** Called every server tick from {@link MineworldMod}. */
+    /** Called every server tick from {@link BlockdreamMod}. */
     public void tick(MinecraftServer server) {
         if (!active) return;
         if (liveMode) {

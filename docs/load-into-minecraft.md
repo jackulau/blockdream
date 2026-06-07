@@ -1,4 +1,4 @@
-# Loading mineworld block-art into Minecraft (Java **and** Bedrock)
+# Loading blockdream block-art into Minecraft (Java **and** Bedrock)
 
 Everything here is **100% vanilla** — no mods, no FAWE, no external tools. The CLI/web emit
 real, droppable packs. The block-art plays as an animated wall of solid blocks, driven
@@ -13,11 +13,11 @@ Generate everything:
 
 ```bash
 # Java datapack (.zip + folder) — default target
-mineworld render clip.gif --target datapack   --out ./out/dp
+blockdream render clip.gif --target datapack   --out ./out/dp
 # Bedrock behavior pack (.mcpack + folder)
-mineworld render clip.gif --target behaviorpack --out ./out/bp
+blockdream render clip.gif --target behaviorpack --out ./out/bp
 # Bedrock Script-API addon (.mcpack + folder)
-mineworld render clip.gif --target bedrock-script --out ./out/script
+blockdream render clip.gif --target bedrock-script --out ./out/script
 ```
 
 Each run prints exactly what to do next. `--speed <ticks>` sets playback rate (20 tps; `2`
@@ -33,21 +33,21 @@ a zipped datapack is just as valid as a folder).
 1. Find your world save folder:
    - **Singleplayer:** `.minecraft/saves/<World>/`
    - **Dedicated server:** `<server>/world/`
-2. Copy `mineworld_art.zip` (or the unzipped folder) into `…/<World>/datapacks/`.
+2. Copy `blockdream_art.zip` (or the unzipped folder) into `…/<World>/datapacks/`.
 3. In game: run `/reload` (or rejoin the world).
 4. Stand where you want the wall's bottom-left corner. The default origin is `0 64 0`,
    `+Z` facing — pass a custom origin when generating if needed.
-5. `/function mineworld_art:setup` &nbsp;— one-time: scoreboards, force-loads the build area, paints frame 0.
-6. `/function mineworld_art:start` &nbsp;— begin playback. `/function mineworld_art:stop` to pause.
+5. `/function blockdream_art:setup` &nbsp;— one-time: scoreboards, force-loads the build area, paints frame 0.
+6. `/function blockdream_art:start` &nbsp;— begin playback. `/function blockdream_art:stop` to pause.
 
 What's inside the `.zip` (validated by `validateJavaDatapackArchive`):
 
 ```
 pack.mcmeta                                  ← at archive ROOT
 data/minecraft/tags/function/tick.json       ← runs the driver every tick
-data/mineworld_art/function/setup.mcfunction
-data/mineworld_art/function/driver.mcfunction
-data/mineworld_art/function/frames/0.mcfunction …  ← keyframe + delta frames (fill-batched)
+data/blockdream_art/function/setup.mcfunction
+data/blockdream_art/function/driver.mcfunction
+data/blockdream_art/function/frames/0.mcfunction …  ← keyframe + delta frames (fill-batched)
 ```
 
 ---
@@ -58,16 +58,16 @@ Bedrock has **no map-pixel API**, so the block-art plays as a solid-block wall. 
 
 ### A) Vanilla behavior pack (`.mcpack`)
 
-1. Double-click **`mineworld.mcpack`** → Minecraft imports it.
-2. Create/edit a world → **Behavior Packs** → activate "mineworld block-art video".
+1. Double-click **`blockdream.mcpack`** → Minecraft imports it.
+2. Create/edit a world → **Behavior Packs** → activate "blockdream block-art video".
 3. Enter the world, stand at the build origin.
-4. `/function mineworld/setup` then `/function mineworld/start` (`/function mineworld/stop` to pause).
+4. `/function blockdream/setup` then `/function blockdream/start` (`/function blockdream/stop` to pause).
 
 (No experiments required — pure functions + `tick.json` + a `tickingarea` to keep chunks loaded.)
 
 ### B) Script-API addon (`.mcpack`) — smoother delta updates
 
-1. Double-click **`mineworld-script.mcpack`** to import.
+1. Double-click **`blockdream-script.mcpack`** to import.
 2. Activate the behavior pack on your world **and enable the "Beta APIs" experiment**
    (the Script API requires it).
 3. In chat: `!mw start` to play, `!mw stop`, `!mw reset`.

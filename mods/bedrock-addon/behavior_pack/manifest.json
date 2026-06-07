@@ -1,7 +1,7 @@
 {
   "format_version": 2,
   "header": {
-    "name": "mineworld Block-Art Player",
+    "name": "blockdream Block-Art Player",
     "description": "Animates a block-art video on a wall using the Script API (system.runInterval + per-frame delta block placement). Bedrock's best-available 'native' real-time path — the Script API cannot paint map items, so this drives the solid-block wall.",
     "uuid": "7c4a9b2e-1d3f-4a6b-9c8d-0e1f2a3b4c5d",
     "version": [0, 1, 0],

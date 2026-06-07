@@ -1,4 +1,4 @@
-# mineworld
+# blockdream
 
 Two coupled systems (full map in [docs/architecture.md](./docs/architecture.md)):
 
@@ -20,7 +20,7 @@ packages/
   emit-bedrock/   # .mcstructure writer
   emit-commands/  # vanilla datapacks, behaviour packs, 3D voxel datapacks, greedy fill optimizer
   nbt/            # NBT read/write
-  cli/            # `mineworld render <input> --target ...`  (incl. voxel3d)
+  cli/            # `blockdream render <input> --target ...`  (incl. voxel3d)
 apps/web/         # Vite single-page demo: three.js 3D viewer + both world-model viewers
 mods/
   java-fabric/    # live map-wall render loop + world-model control bridge (Fabric 1.21.x)

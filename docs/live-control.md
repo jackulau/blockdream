@@ -41,7 +41,7 @@ command blocks cannot open a socket or paint map pixels, and Bedrock can do neit
 
 1. **Run the world-model server** (from `ml/`):
    ```bash
-   python -m mineworld_wm.serve --checkpoint runs/m4/latest.pt   # ws://127.0.0.1:8765
+   python -m blockdream_wm.serve --checkpoint runs/m4/latest.pt   # ws://127.0.0.1:8765
    ```
 2. **Build + install the mod** (JDK 21):
    ```bash
@@ -50,9 +50,9 @@ command blocks cannot open a socket or paint map pixels, and Bedrock can do neit
    Drop the jar in the server's `mods/` (Fabric loader + Fabric API required). The
    Java-WebSocket dependency is bundled (`include`), so the jar is self-contained.
 3. **Build the map wall** in-world: place a grid of item frames (cols×rows), fill them with
-   maps, and list those map ids row-major in `<world>/mineworld/maps.txt` (one per tile). The
-   `mineworld` CLI's `mwframes` target emits a `maps.txt` template.
-4. **Enable live mode**: drop `<world>/mineworld/live.json`:
+   maps, and list those map ids row-major in `<world>/blockdream/maps.txt` (one per tile). The
+   `blockdream` CLI's `mwframes` target emits a `maps.txt` template.
+4. **Enable live mode**: drop `<world>/blockdream/live.json`:
    ```json
    { "url": "ws://127.0.0.1:8765", "cols": 4, "rows": 2, "skill": "walk", "actionEveryTicks": 1 }
    ```

@@ -1,4 +1,4 @@
-// EXAMPLE data — regenerate with:  mineworld render <input> --target bedrock-script
+// EXAMPLE data — regenerate with:  blockdream render <input> --target bedrock-script
 // Schema: POOL.frames[f] = array of [x, y, paletteIndex]; frame 0 is a full
 // keyframe, later frames are deltas (changed cells only).
 export const POOL = {

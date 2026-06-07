@@ -2,7 +2,7 @@ import { world, system, BlockPermutation } from "@minecraft/server";
 import { POOL } from "./frames.js";
 
 /**
- * mineworld Block-Art Player (Bedrock Script API).
+ * blockdream Block-Art Player (Bedrock Script API).
  *
  * Plays POOL (see frames.js) on a solid-block wall. Frame 0 is a full keyframe;
  * later frames are deltas (only changed cells), matching the renderer's
@@ -63,12 +63,12 @@ world.afterEvents.chatSend?.subscribe((ev) => {
   if (cmd === "start") {
     reset();
     playing = true;
-    ev.sender.sendMessage("§a[mineworld] playing");
+    ev.sender.sendMessage("§a[blockdream] playing");
   } else if (cmd === "stop") {
     playing = false;
-    ev.sender.sendMessage("§e[mineworld] stopped");
+    ev.sender.sendMessage("§e[blockdream] stopped");
   } else if (cmd === "reset") {
     reset();
-    ev.sender.sendMessage("§b[mineworld] reset to frame 0");
+    ev.sender.sendMessage("§b[blockdream] reset to frame 0");
   }
 });

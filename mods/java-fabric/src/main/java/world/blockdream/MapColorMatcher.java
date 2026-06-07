@@ -1,4 +1,4 @@
-package world.mineworld;
+package world.blockdream;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Nearest Minecraft map-colour matcher. Loads the canonical palette bundled at
- * {@code /mineworld/map-colors.json} (generated from {@code @mineworld/palette}, the SAME
+ * {@code /blockdream/map-colors.json} (generated from {@code @blockdream/palette}, the SAME
  * 244-entry table the rest of the toolchain uses) and maps an RGB pixel to its nearest map
  * colour id. This mirrors color-core's nearest-by-distance match used in the headless bridge
  * proof (packages/cli/src/control-sim.ts → frameToMapTiles).
@@ -32,8 +32,8 @@ public final class MapColorMatcher {
     }
 
     public static MapColorMatcher loadBundled() {
-        try (InputStream in = MapColorMatcher.class.getResourceAsStream("/mineworld/map-colors.json")) {
-            if (in == null) throw new IllegalStateException("missing /mineworld/map-colors.json resource");
+        try (InputStream in = MapColorMatcher.class.getResourceAsStream("/blockdream/map-colors.json")) {
+            if (in == null) throw new IllegalStateException("missing /blockdream/map-colors.json resource");
             JsonObject root = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
             JsonArray colors = root.getAsJsonArray("colors");
             int n = colors.size();

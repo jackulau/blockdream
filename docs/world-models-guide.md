@@ -20,7 +20,7 @@ All share the conv VQ/continuous **tokenizer** (`tokenizer.py`) and an **action 
 
 ```bash
 # Minecraft AR (real VPT pool), resumable, two-phase tokenizer→AR, time-boxed
-.venv/bin/python -m mineworld_wm.train_long --pool data/pool_m4 --out runs/m4 \
+.venv/bin/python -m blockdream_wm.train_long --pool data/pool_m4 --out runs/m4 \
     --preset m4 --device mps --ckpt-every-min 30 --max-minutes 480
 
 # Skill-conditioned on all 9 movement types (see Movement types)
@@ -39,9 +39,9 @@ stops cleanly on `--max-minutes` or a `<out>/STOP` file.
 
 ```bash
 # Minecraft AR over WebSocket (CPU beats MPS for sequential token decode)
-.venv/bin/python -m mineworld_wm.serve --real runs/m4/latest.pt --device cpu   # :8765
+.venv/bin/python -m blockdream_wm.serve --real runs/m4/latest.pt --device cpu   # :8765
 # Driving
-.venv/bin/python -m mineworld_wm.drive.serve --checkpoint runs/drive/latest.pt # :8766
+.venv/bin/python -m blockdream_wm.drive.serve --checkpoint runs/drive/latest.pt # :8766
 ```
 
 The web demo (`apps/web`, `pnpm --filter web dev`) auto-connects to both. Display is **decoupled**
@@ -68,7 +68,7 @@ The server-free, in-browser engine (`ml/web/rollout.js`, onnxruntime-web). Pipel
 ```bash
 # 1. train (above) → runs/diffusion/latest.pt
 # 2. export the trained transition + decoder to ONNX (REAL weights via --checkpoint)
-.venv/bin/python -m mineworld_wm.export_onnx --checkpoint runs/diffusion/latest.pt \
+.venv/bin/python -m blockdream_wm.export_onnx --checkpoint runs/diffusion/latest.pt \
     --out ../apps/web/public/onnx
 # 3. verify the export runs few-step Euler + decodes a valid frame at real-time fps
 .venv/bin/python scripts/verify_diffusion_export.py --onnx ../apps/web/public/onnx

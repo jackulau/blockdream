@@ -1,8 +1,8 @@
 # Command-block optimization — building & animating blocks in vanilla, efficiently
 
-This is the deep version of `vanilla-command-budgets.md`. It covers how mineworld places
+This is the deep version of `vanilla-command-budgets.md`. It covers how blockdream places
 and animates thousands of blocks per tick in **100% vanilla** Minecraft, why each choice
-wins, and the strategy the builder (`@mineworld/emit-commands` + `@mineworld/voxel`) now
+wins, and the strategy the builder (`@blockdream/emit-commands` + `@blockdream/voxel`) now
 bakes in. No mods, no FAWE, no WorldEdit.
 
 ## 0. The mental model: "command block" = datapack function
@@ -57,7 +57,7 @@ The keyframe (frame 0) is the worst case. **Sustained cost is the delta, not the
 - **Structure blocks / `place template`** — load a saved `.nbt`/`.mcstructure` instantly,
   bypassing per-block commands entirely. Best for a *static* 3D build or a small set of
   discrete frames (swap structures per frame). The cost moves from per-tick commands to
-  load I/O. mineworld emits `.mcstructure` (`buildVoxelMcStructure`) for exactly this path.
+  load I/O. blockdream emits `.mcstructure` (`buildVoxelMcStructure`) for exactly this path.
 
 **Winner for animation:** `/fill` run-batching over `/setblock`, with structure-swap as the
 alternative for a handful of heavy 3D frames.
@@ -86,7 +86,7 @@ respected because runs are 1-D. This is wired into the 3D datapack via the `opti
 
 ## 5. 3D & spin specifics
 
-- A 3D build is a `VoxelVolume` (`@mineworld/voxel`); the emitter clears the bounding box
+- A 3D build is a `VoxelVolume` (`@blockdream/voxel`); the emitter clears the bounding box
   once with a single `/fill … air` then places solids, so leftover blocks never corrupt it.
 - A **spin** is `voxel.spin(volume, nFrames)` → N rotated volumes → delta-encoded frames.
   Because rotation only changes a thin shell of voxels per step, deltas stay small.
@@ -112,7 +112,7 @@ Pick the budget so the *delta* per advance stays under a few thousand post-`/fil
 - **Hero stills / low motion** → vanilla blocks, 64–128 wide (or a modest 3D volume),
   5–10 fps. Crisp, fully vanilla.
 - **High motion / video** → drop resolution/fps, or use the map-item wall
-  (`@mineworld/emit-java`) which swaps a 16,384-byte colour array per map instead of
+  (`@blockdream/emit-java`) which swaps a 16,384-byte colour array per map instead of
   thousands of block updates.
 - **Static 3D / few frames** → `.mcstructure` + structure blocks (instant load).
 

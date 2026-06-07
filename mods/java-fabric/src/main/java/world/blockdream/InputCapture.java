@@ -1,4 +1,4 @@
-package world.mineworld;
+package world.blockdream;
 
 import net.minecraft.server.network.ServerPlayerEntity;
 

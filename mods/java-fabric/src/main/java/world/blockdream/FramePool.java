@@ -1,4 +1,4 @@
-package world.mineworld;
+package world.blockdream;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -6,7 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Reads the binary frame pool emitted by the mineworld CLI.
+ * Reads the binary frame pool emitted by the blockdream CLI.
  *
  * Format (big-endian):
  *   magic   : 4 bytes  = 'M','W','M','W'
@@ -46,7 +46,7 @@ public final class FramePool {
             byte[] magic = new byte[4];
             in.readFully(magic);
             if (magic[0] != 'M' || magic[1] != 'W' || magic[2] != 'M' || magic[3] != 'W') {
-                throw new IOException("not a mineworld frame pool");
+                throw new IOException("not a blockdream frame pool");
             }
             int version = in.readInt();
             if (version != 1) throw new IOException("unsupported frame pool version " + version);

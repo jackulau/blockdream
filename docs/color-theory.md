@@ -1,4 +1,4 @@
-# mineworld — color palette & matching theory
+# blockdream — color palette & matching theory
 
 Research-grounded decisions for matching arbitrary images/video onto Minecraft's
 fixed, gamut-limited color set. (Sources at the bottom.)
