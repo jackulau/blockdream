@@ -38,6 +38,17 @@ class DriveTransition(nn.Module):
         self.ar = ARTransition(cfg, n_tokens=n_tokens, codebook_size=codebook_size, action_dim=cond_dim)
         self.lidar_head = nn.Sequential(nn.Linear(cond_dim, 64), nn.GELU(), nn.Linear(64, n_lidar))
         self.telemetry_head = nn.Sequential(nn.Linear(cond_dim, 64), nn.GELU(), nn.Linear(64, n_telemetry))
+        # PHYSICAL TELEMETRY BOUND (critical for recursive stability). The telemetry head's output is
+        # fed back as prev_tel every step; an unbounded Linear in that loop diverges to NaN over a long
+        # rollout (off-distribution feedback the teacher-forced trainer never saw). We soft-clamp each
+        # channel with scale*tanh(x/scale): ~identity for in-range values, saturating on runaway, so
+        # speed/yaw-rate can never explode regardless of checkpoint quality. Scales are physical, set
+        # from the sim telemetry layout [vx/30, vy/15, r, speed/30, sin(yaw), cos(yaw)] with headroom
+        # (speed up to 60 m/s, yaw-rate up to 3 rad/s; sin/cos clamped near their [-1,1] domain).
+        # persistent=False → not in state_dict, so old (pre-bound) checkpoints still load strict.
+        default_scale = torch.tensor([2.0, 2.0, 3.0, 2.0, 1.5, 1.5])
+        tel_scale = default_scale if n_telemetry == 6 else torch.full((n_telemetry,), 3.0)
+        self.register_buffer("tel_scale", tel_scale, persistent=False)
 
     def _fuse(self, control: torch.Tensor, lidar: torch.Tensor, telemetry: torch.Tensor,
               history: torch.Tensor | None = None) -> torch.Tensor:
@@ -48,11 +59,17 @@ class DriveTransition(nn.Module):
             c = c + self.hist_proj(history)
         return c
 
+    def bound_tel(self, raw: torch.Tensor) -> torch.Tensor:
+        """Soft-clamp raw telemetry to its physical per-channel range. scale*tanh(x/scale) is ~identity
+        for |x| << scale and saturates at ±scale, so the recursively fed-back telemetry can never diverge."""
+        s = self.tel_scale.to(raw.dtype)
+        return s * torch.tanh(raw / s)
+
     def loss(self, prev_tokens, next_tokens, prev_lidar, prev_tel, control, next_lidar, next_tel, history=None):
         c = self._fuse(control, prev_lidar, prev_tel, history)
         rgb_loss = self.ar.loss(prev_tokens, next_tokens, c)
         lidar_loss = F.mse_loss(torch.sigmoid(self.lidar_head(c)), next_lidar)
-        tel_loss = F.mse_loss(self.telemetry_head(c), next_tel)
+        tel_loss = F.mse_loss(self.bound_tel(self.telemetry_head(c)), next_tel)
         return rgb_loss + lidar_loss + tel_loss, {"rgb": rgb_loss.item(), "lidar": lidar_loss.item(), "tel": tel_loss.item()}
 
     @torch.no_grad()
@@ -61,5 +78,5 @@ class DriveTransition(nn.Module):
         c = self._fuse(control, prev_lidar, prev_tel, history)
         next_tokens = self.ar.generate(prev_tokens, c)
         next_lidar = torch.sigmoid(self.lidar_head(c))
-        next_tel = self.telemetry_head(c)
+        next_tel = self.bound_tel(self.telemetry_head(c))
         return next_tokens, next_lidar, next_tel

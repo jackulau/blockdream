@@ -53,6 +53,13 @@ class DriveSession:
         return self._decode()
 
 
+def _finite4(x: float) -> float:
+    """Round to 4 dp, mapping NaN/Inf → 0.0 so the JSON we emit is always valid + plottable
+    (json.dumps would otherwise serialise NaN/Infinity, which the browser's JSON.parse rejects)."""
+    x = float(x)
+    return round(x, 4) if math.isfinite(x) else 0.0
+
+
 class DriveServer:
     def __init__(self, session: DriveSession):
         self.session = session
@@ -70,8 +77,8 @@ class DriveServer:
             "type": "frame",
             "step": self.session.step_idx,
             "rgb_png_b64": frame_to_png_b64(o["rgb"]),
-            "lidar": [round(float(x), 4) for x in o["lidar"].tolist()],
-            "telemetry": [round(float(x), 4) for x in o["telemetry"].tolist()],
+            "lidar": [_finite4(x) for x in o["lidar"].tolist()],
+            "telemetry": [_finite4(x) for x in o["telemetry"].tolist()],
         }
 
 
