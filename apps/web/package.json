@@ -11,15 +11,15 @@
     "prebuild": "node scripts/check-emit-browser-safe.mjs && node scripts/check-render-loop.mjs"
   },
   "dependencies": {
-    "@mineworld/color-core": "workspace:*",
-    "@mineworld/palette": "workspace:*",
-    "@mineworld/voxel": "workspace:*",
+    "@blockdream/color-core": "workspace:*",
+    "@blockdream/palette": "workspace:*",
+    "@blockdream/voxel": "workspace:*",
     "fflate": "^0.8.3",
     "three": "^0.184.0",
-    "@mineworld/emit-commands": "workspace:*"
+    "@blockdream/emit-commands": "workspace:*"
   },
   "devDependencies": {
-    "@mineworld/video": "workspace:*",
+    "@blockdream/video": "workspace:*",
     "@types/three": "^0.184.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.11"

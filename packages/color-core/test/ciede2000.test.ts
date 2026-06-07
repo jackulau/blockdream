@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette } from "@blockdream/palette";
 import { preparePalette, nearestSrgb } from "../src/match";
 import { createRgbImage, setPixel, type RgbImage } from "../src/image";
 import { ciede2000, srgbToCielab, deltaE2000Srgb, type CieLab } from "../src/ciede2000";

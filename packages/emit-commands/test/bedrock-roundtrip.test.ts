@@ -4,7 +4,7 @@
 // Each must reconstruct every source frame exactly (Bedrock Y-flip + origin).
 
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { generateBedrockBehaviorPack } from "../src/behaviorpack";
 import { generateBedrockScriptAddon } from "../src/bedrock-script";
 import { playFrames, playPool, expectedWall2D, expectGridsEqual } from "./sim";
@@ -36,7 +36,7 @@ describe("round-trip: Bedrock behavior pack animation", () => {
   const pack = generateBedrockBehaviorPack(frames, resolve, { origin });
 
   it("reconstructs every frame exactly via the emitted functions", () => {
-    const grids = playFrames(pack.files, "mineworld", "bedrock", frames.length);
+    const grids = playFrames(pack.files, "blockdream", "bedrock", frames.length);
     for (let f = 0; f < frames.length; f++) {
       expectGridsEqual(grids[f]!, expectedWall2D(frames[f]!, origin, resolveFull), expect);
     }

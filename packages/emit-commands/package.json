@@ -1,5 +1,5 @@
 {
-  "name": "@mineworld/emit-commands",
+  "name": "@blockdream/emit-commands",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -13,9 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mineworld/palette": "workspace:*",
-    "@mineworld/color-core": "workspace:*",
-    "@mineworld/voxel": "workspace:*"
+    "@blockdream/palette": "workspace:*",
+    "@blockdream/color-core": "workspace:*",
+    "@blockdream/voxel": "workspace:*"
   },
   "files": [
     "src"

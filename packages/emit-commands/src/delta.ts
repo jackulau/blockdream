@@ -1,4 +1,4 @@
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 
 export interface Cell {
   x: number;

@@ -10,7 +10,7 @@
 // carry DIFFERENT textures per face (grass top/side/bottom, log end-grain) by keying on the face.
 // Pure (no three.js) → unit-testable in node.
 
-import { EMPTY, getVoxel, type VoxelVolume } from "@mineworld/voxel";
+import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
 
 /** Face directions: +X, -X, +Y, -Y, +Z, -Z. */
 export type FaceDir = 0 | 1 | 2 | 3 | 4 | 5;

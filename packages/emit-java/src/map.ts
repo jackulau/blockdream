@@ -1,5 +1,5 @@
 import { gzipSync, gunzipSync } from "node:zlib";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import {
   Byte,
   ByteArray,

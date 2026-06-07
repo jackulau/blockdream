@@ -3,7 +3,7 @@
 // per-cell metric (e.g. brightness). The heightOf callback decouples this package from
 // the palette — the caller maps a map-colour id to a 0..1 height.
 
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { createVolume, setVoxel, type VoxelVolume } from "./volume";
 
 export interface VoxelizeOptions {

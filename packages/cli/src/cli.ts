@@ -2,10 +2,10 @@ import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { render, type RenderOptions, type RenderTarget, type Edition } from "./render";
 import { previewPng } from "./preview";
-import type { DitherMethod } from "@mineworld/color-core";
+import type { DitherMethod } from "@blockdream/color-core";
 
-const USAGE = `mineworld render <input> [options]
-mineworld preview <input> --out preview.png   (side-by-side source | block-art PNG)
+const USAGE = `blockdream render <input> [options]
+blockdream preview <input> --out preview.png   (side-by-side source | block-art PNG)
 
 Convert a GIF/video into Minecraft block-art.
 

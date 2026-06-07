@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { framesToAnimated3d } from "../src/video3d";
-import { getVoxel, forEachSolid, EMPTY, type VoxelVolume } from "@mineworld/voxel";
+import { getVoxel, forEachSolid, EMPTY, type VoxelVolume } from "@blockdream/voxel";
 
 // a `sub`×`sub` square subject (id 5) at (px,py) on a background (id 0)
 function squareFrame(size: number, sub: number, px: number, py: number): QuantizedFrame {

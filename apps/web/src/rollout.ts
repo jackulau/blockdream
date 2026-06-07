@@ -1,5 +1,5 @@
 // Server-free, in-browser diffusion world-model engine. Loads the ONNX exported by
-// `python -m mineworld_wm.export_onnx --checkpoint ...` (transition.onnx + decoder.onnx) and runs
+// `python -m blockdream_wm.export_onnx --checkpoint ...` (transition.onnx + decoder.onnx) and runs
 // the few-step Euler loop in JS — the >=30fps route (the whole frame's latent is denoised in
 // parallel, unlike the AR server's token-by-token decode).
 //

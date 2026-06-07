@@ -4,8 +4,8 @@
 
 import { describe, it, expect } from "vitest";
 import { unzipSync, strFromU8 } from "fflate";
-import { generateJavaDatapack, generateVoxelDatapack, fillBatch } from "@mineworld/emit-commands";
-import { createVolume, setVoxel, getVoxel, EMPTY, objToVolume, type VoxelVolume } from "@mineworld/voxel";
+import { generateJavaDatapack, generateVoxelDatapack, fillBatch } from "@blockdream/emit-commands";
+import { createVolume, setVoxel, getVoxel, EMPTY, objToVolume, type VoxelVolume } from "@blockdream/voxel";
 import { zipDatapack } from "../src/datapack-export";
 
 const BUDGET = 8000;
@@ -63,9 +63,9 @@ describe("full pipeline", () => {
 
     // simulate: box-clear (setup) then each frame cumulatively
     const grid: Grid = new Map();
-    applyLines(grid, strFromU8(files["data/mineworld/function/setup.mcfunction"]!));
+    applyLines(grid, strFromU8(files["data/blockdream/function/setup.mcfunction"]!));
     for (let f = 0; f < frames.length; f++) {
-      const text = strFromU8(files[`data/mineworld/function/frames/${f}.mcfunction`]!);
+      const text = strFromU8(files[`data/blockdream/function/frames/${f}.mcfunction`]!);
       applyLines(grid, text);
       for (const [k, want] of expectedGrid(frames[f]!, origin)) expect(grid.get(k)).toBe(want);
       const cmds = text.split("\n").filter((l) => /^\s*(setblock|fill)\b/.test(l));
@@ -79,6 +79,6 @@ describe("full pipeline", () => {
     const pack = generateVoxelDatapack([vol], resolveBlock, { optimize: (c, r) => fillBatch(c, r) });
     const files = unzipSync(zipDatapack(pack.files));
     expect(strFromU8(files["pack.mcmeta"]!)).toContain("pack_format");
-    expect(strFromU8(files["data/mineworld/function/frames/0.mcfunction"]!)).toMatch(/(setblock|fill)/);
+    expect(strFromU8(files["data/blockdream/function/frames/0.mcfunction"]!)).toMatch(/(setblock|fill)/);
   });
 });

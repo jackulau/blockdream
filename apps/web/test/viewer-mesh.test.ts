@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createVolume, setVoxel } from "@mineworld/voxel";
+import { createVolume, setVoxel } from "@blockdream/voxel";
 import { greedyQuads, meshByMaterial, quadCount, FACE_NORMALS, type FaceDir } from "../src/mesh3d";
 
 function solidCube(n: number, id = 7) {

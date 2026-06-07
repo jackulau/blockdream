@@ -7,9 +7,9 @@
 // ARE the contract between mod and server, and they are exercised here end-to-end. The mod
 // is the same pipeline realized against a live client + ws://127.0.0.1:8765.
 
-import { getJavaMapPalette } from "@mineworld/palette";
-import { preparePalette, quantizeFrame, type RgbImage, type PreparedPalette } from "@mineworld/color-core";
-import { splitIntoMaps, toMapColors, MAP_DIM } from "@mineworld/emit-java";
+import { getJavaMapPalette } from "@blockdream/palette";
+import { preparePalette, quantizeFrame, type RgbImage, type PreparedPalette } from "@blockdream/color-core";
+import { splitIntoMaps, toMapColors, MAP_DIM } from "@blockdream/emit-java";
 
 // VPT-style button order (matches apps/web/src/action.ts; indices 6-8 are server-derivable extras)
 export const BTN = {

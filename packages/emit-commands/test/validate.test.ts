@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { generateJavaDatapack } from "../src/datapack";
 import { generateBedrockBehaviorPack } from "../src/behaviorpack";
 import { computeDeltas } from "../src/delta";
@@ -24,16 +24,16 @@ describe("command validator", () => {
     for (const cmd of [
       "setblock 0 127 0 minecraft:white_concrete replace",
       "setblock -3 64 12 white_concrete replace",
-      "function mineworld:frames/0",
-      "function mineworld/dispatch/0_2",
-      "$function mineworld:frames/$(idx)",
+      "function blockdream:frames/0",
+      "function blockdream/dispatch/0_2",
+      "$function blockdream:frames/$(idx)",
       "scoreboard objectives add ma dummy",
       "scoreboard players set #f ma 0",
       "execute if score #t ma < #speed ma run return 0",
-      "execute if score f ma matches 0..1 run function mineworld/dispatch/0_1",
-      "execute store result storage mineworld:anim idx int 1 run scoreboard players get #f ma",
+      "execute if score f ma matches 0..1 run function blockdream/dispatch/0_1",
+      "execute store result storage blockdream:anim idx int 1 run scoreboard players get #f ma",
       "forceload add 0 0 2 0",
-      "tickingarea add 0 64 0 7 71 0 mineworld_area",
+      "tickingarea add 0 64 0 7 71 0 blockdream_area",
       "# a comment",
       "",
     ]) {

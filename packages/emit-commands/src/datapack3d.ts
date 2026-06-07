@@ -4,7 +4,7 @@
 // and cells carry a Z. The build region is cleared once with /fill, then keyframe 0
 // places the solids and later frames place only changed voxels (air transitions included).
 
-import { EMPTY, getVoxel, type VoxelVolume } from "@mineworld/voxel";
+import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
 import type { DatapackOptions, GeneratedPack } from "./datapack";
 
@@ -75,7 +75,7 @@ export function generateVoxelDatapack(
   opts: VoxelDatapackOptions = {},
 ): GeneratedPack {
   if (volumes.length === 0) throw new Error("no frames");
-  const ns = opts.namespace ?? "mineworld";
+  const ns = opts.namespace ?? "blockdream";
   assertNamespace(ns);
   const packFormat = opts.packFormat ?? 48;
   const origin = opts.origin ?? { x: 0, y: 64, z: 0 };
@@ -156,7 +156,7 @@ export function generateVoxelDatapack(
   files.set(
     "pack.mcmeta",
     JSON.stringify(
-      { pack: { pack_format: packFormat, description: opts.description ?? `mineworld 3D voxel build (${sx}x${sy}x${sz}, ${volumes.length} frames)` } },
+      { pack: { pack_format: packFormat, description: opts.description ?? `blockdream 3D voxel build (${sx}x${sy}x${sz}, ${volumes.length} frames)` } },
       null,
       2,
     ) + "\n",

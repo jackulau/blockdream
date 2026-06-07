@@ -23,16 +23,16 @@ importers:
 
   apps/web:
     dependencies:
-      '@mineworld/color-core':
+      '@blockdream/color-core':
         specifier: workspace:*
         version: link:../../packages/color-core
-      '@mineworld/emit-commands':
+      '@blockdream/emit-commands':
         specifier: workspace:*
         version: link:../../packages/emit-commands
-      '@mineworld/palette':
+      '@blockdream/palette':
         specifier: workspace:*
         version: link:../../packages/palette
-      '@mineworld/voxel':
+      '@blockdream/voxel':
         specifier: workspace:*
         version: link:../../packages/voxel
       fflate:
@@ -42,7 +42,7 @@ importers:
         specifier: ^0.184.0
         version: 0.184.0
     devDependencies:
-      '@mineworld/video':
+      '@blockdream/video':
         specifier: workspace:*
         version: link:../../packages/video
       '@types/three':
@@ -57,70 +57,70 @@ importers:
 
   packages/cli:
     dependencies:
-      '@mineworld/color-core':
+      '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core
-      '@mineworld/emit-bedrock':
+      '@blockdream/emit-bedrock':
         specifier: workspace:*
         version: link:../emit-bedrock
-      '@mineworld/emit-commands':
+      '@blockdream/emit-commands':
         specifier: workspace:*
         version: link:../emit-commands
-      '@mineworld/emit-java':
+      '@blockdream/emit-java':
         specifier: workspace:*
         version: link:../emit-java
-      '@mineworld/palette':
+      '@blockdream/palette':
         specifier: workspace:*
         version: link:../palette
-      '@mineworld/video':
+      '@blockdream/video':
         specifier: workspace:*
         version: link:../video
-      '@mineworld/voxel':
+      '@blockdream/voxel':
         specifier: workspace:*
         version: link:../voxel
 
   packages/color-core:
     dependencies:
-      '@mineworld/palette':
+      '@blockdream/palette':
         specifier: workspace:*
         version: link:../palette
 
   packages/emit-bedrock:
     dependencies:
-      '@mineworld/color-core':
+      '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core
-      '@mineworld/nbt':
+      '@blockdream/nbt':
         specifier: workspace:*
         version: link:../nbt
-      '@mineworld/palette':
+      '@blockdream/palette':
         specifier: workspace:*
         version: link:../palette
-      '@mineworld/voxel':
+      '@blockdream/voxel':
         specifier: workspace:*
         version: link:../voxel
 
   packages/emit-commands:
     dependencies:
-      '@mineworld/color-core':
+      '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core
-      '@mineworld/palette':
+      '@blockdream/palette':
         specifier: workspace:*
         version: link:../palette
-      '@mineworld/voxel':
+      '@blockdream/voxel':
         specifier: workspace:*
         version: link:../voxel
 
   packages/emit-java:
     dependencies:
-      '@mineworld/color-core':
+      '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core
-      '@mineworld/nbt':
+      '@blockdream/nbt':
         specifier: workspace:*
         version: link:../nbt
-      '@mineworld/palette':
+      '@blockdream/palette':
         specifier: workspace:*
         version: link:../palette
 
@@ -130,16 +130,16 @@ importers:
 
   packages/video:
     dependencies:
-      '@mineworld/color-core':
+      '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core
 
   packages/voxel:
     dependencies:
-      '@mineworld/color-core':
+      '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core
-      '@mineworld/palette':
+      '@blockdream/palette':
         specifier: workspace:*
         version: link:../palette
 

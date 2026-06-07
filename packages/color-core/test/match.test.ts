@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette } from "@blockdream/palette";
 import { preparePalette, nearestSrgb } from "../src/match";
 
 const pal = preparePalette(getJavaMapPalette());

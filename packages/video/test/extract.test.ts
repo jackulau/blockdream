@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { runFfmpeg, hasFfmpeg } from "../src/ffmpeg";
 import { extractFrames } from "../src/extract";
 import { resizeAreaLinear } from "../src/resize";
-import { createRgbImage, setPixel } from "@mineworld/color-core";
+import { createRgbImage, setPixel } from "@blockdream/color-core";
 
 const ff = hasFfmpeg();
 const d = ff ? describe : describe.skip;

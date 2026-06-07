@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette } from "@blockdream/palette";
 import {
   preparePalette,
   quantizeFloydSteinberg,
   createRgbImage,
   setPixel,
   type RgbImage,
-} from "@mineworld/color-core";
+} from "@blockdream/color-core";
 import { buildMapDat, readMapColors, toMapColors, splitIntoMaps, MAP_AREA } from "../src/map";
 import { writeNbt, readNbt, Compound, Int, Str, Byte, ByteArray, TAG } from "../src/nbt";
 

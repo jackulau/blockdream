@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createVolume, setVoxel } from "@mineworld/voxel";
+import { createVolume, setVoxel } from "@blockdream/voxel";
 import { buildVoxelMcStructure, readMcStructure } from "../src/mcstructure";
 
 const blockFor = (id: number) => ({ name: `minecraft:c${id}` });

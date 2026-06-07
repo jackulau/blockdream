@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { imageToSolid } from "../src/depth";
 import { getVoxel, EMPTY, type VoxelVolume } from "../src/volume";
 

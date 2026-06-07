@@ -1,6 +1,6 @@
-import type { QuantizedFrame } from "@mineworld/color-core";
-import type { BlockEntry } from "@mineworld/palette";
-import { EMPTY, getVoxel, type VoxelVolume } from "@mineworld/voxel";
+import type { QuantizedFrame } from "@blockdream/color-core";
+import type { BlockEntry } from "@blockdream/palette";
+import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
 import {
   Compound,
   Int,
@@ -11,7 +11,7 @@ import {
   readNbt,
   type NbtValue,
   type NbtCompound,
-} from "@mineworld/nbt";
+} from "@blockdream/nbt";
 
 /**
  * Bedrock block version int (packed [major,minor,patch,revision]). 1.21.0 here;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette } from "@mineworld/palette";
-import { preparePalette, quantizeNearest, createRgbImage, setPixel, type RgbImage } from "@mineworld/color-core";
+import { getJavaMapPalette } from "@blockdream/palette";
+import { preparePalette, quantizeNearest, createRgbImage, setPixel, type RgbImage } from "@blockdream/color-core";
 import { buildFramePool } from "../src/framepool";
 import { MAP_AREA } from "../src/map";
 

@@ -4,7 +4,7 @@
 // is byte-correct, not just structurally valid.
 
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { generateJavaDatapack } from "../src/datapack";
 import { playFrames, expectedWall2D, expectGridsEqual } from "./sim";
 
@@ -38,7 +38,7 @@ describe("round-trip: 2D Java datapack animation", () => {
   const pack = generateJavaDatapack(frames, resolve, { origin });
 
   it("reconstructs every frame exactly (keyframe + cumulative deltas)", () => {
-    const grids = playFrames(pack.files, "mineworld", "java", frames.length);
+    const grids = playFrames(pack.files, "blockdream", "java", frames.length);
     expect(grids.length).toBe(frames.length);
     for (let f = 0; f < frames.length; f++) {
       expectGridsEqual(grids[f]!, expectedWall2D(frames[f]!, origin, resolveFull), expect);
@@ -46,12 +46,12 @@ describe("round-trip: 2D Java datapack animation", () => {
   });
 
   it("an unchanged frame emits an empty delta (no commands)", () => {
-    const f2 = pack.files.get("data/mineworld/function/frames/2.mcfunction")!;
+    const f2 = pack.files.get("data/blockdream/function/frames/2.mcfunction")!;
     expect(f2.split("\n").filter((l) => /^\s*(setblock|fill)\b/.test(l)).length).toBe(0);
   });
 
   it("the keyframe is fill-batched (2 solid halves → 2 commands, not 24 setblocks)", () => {
-    const f0 = pack.files.get("data/mineworld/function/frames/0.mcfunction")!;
+    const f0 = pack.files.get("data/blockdream/function/frames/0.mcfunction")!;
     const cmds = f0.split("\n").filter((l) => /^\s*(setblock|fill)\b/.test(l));
     expect(cmds.length).toBe(2);
   });

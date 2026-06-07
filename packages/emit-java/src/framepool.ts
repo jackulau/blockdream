@@ -1,4 +1,4 @@
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { splitIntoMaps, MAP_AREA, MAP_DIM } from "./map";
 
 /**

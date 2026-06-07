@@ -1,4 +1,4 @@
-import type { MapColor, MapPalette } from "@mineworld/palette";
+import type { MapColor, MapPalette } from "@blockdream/palette";
 import { srgbChannelToLinear, srgbToOklab, type Lab } from "./oklab";
 
 /**

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-declare module "@mineworld/palette/data/*.json" {
-  const value: import("@mineworld/palette").MapPalette;
+declare module "@blockdream/palette/data/*.json" {
+  const value: import("@blockdream/palette").MapPalette;
   export default value;
 }

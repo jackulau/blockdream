@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { chunk } from "../src/chunk";
 import { generateJavaDatapack } from "../src/datapack";
 import { generateBedrockBehaviorPack } from "../src/behaviorpack";
@@ -31,12 +31,12 @@ describe("command-budget splitting", () => {
 
   it("java: oversized frame splits into a parent that calls ≤limit-sized parts", () => {
     const pack = generateJavaDatapack([frame], resolve, { maxCommandsPerFunction: limit, optimizeFills: false });
-    const parent = pack.files.get("data/mineworld/function/frames/0.mcfunction")!;
+    const parent = pack.files.get("data/blockdream/function/frames/0.mcfunction")!;
     // parent should call parts, not contain setblocks
     expect(parent).not.toContain("setblock");
-    expect(parent).toContain("function mineworld:frames/0/part0");
+    expect(parent).toContain("function blockdream:frames/0/part0");
     // 100 cells / 30 = 4 parts (30,30,30,10)
-    const partPaths = [...pack.files.keys()].filter((k) => k.startsWith("data/mineworld/function/frames/0/part"));
+    const partPaths = [...pack.files.keys()].filter((k) => k.startsWith("data/blockdream/function/frames/0/part"));
     expect(partPaths.length).toBe(4);
     for (const p of partPaths) {
       const cmds = pack.files.get(p)!.split("\n").filter((l) => l.startsWith("setblock"));
@@ -47,15 +47,15 @@ describe("command-budget splitting", () => {
   it("java: small frame stays a single function (no parts)", () => {
     const small = checker(4, 4); // 16 < 30
     const pack = generateJavaDatapack([small], resolve, { maxCommandsPerFunction: limit, optimizeFills: false });
-    expect(pack.files.get("data/mineworld/function/frames/0.mcfunction")!).toContain("setblock");
+    expect(pack.files.get("data/blockdream/function/frames/0.mcfunction")!).toContain("setblock");
     expect([...pack.files.keys()].some((k) => k.includes("/frames/0/part"))).toBe(false);
   });
 
   it("bedrock: oversized frame splits into chained sub-functions too", () => {
     const pack = generateBedrockBehaviorPack([frame], resolve, { maxCommandsPerFunction: limit, optimizeFills: false });
-    const parent = pack.files.get("functions/mineworld/frames/0.mcfunction")!;
-    expect(parent).toContain("function mineworld/frames/0/part0");
-    const parts = [...pack.files.keys()].filter((k) => k.startsWith("functions/mineworld/frames/0/part"));
+    const parent = pack.files.get("functions/blockdream/frames/0.mcfunction")!;
+    expect(parent).toContain("function blockdream/frames/0/part0");
+    const parts = [...pack.files.keys()].filter((k) => k.startsWith("functions/blockdream/frames/0/part"));
     expect(parts.length).toBe(4);
   });
 
@@ -67,7 +67,7 @@ describe("command-budget splitting", () => {
     const checker2d: QuantizedFrame = { width: 10, height: 10, paletteIndex: new Int32Array(100), mapColorId: flat };
     const pack = generateJavaDatapack([checker2d], resolve, { maxCommandsPerFunction: limit }); // optimize ON (default)
     expect(pack.totalCommands).toBe(100); // unmergeable → 100 commands
-    const partPaths = [...pack.files.keys()].filter((k) => k.startsWith("data/mineworld/function/frames/0/part"));
+    const partPaths = [...pack.files.keys()].filter((k) => k.startsWith("data/blockdream/function/frames/0/part"));
     expect(partPaths.length).toBe(4);
   });
 });

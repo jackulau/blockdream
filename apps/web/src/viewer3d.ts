@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { poseAt, type VoxelVolume } from "@mineworld/voxel";
+import { poseAt, type VoxelVolume } from "@blockdream/voxel";
 import { meshByMaterial, type FaceDir } from "./mesh3d";
 import { buildSchedule, uniformSchedule, frameAtElapsed, startOfFrame, type FrameSchedule } from "./anim";
 

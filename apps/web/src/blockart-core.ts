@@ -9,9 +9,9 @@ import {
   type DitherMethod,
   type PreparedPalette,
   type QuantizedFrame,
-} from "@mineworld/color-core";
-import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
-import type { MapPalette } from "@mineworld/palette";
+} from "@blockdream/color-core";
+import javaMapPalette from "@blockdream/palette/data/java-map-colors-1.21.9.json";
+import type { MapPalette } from "@blockdream/palette";
 import { blockForBase, swatchDataUrl, localTextureUrl, loadTextureManifest } from "./blocks";
 import { decodeGif, isGif } from "./gif";
 import { buildSchedule, frameAtElapsed, type FrameSchedule } from "./anim";

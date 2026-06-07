@@ -1,4 +1,4 @@
-import type { RgbImage } from "@mineworld/color-core";
+import type { RgbImage } from "@blockdream/color-core";
 import { runFfmpeg } from "./ffmpeg";
 
 export interface ExtractOptions {

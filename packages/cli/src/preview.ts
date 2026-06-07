@@ -7,9 +7,9 @@ import {
   type QuantizedFrame,
   type PreparedPalette,
   type DitherMethod,
-} from "@mineworld/color-core";
-import { getJavaMapPalette, getFullBlockMapPalette } from "@mineworld/palette";
-import { extractFrames, rgbToPng } from "@mineworld/video";
+} from "@blockdream/color-core";
+import { getJavaMapPalette, getFullBlockMapPalette } from "@blockdream/palette";
+import { extractFrames, rgbToPng } from "@blockdream/video";
 
 function renderQuantized(q: QuantizedFrame, pal: PreparedPalette): RgbImage {
   const img = createRgbImage(q.width, q.height);

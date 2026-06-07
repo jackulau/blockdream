@@ -1,4 +1,4 @@
-import type { RgbImage } from "@mineworld/color-core";
+import type { RgbImage } from "@blockdream/color-core";
 import { runFfmpeg } from "./ffmpeg";
 
 /** Encode a packed RGB image to a PNG buffer via ffmpeg (stdin → stdout). */

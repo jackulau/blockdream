@@ -3,7 +3,7 @@
 // every animation frame, AND each frame's per-tick command count must stay within budget.
 
 import { describe, it, expect } from "vitest";
-import { createVolume, getVoxel, setVoxel, EMPTY, type VoxelVolume } from "@mineworld/voxel";
+import { createVolume, getVoxel, setVoxel, EMPTY, type VoxelVolume } from "@blockdream/voxel";
 import { generateVoxelDatapack } from "../src/datapack3d";
 import { fillBatch } from "../src/fill";
 
@@ -48,7 +48,7 @@ function expectedGrid(v: VoxelVolume, o: { x: number; y: number; z: number }): G
 }
 
 function frameLines(pack: ReturnType<typeof generateVoxelDatapack>, i: number): string[] {
-  return (pack.files.get(`data/mineworld/function/frames/${i}.mcfunction`) ?? "").split("\n");
+  return (pack.files.get(`data/blockdream/function/frames/${i}.mcfunction`) ?? "").split("\n");
 }
 
 describe("round-trip: emit → simulate → matches, within budget", () => {
@@ -58,7 +58,7 @@ describe("round-trip: emit → simulate → matches, within budget", () => {
 
   it("reconstructs every animation frame exactly", () => {
     const grid: Grid = new Map();
-    applyLines(grid, (pack.files.get("data/mineworld/function/setup.mcfunction") ?? "").split("\n")); // box clear
+    applyLines(grid, (pack.files.get("data/blockdream/function/setup.mcfunction") ?? "").split("\n")); // box clear
     for (let f = 0; f < frames.length; f++) {
       applyLines(grid, frameLines(pack, f)); // keyframe then deltas, cumulative
       const want = expectedGrid(frames[f]!, origin);

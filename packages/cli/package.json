@@ -1,8 +1,8 @@
 {
-  "name": "@mineworld/cli",
+  "name": "@blockdream/cli",
   "version": "0.0.0",
   "type": "module",
-  "bin": { "mineworld": "./src/index.ts" },
+  "bin": { "blockdream": "./src/index.ts" },
   "main": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "scripts": {
@@ -10,13 +10,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mineworld/palette": "workspace:*",
-    "@mineworld/color-core": "workspace:*",
-    "@mineworld/video": "workspace:*",
-    "@mineworld/emit-java": "workspace:*",
-    "@mineworld/emit-bedrock": "workspace:*",
-    "@mineworld/emit-commands": "workspace:*",
-    "@mineworld/voxel": "workspace:*"
+    "@blockdream/palette": "workspace:*",
+    "@blockdream/color-core": "workspace:*",
+    "@blockdream/video": "workspace:*",
+    "@blockdream/emit-java": "workspace:*",
+    "@blockdream/emit-bedrock": "workspace:*",
+    "@blockdream/emit-commands": "workspace:*",
+    "@blockdream/voxel": "workspace:*"
   },
   "files": ["src"]
 }

@@ -4,7 +4,7 @@ import {
   getJavaMapPalette,
   getBedrockMapPalette,
   getSolidBlockMapPalette,
-} from "@mineworld/palette";
+} from "@blockdream/palette";
 import {
   preparePalette,
   quantizeFrame,
@@ -13,17 +13,17 @@ import {
   type DitherMethod,
   type QuantizedFrame,
   type PreparedPalette,
-} from "@mineworld/color-core";
-import { extractFrames } from "@mineworld/video";
-import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@mineworld/emit-java";
-import { buildMcStructure } from "@mineworld/emit-bedrock";
-import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack } from "@mineworld/emit-commands";
-import { framesToAnimated3d } from "@mineworld/voxel";
+} from "@blockdream/color-core";
+import { extractFrames } from "@blockdream/video";
+import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
+import { buildMcStructure } from "@blockdream/emit-bedrock";
+import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack } from "@blockdream/emit-commands";
+import { framesToAnimated3d } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
   writePack,
-} from "@mineworld/emit-commands/node";
+} from "@blockdream/emit-commands/node";
 
 export type RenderTarget =
   | "map"
@@ -66,7 +66,7 @@ function writeFile(path: string, data: Buffer | string): void {
 }
 
 function quantizeAll(
-  frames: import("@mineworld/color-core").RgbImage[],
+  frames: import("@blockdream/color-core").RgbImage[],
   pal: PreparedPalette,
   dither: DitherMethod,
   temporalThreshold: number | undefined,
@@ -154,7 +154,7 @@ export function render(opts: RenderOptions): RenderResult {
     // video → temporally-stable animated 3D block build → vanilla datapack (delta-encoded, fill-batched)
     const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
     const pack = generateVoxelDatapack(volumes, resolveBlock, {
-      namespace: "mineworld_3d",
+      namespace: "blockdream_3d",
       optimize: (cells, r) => greedyBoxes(cells, r),
     });
     writePack(pack, opts.out);
@@ -186,10 +186,10 @@ export function render(opts: RenderOptions): RenderResult {
     const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: opts.speedTicks });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
-    const mcpack = join(opts.out, "mineworld-script.mcpack");
+    const mcpack = join(opts.out, "blockdream-script.mcpack");
     writeFile(mcpack, Buffer.from(packageMcpack(pack.files, { stripPrefix: "behavior_pack/" })));
     filesWritten.push(mcpack);
-    notes.push(`Bedrock Script-API addon: double-click mineworld-script.mcpack to import, then in chat: !mw start.`);
+    notes.push(`Bedrock Script-API addon: double-click blockdream-script.mcpack to import, then in chat: !mw start.`);
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
@@ -208,9 +208,9 @@ export function render(opts: RenderOptions): RenderResult {
   const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: opts.speedTicks });
   writePack(pack, opts.out);
   filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
-  const mcpack = join(opts.out, "mineworld.mcpack");
+  const mcpack = join(opts.out, "blockdream.mcpack");
   writeFile(mcpack, Buffer.from(packageMcpack(pack.files)));
   filesWritten.push(mcpack);
-  notes.push(`Vanilla Bedrock behavior pack: double-click mineworld.mcpack to import (or copy the folder to behavior_packs/), /function ${pack.namespace}/setup then /function ${pack.namespace}/start.`);
+  notes.push(`Vanilla Bedrock behavior pack: double-click blockdream.mcpack to import (or copy the folder to behavior_packs/), /function ${pack.namespace}/setup then /function ${pack.namespace}/start.`);
   return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette, getFullBlockMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette, getFullBlockMapPalette } from "@blockdream/palette";
 import { preparePalette, nearestSrgb, nearestSrgbHue, hueDistance } from "../src/match";
 import { srgbToOklab } from "../src/oklab";
 

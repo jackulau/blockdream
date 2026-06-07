@@ -1,10 +1,10 @@
 // Browser glue for "import an animation video → animated 3D blocks". The temporally-stable
-// frame→solid conversion is the pure framesToAnimated3d in @mineworld/voxel (shared with the CLI);
+// frame→solid conversion is the pure framesToAnimated3d in @blockdream/voxel (shared with the CLI);
 // here we add the browser-side decode + quantize step. Each decoded RGB frame is matched to the 3D
 // block palette, then turned into a real subject-isolated solid (NOT the old flat depth-2 slab).
 
-import { framesToAnimated3d, type Video3dOptions, type VoxelVolume } from "@mineworld/voxel";
-import { quantizeFrame, type RgbImage } from "@mineworld/color-core";
+import { framesToAnimated3d, type Video3dOptions, type VoxelVolume } from "@blockdream/voxel";
+import { quantizeFrame, type RgbImage } from "@blockdream/color-core";
 
 export { framesToAnimated3d };
 export type { Video3dOptions };

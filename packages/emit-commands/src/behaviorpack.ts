@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { computeDeltas, type FrameDelta } from "./delta";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
 import { greedyBoxes, type PlacedCell } from "./fill";
@@ -109,7 +109,7 @@ export function generateBedrockBehaviorPack(
   opts: BehaviorPackOptions = {},
 ): GeneratedPack {
   if (frames.length === 0) throw new Error("no frames");
-  const ns = opts.namespace ?? "mineworld";
+  const ns = opts.namespace ?? "blockdream";
   if (!/^[a-z0-9_]+$/.test(ns)) throw new Error(`invalid namespace: ${ns}`);
   const origin = opts.origin ?? { x: 0, y: 64, z: 0 };
   const speed = Math.max(1, Math.floor(opts.speedTicks ?? 2));
@@ -191,7 +191,7 @@ export function generateBedrockBehaviorPack(
       {
         format_version: 2,
         header: {
-          name: opts.name ?? "mineworld block-art video",
+          name: opts.name ?? "blockdream block-art video",
           description: opts.description ?? `${W}×${H}, ${frames.length} frames`,
           uuid: headerUuid,
           version: [1, 0, 0],

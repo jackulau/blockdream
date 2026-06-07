@@ -1,5 +1,5 @@
 {
-  "name": "@mineworld/emit-bedrock",
+  "name": "@blockdream/emit-bedrock",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -12,10 +12,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mineworld/palette": "workspace:*",
-    "@mineworld/color-core": "workspace:*",
-    "@mineworld/nbt": "workspace:*",
-    "@mineworld/voxel": "workspace:*"
+    "@blockdream/palette": "workspace:*",
+    "@blockdream/color-core": "workspace:*",
+    "@blockdream/nbt": "workspace:*",
+    "@blockdream/voxel": "workspace:*"
   },
   "files": [
     "src"

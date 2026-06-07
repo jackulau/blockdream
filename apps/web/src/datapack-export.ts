@@ -1,4 +1,4 @@
-// Package a generated datapack (a files Map<path,string> from @mineworld/emit-commands)
+// Package a generated datapack (a files Map<path,string> from @blockdream/emit-commands)
 // into a real, droppable Minecraft datapack .zip in the browser — store-only (datapacks
 // don't need compression) via fflate — and trigger a download.
 

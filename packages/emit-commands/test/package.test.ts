@@ -3,7 +3,7 @@
 // writer/reader so we know the container itself is valid (CRC, central directory, EOCD).
 
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { generateJavaDatapack } from "../src/datapack";
 import { generateBedrockBehaviorPack } from "../src/behaviorpack";
 import { generateBedrockScriptAddon } from "../src/bedrock-script";
@@ -42,7 +42,7 @@ describe("zip container (store-only) round-trips", () => {
 });
 
 describe("Java datapack is a droppable .zip", () => {
-  const zip = packageJavaDatapack(generateJavaDatapack(frames, resolve, { namespace: "mineworld_art" }));
+  const zip = packageJavaDatapack(generateJavaDatapack(frames, resolve, { namespace: "blockdream_art" }));
 
   it("validates structurally (pack.mcmeta + tick tag + namespaced functions)", () => {
     const check = validateJavaDatapackArchive(zip);
@@ -53,7 +53,7 @@ describe("Java datapack is a droppable .zip", () => {
   it("has pack.mcmeta at the archive ROOT (not nested)", () => {
     const files = unzipText(zip);
     expect(files.has("pack.mcmeta")).toBe(true);
-    expect(files.has("data/mineworld_art/function/setup.mcfunction")).toBe(true);
+    expect(files.has("data/blockdream_art/function/setup.mcfunction")).toBe(true);
   });
 });
 

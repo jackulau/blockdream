@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette } from "@blockdream/palette";
 import { preparePalette } from "../src/match";
 import { createRgbImage, setPixel, type RgbImage } from "../src/image";
 import { oklabDeltaE, meanMatchError, blockAverageError, qualityReport } from "../src/quality";

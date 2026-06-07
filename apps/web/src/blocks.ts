@@ -4,7 +4,7 @@
 // generated swatch (block RGB + deterministic noise so it reads as a texture, not a
 // flat chip); a real-texture mode fetches from an open minecraft-assets CDN.
 
-import blockPalette from "@mineworld/palette/data/java-block-palette-1.21.json";
+import blockPalette from "@blockdream/palette/data/java-block-palette-1.21.json";
 
 export interface BlockInfo {
   baseId: number;

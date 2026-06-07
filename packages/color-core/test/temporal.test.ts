@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette } from "@blockdream/palette";
 import { preparePalette } from "../src/match";
 import { quantizeVideo } from "../src/temporal";
 import { createRgbImage, setPixel, type RgbImage } from "../src/image";

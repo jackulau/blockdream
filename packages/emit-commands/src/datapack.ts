@@ -1,10 +1,10 @@
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { computeDeltas, type FrameDelta } from "./delta";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
 import { greedyBoxes, type PlacedCell } from "./fill";
 
 export interface DatapackOptions {
-  /** datapack namespace (a..z0-9_-). Default "mineworld". */
+  /** datapack namespace (a..z0-9_-). Default "blockdream". */
   namespace?: string;
   /** pack_format: 48 = MC 1.21.0 (singular folder layout). Override per target. */
   packFormat?: number;
@@ -98,7 +98,7 @@ export function generateJavaDatapack(
   opts: DatapackOptions = {},
 ): GeneratedPack {
   if (frames.length === 0) throw new Error("no frames");
-  const ns = opts.namespace ?? "mineworld";
+  const ns = opts.namespace ?? "blockdream";
   assertNamespace(ns);
   const packFormat = opts.packFormat ?? 48;
   const origin = opts.origin ?? { x: 0, y: 64, z: 0 };
@@ -187,7 +187,7 @@ export function generateJavaDatapack(
       {
         pack: {
           pack_format: packFormat,
-          description: opts.description ?? `mineworld block-art video (${W}×${H}, ${frames.length} frames)`,
+          description: opts.description ?? `blockdream block-art video (${W}×${H}, ${frames.length} frames)`,
         },
       },
       null,

@@ -15,7 +15,7 @@
 //      both the front and back carry the image and the side silhouette shows the depth profile.
 //      The object stays coherent from every viewing angle.
 
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { createVolume, setVoxel, type VoxelVolume } from "./volume";
 
 export interface SolidifyImageOptions {

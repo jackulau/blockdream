@@ -2,11 +2,11 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runFfmpeg, hasFfmpeg } from "@mineworld/video";
-import { getJavaMapPalette } from "@mineworld/palette";
-import { preparePalette, meanMatchError, quantizeFrame } from "@mineworld/color-core";
-import { extractFrames } from "@mineworld/video";
-import { readMapColors, toMapColors } from "@mineworld/emit-java";
+import { runFfmpeg, hasFfmpeg } from "@blockdream/video";
+import { getJavaMapPalette } from "@blockdream/palette";
+import { preparePalette, meanMatchError, quantizeFrame } from "@blockdream/color-core";
+import { extractFrames } from "@blockdream/video";
+import { readMapColors, toMapColors } from "@blockdream/emit-java";
 import { render } from "../src/render";
 import { previewPng } from "../src/preview";
 

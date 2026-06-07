@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { unzipSync, strFromU8 } from "fflate";
-import { generateJavaDatapack } from "@mineworld/emit-commands";
+import { generateJavaDatapack } from "@blockdream/emit-commands";
 import { zipDatapack } from "../src/datapack-export";
 
 const frame = {

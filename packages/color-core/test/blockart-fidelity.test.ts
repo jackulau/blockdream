@@ -3,7 +3,7 @@
 // the source pixel (small ΔE2000), and the chosen-block count should be sane.
 
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette } from "@blockdream/palette";
 import { preparePalette } from "../src/match";
 import { quantizeFrame } from "../src/dither";
 import { createRgbImage, setPixel, type RgbImage } from "../src/image";

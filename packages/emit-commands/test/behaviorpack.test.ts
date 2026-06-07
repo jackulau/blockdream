@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { generateBedrockBehaviorPack } from "../src/behaviorpack";
 
 function frameFromIds(ids: number[][]): QuantizedFrame {
@@ -48,42 +48,42 @@ describe("vanilla bedrock behavior pack generator", () => {
   });
 
   it("keyframe places W·H blocks; all setblock lines valid Bedrock syntax", () => {
-    const f0 = pack.files.get("functions/mineworld/frames/0.mcfunction")!;
+    const f0 = pack.files.get("functions/blockdream/frames/0.mcfunction")!;
     const cmds = f0.split("\n").filter((l) => l.startsWith("setblock"));
     expect(cmds.length).toBe(2 * 4);
     expect(cmds.every((l) => SETBLOCK.test(l))).toBe(true);
   });
 
   it("delta frames carry only changed cells", () => {
-    const f1 = pack.files.get("functions/mineworld/frames/1.mcfunction")!;
+    const f1 = pack.files.get("functions/blockdream/frames/1.mcfunction")!;
     expect(f1.split("\n").filter((l) => l.startsWith("setblock")).length).toBe(1);
   });
 
   it("registers a tick.json that runs the driver every tick", () => {
     const tick = JSON.parse(pack.files.get("functions/tick.json")!);
-    expect(tick.values).toContain("mineworld/driver");
+    expect(tick.values).toContain("blockdream/driver");
   });
 
   it("uses a binary dispatch tree (log-depth), not an O(N) scan", () => {
     // 3 frames → root range 0_2 exists and branches to subranges
-    const root = pack.files.get("functions/mineworld/dispatch/0_2.mcfunction")!;
+    const root = pack.files.get("functions/blockdream/dispatch/0_2.mcfunction")!;
     expect(root).toContain("matches 0..1");
     expect(root).toContain("matches 2..2");
     // a leaf calls its frame directly
-    const leaf = pack.files.get("functions/mineworld/dispatch/2_2.mcfunction")!;
-    expect(leaf.trim()).toBe("function mineworld/frames/2");
+    const leaf = pack.files.get("functions/blockdream/dispatch/2_2.mcfunction")!;
+    expect(leaf.trim()).toBe("function blockdream/frames/2");
   });
 
   it("avoids `return` (unsupported on Bedrock) — uses nested guard functions", () => {
-    const driver = pack.files.get("functions/mineworld/driver.mcfunction")!;
+    const driver = pack.files.get("functions/blockdream/driver.mcfunction")!;
     expect(driver).not.toContain("return");
-    expect(driver).toContain("run function mineworld/advance");
+    expect(driver).toContain("run function blockdream/advance");
   });
 
   it("loads chunks via tickingarea and builds the keyframe in setup", () => {
-    const setup = pack.files.get("functions/mineworld/setup.mcfunction")!;
+    const setup = pack.files.get("functions/blockdream/setup.mcfunction")!;
     expect(setup).toContain("tickingarea add");
-    expect(setup).toContain("function mineworld/frames/0");
+    expect(setup).toContain("function blockdream/frames/0");
     expect(setup).toContain("count ma 3");
   });
 });

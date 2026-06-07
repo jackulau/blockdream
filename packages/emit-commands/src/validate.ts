@@ -1,5 +1,5 @@
 /**
- * Pragmatic validator for the command forms mineworld emits. Not a full
+ * Pragmatic validator for the command forms blockdream emits. Not a full
  * Minecraft grammar — it accepts exactly the heads we generate and rejects
  * malformed lines, so a broken generator can't silently ship invalid commands.
  */

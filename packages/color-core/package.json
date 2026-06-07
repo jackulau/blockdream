@@ -1,5 +1,5 @@
 {
-  "name": "@mineworld/color-core",
+  "name": "@blockdream/color-core",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mineworld/palette": "workspace:*"
+    "@blockdream/palette": "workspace:*"
   },
   "files": ["src"]
 }

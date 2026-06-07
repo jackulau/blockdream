@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { mkdtempSync, existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runFfmpeg, hasFfmpeg } from "@mineworld/video";
+import { runFfmpeg, hasFfmpeg } from "@blockdream/video";
 import { render } from "../src/render";
 import { runCli } from "../src/cli";
 
@@ -33,7 +33,7 @@ d("render() end-to-end", () => {
     expect(res.frameCount).toBe(4);
     const meta = JSON.parse(readFileSync(join(out, "pack.mcmeta"), "utf8"));
     expect(meta.pack.pack_format).toBe(48);
-    expect(countFrameFunctions(out, "mineworld")).toBe(4);
+    expect(countFrameFunctions(out, "blockdream")).toBe(4);
   });
 
   it("voxel3d: emits an animated 3D voxel datapack + zip from video frames", () => {
@@ -41,7 +41,7 @@ d("render() end-to-end", () => {
     const res = render({ input: gif, out, target: "voxel3d", width: 16, height: 16, maxFrames: 3, depth: 6 });
     expect(res.frameCount).toBe(3);
     expect(existsSync(join(out, "pack.mcmeta"))).toBe(true);
-    expect(existsSync(join(out, "mineworld_3d.zip"))).toBe(true);
+    expect(existsSync(join(out, "blockdream_3d.zip"))).toBe(true);
     const meta = JSON.parse(readFileSync(join(out, "pack.mcmeta"), "utf8"));
     expect(meta.pack.pack_format).toBeGreaterThan(0);
   });

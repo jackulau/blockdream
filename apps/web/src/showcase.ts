@@ -6,9 +6,9 @@ import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt } from "./blockart-core";
-import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-core";
-import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
-import type { MapPalette } from "@mineworld/palette";
+import { preparePalette, quantizeFrame, type RgbImage } from "@blockdream/color-core";
+import javaMapPalette from "@blockdream/palette/data/java-map-colors-1.21.9.json";
+import type { MapPalette } from "@blockdream/palette";
 import {
   imageToSolid,
   objToVolume,
@@ -19,10 +19,10 @@ import {
   TRANSFORM_ANIMS,
   type SequenceAnimName,
   type VoxelVolume,
-} from "@mineworld/voxel";
+} from "@blockdream/voxel";
 import { rgbFramesToAnimated3d } from "./video3d";
 import { log } from "./log";
-import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@mineworld/emit-commands";
+import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
 import { downloadDatapack } from "./datapack-export";
@@ -163,9 +163,9 @@ baDrop.addEventListener("drop", (ev) => {
 $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
   const q = ba.getFrame();
   if (!q) return;
-  const pack = generateJavaDatapack([q], resolveBlock, { namespace: "mineworld_art" });
-  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function mineworld_art:setup`;
-  downloadDatapack("mineworld-blockart-datapack", pack.files);
+  const pack = generateJavaDatapack([q], resolveBlock, { namespace: "blockdream_art" });
+  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream_art:setup`;
+  downloadDatapack("blockdream-blockart-datapack", pack.files);
 });
 
 // auto-connect both world models so the page "just works"
@@ -399,13 +399,13 @@ async function setup3dViewer(): Promise<void> {
   $<HTMLButtonElement>("v3-download").addEventListener("click", () => {
     if (!current3d.length) return;
     const pack = generateVoxelDatapack(current3d, resolveBlock, {
-      namespace: "mineworld_3d",
+      namespace: "blockdream_3d",
       optimize: (cells, r) => greedyBoxes(cells, r),
     });
     const cmds = pack.totalCommands ?? pack.totalSetblocks;
     $<HTMLDivElement>("v3-export").textContent =
-      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames · /function mineworld_3d:setup`;
-    downloadDatapack("mineworld-3d-datapack", pack.files);
+      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames · /function blockdream_3d:setup`;
+    downloadDatapack("blockdream-3d-datapack", pack.files);
   });
 
   playBtn.addEventListener("click", () => {

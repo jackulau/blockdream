@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { greedyBoxes, fillBatch, type PlacedCell } from "../src/fill";
 import { generateJavaDatapack } from "../src/datapack";
 
@@ -104,7 +104,7 @@ describe("generateJavaDatapack — optimized 2D output", () => {
   it("solid 32×32 keyframe is 1 command and reconstructs byte-identical", () => {
     const ids = Array.from({ length: 32 }, () => Array.from({ length: 32 }, () => 0));
     const pack = generateJavaDatapack([frameFromIds(ids)], resolve, { origin: { x: 0, y: 64, z: 0 } });
-    const f0 = pack.files.get("data/mineworld/function/frames/0.mcfunction")!;
+    const f0 = pack.files.get("data/blockdream/function/frames/0.mcfunction")!;
     const cmds = f0.split("\n").filter((l) => l.startsWith("setblock") || l.startsWith("fill"));
     expect(cmds.length).toBe(1);
     expect(pack.totalCommands).toBe(1);
@@ -125,7 +125,7 @@ describe("generateJavaDatapack — optimized 2D output", () => {
     expect(raw.totalCommands).toBe(256);
 
     // both reconstruct to the same wall
-    const optGrid = applyLines(opt.files.get("data/mineworld/function/frames/0.mcfunction")!.split("\n").filter((l) => /^(setblock|fill)/.test(l)));
+    const optGrid = applyLines(opt.files.get("data/blockdream/function/frames/0.mcfunction")!.split("\n").filter((l) => /^(setblock|fill)/.test(l)));
     expect(optGrid.size).toBe(256);
   });
 });

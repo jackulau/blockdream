@@ -8,10 +8,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-core";
-import { getSolidBlockMapPalette } from "@mineworld/palette";
-import { imageToSolid, getVoxel, EMPTY, type VoxelVolume } from "@mineworld/voxel";
-import { extractFrames, hasFfmpeg, rgbToPng } from "@mineworld/video";
+import { preparePalette, quantizeFrame, type RgbImage } from "@blockdream/color-core";
+import { getSolidBlockMapPalette } from "@blockdream/palette";
+import { imageToSolid, getVoxel, EMPTY, type VoxelVolume } from "@blockdream/voxel";
+import { extractFrames, hasFfmpeg, rgbToPng } from "@blockdream/video";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..", "..");

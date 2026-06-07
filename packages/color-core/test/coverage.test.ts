@@ -4,7 +4,7 @@ import {
   getSolidBlockMapPalette,
   getFullBlockMapPalette,
   getFullBlockColorPalette,
-} from "@mineworld/palette";
+} from "@blockdream/palette";
 import { preparePalette } from "../src/match";
 import { gamutCoverage } from "../src/quality";
 

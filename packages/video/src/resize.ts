@@ -1,4 +1,4 @@
-import { srgbChannelToLinear, linearToSrgbChannel, type RgbImage } from "@mineworld/color-core";
+import { srgbChannelToLinear, linearToSrgbChannel, type RgbImage } from "@blockdream/color-core";
 
 /**
  * Box-average downscale in LINEAR light (the correct space for averaging colors).

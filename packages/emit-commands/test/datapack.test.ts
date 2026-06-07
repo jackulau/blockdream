@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { computeDeltas } from "../src/delta";
 import { generateJavaDatapack } from "../src/datapack";
 
@@ -46,7 +46,7 @@ describe("vanilla java datapack generator", () => {
     [0, 1, 2],
     [1, 1, 0], // one changed cell
   ]);
-  const pack = generateJavaDatapack([a, b], resolve, { namespace: "mineworld", origin: { x: 0, y: 64, z: 0 } });
+  const pack = generateJavaDatapack([a, b], resolve, { namespace: "blockdream", origin: { x: 0, y: 64, z: 0 } });
 
   it("emits a valid pack.mcmeta (pack_format 48)", () => {
     const meta = JSON.parse(pack.files.get("pack.mcmeta")!);
@@ -54,14 +54,14 @@ describe("vanilla java datapack generator", () => {
   });
 
   it("keyframe function places W·H blocks; all setblock lines are valid", () => {
-    const f0 = pack.files.get("data/mineworld/function/frames/0.mcfunction")!;
+    const f0 = pack.files.get("data/blockdream/function/frames/0.mcfunction")!;
     const cmds = f0.split("\n").filter((l) => l.startsWith("setblock"));
     expect(cmds.length).toBe(2 * 3);
     expect(cmds.every((l) => SETBLOCK.test(l))).toBe(true);
   });
 
   it("delta function carries only the changed cell", () => {
-    const f1 = pack.files.get("data/mineworld/function/frames/1.mcfunction")!;
+    const f1 = pack.files.get("data/blockdream/function/frames/1.mcfunction")!;
     const cmds = f1.split("\n").filter((l) => l.startsWith("setblock"));
     expect(cmds.length).toBe(1);
     expect(SETBLOCK.test(cmds[0]!)).toBe(true);
@@ -69,27 +69,27 @@ describe("vanilla java datapack generator", () => {
 
   it("places image-row 0 at the top of the wall (highest Y)", () => {
     // height 2, origin y=64 → row0 → y=65, row1 → y=64
-    const f0 = pack.files.get("data/mineworld/function/frames/0.mcfunction")!;
+    const f0 = pack.files.get("data/blockdream/function/frames/0.mcfunction")!;
     expect(f0).toContain(" 65 "); // top row present
     expect(f0).toContain(" 64 "); // bottom row present
   });
 
   it("uses a vanilla macro for frame dispatch (no execute-if jump table)", () => {
-    const play = pack.files.get("data/mineworld/function/play.mcfunction")!;
-    expect(play.trim()).toBe("$function mineworld:frames/$(idx)");
+    const play = pack.files.get("data/blockdream/function/play.mcfunction")!;
+    expect(play.trim()).toBe("$function blockdream:frames/$(idx)");
   });
 
   it("wires a #minecraft:tick driver with scoreboard speed control", () => {
     const tick = JSON.parse(pack.files.get("data/minecraft/tags/function/tick.json")!);
-    expect(tick.values).toContain("mineworld:driver");
-    const driver = pack.files.get("data/mineworld/function/driver.mcfunction")!;
-    expect(driver).toContain("function mineworld:play with storage mineworld:anim");
+    expect(tick.values).toContain("blockdream:driver");
+    const driver = pack.files.get("data/blockdream/function/driver.mcfunction")!;
+    expect(driver).toContain("function blockdream:play with storage blockdream:anim");
     expect(driver).toContain("#speed ma");
   });
 
   it("setup builds the keyframe and forceloads the build area", () => {
-    const setup = pack.files.get("data/mineworld/function/setup.mcfunction")!;
-    expect(setup).toContain("function mineworld:frames/0");
+    const setup = pack.files.get("data/blockdream/function/setup.mcfunction")!;
+    expect(setup).toContain("function blockdream:frames/0");
     expect(setup).toMatch(/forceload add 0 0 2 0/);
     expect(setup).toContain("#count ma 2");
   });

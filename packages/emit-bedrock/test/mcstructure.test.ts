@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { getJavaMapPalette, getSolidBlockMapPalette } from "@mineworld/palette";
+import { getJavaMapPalette, getSolidBlockMapPalette } from "@blockdream/palette";
 import {
   preparePalette,
   quantizeNearest,
   createRgbImage,
   setPixel,
   type RgbImage,
-} from "@mineworld/color-core";
+} from "@blockdream/color-core";
 import { buildMcStructure, readMcStructure } from "../src/mcstructure";
-import { writeNbt, readNbt, Compound, Int, Str, TAG } from "@mineworld/nbt";
+import { writeNbt, readNbt, Compound, Int, Str, TAG } from "@blockdream/nbt";
 
 function gradient(w: number, h: number): RgbImage {
   const img = createRgbImage(w, h);

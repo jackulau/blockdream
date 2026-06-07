@@ -8,7 +8,7 @@
 // A real per-pixel depth source (a monocular depth model, or a Blender depth-pass sidecar) can be
 // supplied via opts.depthForFrame to replace the silhouette heuristic on natural footage.
 
-import type { QuantizedFrame } from "@mineworld/color-core";
+import type { QuantizedFrame } from "@blockdream/color-core";
 import { imageToSolid, detectBackgroundMask, silhouetteDistance, type SolidifyImageOptions } from "./depth";
 import type { VoxelVolume } from "./volume";
 
