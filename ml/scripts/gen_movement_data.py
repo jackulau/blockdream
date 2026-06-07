@@ -48,9 +48,11 @@ def skill_dynamics(prev: np.ndarray, action: np.ndarray, skill: str, t: int) -> 
     nxt = np.roll(prev, rows, axis=0)  # scroll downward (forward motion)
     if cam_x:
         nxt = np.roll(nxt, int(round(cam_x * 4)), axis=1)  # camera pans horizontally
-    # blend toward the skill colour cast so the regime is visible + learnable
+    # blend STRONGLY toward the skill colour cast so each movement type has an unmistakable,
+    # fast-learnable regime — boat reads blue, walk green, pig pink within a couple of rollout steps,
+    # so per-skill divergence is large even at short rollouts (and learnable in far fewer steps).
     cast_arr = np.array(cast, dtype=np.float32) * 255.0
-    nxt = (0.82 * nxt.astype(np.float32) + 0.18 * cast_arr).astype(np.uint8)
+    nxt = (0.55 * nxt.astype(np.float32) + 0.45 * cast_arr).astype(np.uint8)
     # a moving bright stripe gives structure that scrolls (so it's not a flat field)
     y = int((t * (1 + speed) + bob * np.sin(t * 0.5)) % h)
     nxt[y, :, :] = np.array([245, 245, 245], dtype=np.uint8)
