@@ -9,7 +9,7 @@ import { createBlockArt } from "./blockart-core";
 import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-core";
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@mineworld/palette";
-import { imageToVolume, spin, objToVolume, type VoxelVolume } from "@mineworld/voxel";
+import { imageToVolume, imageToSolid, objToVolume, type VoxelVolume } from "@mineworld/voxel";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@mineworld/emit-commands";
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, loadTextureManifest } from "./blocks";
@@ -247,6 +247,7 @@ async function setup3dViewer(): Promise<void> {
   const depth = $<HTMLInputElement>("v3-depth");
   let current3d: VoxelVolume[] = [];
   let lastSource: ReturnType<typeof quantizeFrame> | null = null;
+  let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
 
   // nearest-downscale a quantized frame so the voxel volume stays light (3D = W×H×depth × frames)
   function downscale(q: ReturnType<typeof quantizeFrame>, maxW: number) {
@@ -265,43 +266,49 @@ async function setup3dViewer(): Promise<void> {
     return { width: w, height: h, mapColorId, paletteIndex };
   }
 
-  // map a quantized cell → 0..1 perceptual brightness (for relief depth), via the palette
-  const brightnessOf = (mapColorId: number): number => {
-    const hex = hexByMap.get(mapColorId) ?? 0x808080;
-    const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
-    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  };
-
-  function build3d(q: ReturnType<typeof quantizeFrame>): void {
-    lastSource = q;
-    // Front-facing bas-RELIEF (not a flat slab): the picture stays readable on the front face
-    // and each pixel extrudes back by its brightness, so it reads as 3D from every spin angle
-    // (a flat slab vanishes to a sliver edge-on). 24 pre-rotated frames ARE the turntable, so
-    // setFrames defaults continuous spin off (no double-rotation).
+  // Build a genuine 3D SOLID from the current source. imageToSolid isolates the subject from the
+  // background, inflates thickness by silhouette shape (a rounded dome, not a brightness emboss),
+  // and centers it on the mid-plane so it reads from EVERY angle. A real per-pixel depth map
+  // (depthMap, from a depth model or a Blender depth pass) overrides the heuristic when present.
+  // One volume → the viewer spins it LIVE, so there are no baked, nearest-neighbour-aliased frames
+  // (the old `spin()` 24-frame turntable was the source of the "bad spin").
+  function rebuildVolume(): void {
+    const q = lastSource;
+    if (!q) return;
     const maxDepth = Math.max(4, Number(depth.value));
-    current3d = spin(imageToVolume(q, { mode: "relief", depth: maxDepth, heightOf: brightnessOf }), 24, "y");
-    viewer.setFrames(current3d);
+    const depthOf =
+      depthMap && depthMap.length === q.width * q.height
+        ? (x: number, y: number) => depthMap![y * q.width + x]!
+        : undefined;
+    const vol = imageToSolid(q, { maxDepth, depthOf });
+    current3d = [vol];
+    viewer.setFrames(current3d); // single solid → live turntable spin (no baked frames)
     spinCb.checked = viewer.isSpinning;
-    scrub.max = String(current3d.length - 1);
+    scrub.max = "0";
     $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
     playBtn.textContent = "pause";
-    hud.textContent = `${current3d.length} frames · bas-relief · drag to orbit`;
+    hud.textContent = `solid ${vol.sx}×${vol.sy}×${vol.sz}${depthOf ? " · depth-mapped" : ""} · drag to orbit`;
   }
 
-  // initial source = the preloaded sample image
+  // adopt a new source image (drops any stale depth map computed for the previous one)
+  function setSource(q: ReturnType<typeof quantizeFrame>): void {
+    lastSource = q;
+    depthMap = null;
+    rebuildVolume();
+  }
+
+  // initial source = the preloaded sample image (higher res than the old 28px for a sharper solid)
   const img = new Image();
-  img.onload = () => build3d(quantizeFrame(rgbImageFromImg(img, 28), pal3d, { method: "none" }));
+  img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, { method: "none" }));
   img.src = "/test-assets/pixelart.png";
 
   // "build 3D from image" voxelizes the CURRENT block-art image (downscaled) one-click
   $<HTMLButtonElement>("v3-rebuild").addEventListener("click", () => {
     const q = ba.getFrame();
-    build3d(q ? downscale(q, 32) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 28), pal3d, { method: "none" }));
+    setSource(q ? downscale(q, 40) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 40), pal3d, { method: "none" }));
   });
-  depth.addEventListener("input", () => {
-    if (lastSource) build3d(lastSource);
-  });
+  depth.addEventListener("input", () => rebuildVolume());
 
   function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>): void {
     current3d = frames;
