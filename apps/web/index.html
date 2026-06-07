@@ -205,7 +205,24 @@
           <div class="row">
             <button id="v3-play" class="ui">play</button>
             <input id="v3-scrub" type="range" min="0" max="0" value="0" aria-label="scrub animation frame" style="flex:1;min-width:160px" />
-            <label style="font-size:.8rem;color:var(--dim)"><input id="v3-spin" type="checkbox" checked /> spin</label>
+            <label style="font-size:.8rem;color:var(--dim)">animation
+              <select id="v3-anim">
+                <optgroup label="live transform">
+                  <option value="spin" selected>turntable</option>
+                  <option value="bob">bob</option>
+                  <option value="rock">rock</option>
+                  <option value="tumble">tumble</option>
+                  <option value="pulse">pulse</option>
+                  <option value="orbit">orbit</option>
+                  <option value="none">still</option>
+                </optgroup>
+                <optgroup label="block motion">
+                  <option value="explode">explode ⇄ assemble</option>
+                  <option value="wave">wave</option>
+                  <option value="buildup">build up</option>
+                </optgroup>
+              </select>
+            </label>
           </div>
           <div class="row">
             <label style="font-size:.78rem;color:var(--dim)">3D depth

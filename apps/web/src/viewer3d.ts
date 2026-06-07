@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { type VoxelVolume } from "@mineworld/voxel";
+import { poseAt, type VoxelVolume } from "@mineworld/voxel";
 import { meshByMaterial, type FaceDir } from "./mesh3d";
 import { buildSchedule, uniformSchedule, frameAtElapsed, startOfFrame, type FrameSchedule } from "./anim";
 
@@ -19,9 +19,6 @@ export interface Viewer3DConfig {
   onFrame?: (index: number, count: number) => void;
 }
 
-/** Continuous turntable-spin rate, radians/second (delta-time scaled → refresh-rate independent). */
-const SPIN_RAD_PER_SEC = 0.6;
-
 export class Viewer3D {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -34,10 +31,11 @@ export class Viewer3D {
   private groups: Array<THREE.Group | null> = [];
   private index = 0;
   private playing = false;
-  private spinning = true;
+  private animName = "spin"; // live transform animation applied to the whole object
+  private animStart = 0;
+  private maxDim = 1; // largest volume dimension, scales translation-based animations
   private schedule: FrameSchedule = uniformSchedule(1, 8);
   private playStart = 0;
-  private lastT = 0;
   private readonly fps: number;
   private raf = 0;
 
@@ -125,12 +123,16 @@ export class Viewer3D {
     this.frames = frames;
     this.index = 0;
     this.schedule = opts.durationsMs ? buildSchedule(opts.durationsMs) : uniformSchedule(frames.length, this.fps);
-    this.spinning = frames.length <= 1;
+    // a single static volume turntable-spins; a multi-frame animation defaults its transform off
+    // (the frames ARE the motion — a transform on top would double-animate).
+    this.animName = frames.length <= 1 ? "spin" : "none";
+    this.animStart = performance.now();
     this.playStart = performance.now();
     // frame the camera to the volume
     const v = frames[0];
     if (v) {
       const r = Math.max(v.sx, v.sy, v.sz);
+      this.maxDim = r;
       this.camera.position.set(r * 1.4, r * 1.1, r * 1.7);
       this.controls.target.set(0, 0, 0);
     }
@@ -169,11 +171,19 @@ export class Viewer3D {
   get isPlaying(): boolean {
     return this.playing;
   }
+  /** Select the live transform animation (spin/bob/rock/tumble/pulse/orbit/none). */
+  setAnim(name: string): void {
+    this.animName = name;
+    this.animStart = performance.now();
+  }
+  get anim(): string {
+    return this.animName;
+  }
   setSpin(on: boolean): void {
-    this.spinning = on;
+    this.setAnim(on ? "spin" : "none");
   }
   get isSpinning(): boolean {
-    return this.spinning;
+    return this.animName !== "none";
   }
   get frameCount(): number {
     return this.frames.length;
@@ -181,9 +191,11 @@ export class Viewer3D {
 
   private loop = (t: number): void => {
     this.raf = requestAnimationFrame(this.loop);
-    const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
-    this.lastT = t;
-    if (this.spinning) this.root.rotation.y += SPIN_RAD_PER_SEC * dt; // delta-time → refresh-rate independent
+    // apply the live transform animation as an ABSOLUTE pose (refresh-rate independent — no accumulator)
+    const p = poseAt(this.animName, (t - this.animStart) / 1000, this.maxDim);
+    this.root.position.set(p.px, p.py, p.pz);
+    this.root.rotation.set(p.rx, p.ry, p.rz);
+    this.root.scale.setScalar(p.scale);
     if (this.playing && this.frames.length > 1) {
       const idx = frameAtElapsed(this.schedule, t - this.playStart, true);
       if (idx !== this.index) this.showFrame(idx);

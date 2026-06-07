@@ -9,7 +9,15 @@ import { createBlockArt } from "./blockart-core";
 import { preparePalette, quantizeFrame, type RgbImage } from "@mineworld/color-core";
 import javaMapPalette from "@mineworld/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@mineworld/palette";
-import { imageToVolume, imageToSolid, objToVolume, type VoxelVolume } from "@mineworld/voxel";
+import {
+  imageToVolume,
+  imageToSolid,
+  objToVolume,
+  generateSequence,
+  TRANSFORM_ANIMS,
+  type SequenceAnimName,
+  type VoxelVolume,
+} from "@mineworld/voxel";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@mineworld/emit-commands";
 import { Viewer3D } from "./viewer3d";
 import { blockForBase, localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
@@ -227,7 +235,7 @@ async function setup3dViewer(): Promise<void> {
   const canvas = $<HTMLCanvasElement>("v3-canvas");
   const playBtn = $<HTMLButtonElement>("v3-play");
   const scrub = $<HTMLInputElement>("v3-scrub");
-  const spinCb = $<HTMLInputElement>("v3-spin");
+  const animSel = $<HTMLSelectElement>("v3-anim");
   const hud = $<HTMLDivElement>("v3-hud");
   await loadTextureManifest();
 
@@ -253,8 +261,10 @@ async function setup3dViewer(): Promise<void> {
 
   const depth = $<HTMLInputElement>("v3-depth");
   let current3d: VoxelVolume[] = [];
+  let baseVolume: VoxelVolume | null = null; // the single built solid (source for block-motion anims)
   let lastSource: ReturnType<typeof quantizeFrame> | null = null;
   let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
+  const isTransformAnim = (s: string) => (TRANSFORM_ANIMS as readonly string[]).includes(s);
 
   // nearest-downscale a quantized frame so the voxel volume stays light (3D = W×H×depth × frames)
   function downscale(q: ReturnType<typeof quantizeFrame>, maxW: number) {
@@ -288,14 +298,16 @@ async function setup3dViewer(): Promise<void> {
         ? (x: number, y: number) => depthMap![y * q.width + x]!
         : undefined;
     const vol = imageToSolid(q, { maxDepth, depthOf });
+    baseVolume = vol;
     current3d = [vol];
-    viewer.setFrames(current3d); // single solid → live turntable spin (no baked frames)
-    spinCb.checked = viewer.isSpinning;
+    viewer.setFrames(current3d); // single solid → live transform animation (no baked frames)
+    // re-apply the chosen live animation (setFrames defaults a single volume to "spin")
+    if (isTransformAnim(animSel.value)) viewer.setAnim(animSel.value);
     scrub.max = "0";
     $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
     playBtn.textContent = "pause";
-    hud.textContent = `solid ${vol.sx}×${vol.sy}×${vol.sz}${depthOf ? " · depth-mapped" : ""} · drag to orbit`;
+    hud.textContent = `solid ${vol.sx}×${vol.sy}×${vol.sz}${depthOf ? " · depth-mapped" : ""} · ${animSel.value} · drag to orbit`;
   }
 
   // adopt a new source image (drops any stale depth map computed for the previous one)
@@ -317,10 +329,23 @@ async function setup3dViewer(): Promise<void> {
   });
   depth.addEventListener("input", () => rebuildVolume());
 
+  // animation selector: live transform anims (spin/bob/rock/tumble/pulse/orbit/none) apply instantly;
+  // block-motion anims (explode/wave/buildup) regenerate a frame sequence from the built solid.
+  animSel.addEventListener("change", () => {
+    const sel = animSel.value;
+    if (isTransformAnim(sel)) {
+      if (current3d.length > 1) rebuildVolume(); // back to a single solid from a sequence
+      viewer.setAnim(sel);
+      if (lastSource) hud.textContent = `${sel} · drag to orbit`;
+    } else if (baseVolume) {
+      const frames = generateSequence(sel as SequenceAnimName, baseVolume, 24);
+      showFrames(frames, sel);
+    }
+  });
+
   function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>): void {
     current3d = frames;
-    viewer.setFrames(frames, { durationsMs });
-    spinCb.checked = viewer.isSpinning; // spin defaults off for multi-frame animations
+    viewer.setFrames(frames, { durationsMs }); // multi-frame → live transform anim defaults off
     scrub.max = String(frames.length - 1);
     $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
@@ -377,6 +402,5 @@ async function setup3dViewer(): Promise<void> {
     playBtn.textContent = "play";
     viewer.setFrame(Number(scrub.value));
   });
-  spinCb.addEventListener("change", () => viewer.setSpin(spinCb.checked));
 }
 void setup3dViewer();
