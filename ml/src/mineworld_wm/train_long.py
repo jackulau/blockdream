@@ -118,14 +118,25 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.time()
     last_ckpt = t0
 
+    best_val = [float("inf")]
+    best_path = out / "best.pt"
+
+    def _state():
+        return {"phase": phase, "tok_step": tok_step, "ar_step": ar_step,
+                "config": cfg.to_dict(), "kind": "ar",
+                "skill_conditioned": True, "n_skills": N_MOVEMENT,
+                "tok": tok.state_dict(), "enc": enc.state_dict(), "ar": ar.state_dict(),
+                "tok_opt": tok_opt.state_dict(), "ar_opt": ar_opt.state_dict(),
+                "tokenizer": tok.state_dict(), "action": enc.state_dict(), "transition": ar.state_dict(),
+                "init_frame": frames[0].float().div(255).clone()}
+
     def save(tag: str, loss: float, val: float):
-        _atomic_save({"phase": phase, "tok_step": tok_step, "ar_step": ar_step,
-                      "config": cfg.to_dict(), "kind": "ar",
-                      "skill_conditioned": True, "n_skills": N_MOVEMENT,
-                      "tok": tok.state_dict(), "enc": enc.state_dict(), "ar": ar.state_dict(),
-                      "tok_opt": tok_opt.state_dict(), "ar_opt": ar_opt.state_dict(),
-                      "tokenizer": tok.state_dict(), "action": enc.state_dict(), "transition": ar.state_dict(),
-                      "init_frame": frames[0].float().div(255).clone()}, latest)
+        _atomic_save(_state(), latest)
+        # keep the BEST-by-val checkpoint too: AR val loss can rise late on small data (overfit),
+        # which collapses per-skill divergence — best.pt preserves the peak model to serve/export.
+        if val > 0 and val < best_val[0]:
+            best_val[0] = val
+            _atomic_save(_state(), best_path)
         _log(out, {"t": int(time.time()), "phase": phase, "step": tok_step if phase == "tok" else ar_step,
                    "loss": round(loss, 4), "val": round(val, 4), "mins": round((time.time() - t0) / 60, 1)})
         _dump_sample(tok, frames, val_frames_idx, out, tag, dev)
@@ -188,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
             with torch.no_grad():
                 vp, vn, va = ar_batch(val_pairs)
                 val = ar.loss(vp, vn, va).item()
+            if val < best_val[0]:  # track the peak at every val eval (finer than the ckpt cadence)
+                best_val[0] = val
+                _atomic_save(_state(), best_path)
             maybe_ckpt(loss.item(), val)
 
     save("final", 0.0, 0.0)

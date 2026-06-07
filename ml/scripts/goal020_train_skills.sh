@@ -35,10 +35,15 @@ log "pools = $POOLS"
 # that collapsed all skills to the same blur. Full-wipe the dir on a fresh run (a stale tokens.pt /
 # latest.pt from a different preset has a different token count → shape crash on resume).
 rm -rf runs/skills
-log "training skill-conditioned model -> runs/skills (preset=quick, bounded ~55min)…"
+log "training skill-conditioned model -> runs/skills (preset=quick, best-by-val, bounded ~30min)…"
 "$PY" -m mineworld_wm.train_long --pools "$POOLS" --out runs/skills \
-  --preset quick --device mps --tok-steps 8000 --ar-steps 30000 \
-  --ckpt-every-min 5 --batch 16 --max-minutes 55 2>&1 | tee -a "$LOG"
+  --preset quick --device mps --tok-steps 6000 --ar-steps 30000 \
+  --ckpt-every-min 3 --batch 16 --max-minutes 40 2>&1 | tee -a "$LOG"
 rc=$?
+# serve/verify the BEST-by-val checkpoint, not the (possibly overfit) final one
+if [ -f runs/skills/best.pt ]; then
+  cp runs/skills/best.pt runs/skills/latest.pt
+  log "copied best.pt -> latest.pt (peak-by-val model)"
+fi
 log "D6 training exit rc=$rc (checkpoint: runs/skills/latest.pt)"
 exit $rc
