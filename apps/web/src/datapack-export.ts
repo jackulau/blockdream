@@ -10,8 +10,10 @@ export function loadInstructions(files: Map<string, string>): string {
   const setup = [...files.keys()].find((k) => /^data\/[^/]+\/function\/setup\.mcfunction$/.test(k));
   const ns = setup ? setup.split("/")[1]! : "blockdream_art";
   return [
-    "HOW TO LOAD THIS INTO MINECRAFT (Java Edition 1.21+)",
-    "====================================================",
+    "HOW TO LOAD THIS INTO MINECRAFT (Java Edition — any 1.21.x: 1.21 through 1.21.10)",
+    "================================================================================",
+    "(One pack works across the whole 1.21 line — it declares supported_formats, so",
+    " Minecraft loads it without the red 'incompatible pack' warning on any 1.21.x.)",
     "",
     "1. Find your world's datapacks folder:",
     "     Singleplayer: open the world, pause, 'Open World Folder' then datapacks/",

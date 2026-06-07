@@ -40,6 +40,22 @@ ml/               # Workstream B — world model (Python / PyTorch)
   [driving world model](./docs/driving-world-model.md), [live control](./docs/live-control.md),
   [load into Minecraft](./docs/load-into-minecraft.md), [fps budget](./docs/fps-budget.md)
 
+## Minecraft version support
+
+Every exported artifact is version-stamped from one registry ([`packages/palette/src/versions.ts`](./packages/palette/src/versions.ts)),
+so it loads cleanly across the whole **Java 1.21.x line (1.21 → 1.21.10)** and on **Bedrock 1.21+**:
+
+- **Java datapacks** (2D + 3D voxel) declare `supported_formats`, so a single `.zip` loads without the
+  red "incompatible pack" warning on any 1.21.x — the function content (setblock/fill/scoreboard/macros/`#minecraft:tick`)
+  is uniform across the line.
+- **`--version <ver>`** pins the exact `pack_format` / `DataVersion` for a specific release (e.g. `--version 1.21.5`
+  → `pack_format 71`); an unsupported version fails fast with the list of supported ids instead of a cryptic crash.
+- **Maps** stamp the requested `DataVersion` (older stamps auto-upgrade via the game's DataFixerUpper).
+- **Bedrock** packs use a `1.21.0` `min_engine_version` floor and a 1.21.0 block version — both forward-compatible
+  (Bedrock auto-upgrades block versions, and `min_engine_version` is a lower bound), so one pack runs on 1.21.0 → latest.
+
+Adding a newer patch is one row in the registry. The matrix is asserted in `packages/cli/test/version-matrix.test.ts`.
+
 ## Dev
 
 ```bash
