@@ -71,7 +71,7 @@ export class Viewer {
       this.running = false;
       this.cfg.onStatus?.("disconnected", "idle");
     };
-    ws.onerror = () => this.cfg.onStatus?.("connection failed — is the server running?", "err");
+    ws.onerror = () => this.cfg.onStatus?.("connection failed · is the server running?", "err");
   }
 
   reset(): void {
