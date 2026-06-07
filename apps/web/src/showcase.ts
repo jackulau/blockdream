@@ -386,7 +386,7 @@ async function setup3dViewer(): Promise<void> {
         const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
         showFrames(frames, `gif ${gif.name} · 3D`, durationsMs);
       } else {
-        hud.textContent = "unsupported file — use .gltf/.glb, .obj (one or many), or .gif";
+        hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), or .gif";
       }
     } catch (err) {
       log.warn("3D import failed", err);
