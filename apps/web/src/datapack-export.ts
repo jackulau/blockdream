@@ -4,11 +4,37 @@
 
 import { zipSync, strToU8 } from "fflate";
 
-/** Files Map → a store-only zip (Uint8Array). The zip IS a valid datapack: drop it into
- *  a world's `datapacks/` folder and `/reload`. */
+/** Step-by-step in-game load guide, derived from the pack's own namespace, bundled into the zip so
+ *  the instructions travel with the download (the "how do I load this" answer ships with it). */
+export function loadInstructions(files: Map<string, string>): string {
+  const setup = [...files.keys()].find((k) => /^data\/[^/]+\/function\/setup\.mcfunction$/.test(k));
+  const ns = setup ? setup.split("/")[1]! : "blockdream_art";
+  return [
+    "HOW TO LOAD THIS INTO MINECRAFT (Java Edition 1.21+)",
+    "====================================================",
+    "",
+    "1. Find your world's datapacks folder:",
+    "     Singleplayer: open the world, pause, 'Open World Folder' then datapacks/",
+    "     (or .minecraft/saves/<world>/datapacks/ ; servers: <server>/world/datapacks/)",
+    "2. Drop this .zip into that datapacks/ folder. Do NOT unzip it.",
+    "3. In game run:  /reload",
+    "4. Build it:     /function " + ns + ":setup     (places it at your position)",
+    "5. Animate it:   /function " + ns + ":start     ( /function " + ns + ":stop to pause )",
+    "",
+    "Tip: stand where you want the build to appear before running setup.",
+    "Full guide (Bedrock too): docs/load-into-minecraft.md in the repo.",
+    "",
+    "Made with blockdream.",
+    "",
+  ].join("\n");
+}
+
+/** Files Map → a store-only zip (Uint8Array). The zip IS a valid datapack: drop it into a world's
+ *  `datapacks/` folder and `/reload`. A HOW_TO_LOAD.txt is bundled in (Minecraft ignores it). */
 export function zipDatapack(files: Map<string, string>): Uint8Array {
   const entries: Record<string, Uint8Array> = {};
   for (const [path, content] of files) entries[path] = strToU8(content);
+  entries["HOW_TO_LOAD.txt"] = strToU8(loadInstructions(files));
   return zipSync(entries, { level: 0 }); // store (no deflate) — fast, simple, valid
 }
 

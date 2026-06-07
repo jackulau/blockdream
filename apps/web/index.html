@@ -241,6 +241,24 @@
         </div>
       </section>
 
+      <section class="block">
+        <h2><span class="num">04</span>Load it into Minecraft</h2>
+        <p class="desc">Every downloaded datapack is a ready-to-drop <code>.zip</code> with a <code>HOW_TO_LOAD.txt</code> inside. Quick version:</p>
+        <div class="card" style="max-width:760px">
+          <h3>Java Edition (1.21+)</h3>
+          <ol style="margin:.3rem 0 .8rem 1.1rem;color:var(--ink);font-size:.92rem;line-height:1.7">
+            <li>Open your world, pause, <strong>Open World Folder</strong> then the <code>datapacks/</code> folder (or <code>.minecraft/saves/&lt;world&gt;/datapacks/</code>; a server's is <code>world/datapacks/</code>).</li>
+            <li>Drop the <code>.zip</code> in there. <strong>Do not unzip it.</strong></li>
+            <li>In game: <code>/reload</code></li>
+            <li>Build at your position: <code>/function blockdream_3d:setup</code> (block-art wall: <code>blockdream_art:setup</code>)</li>
+            <li>Play the animation: <code>/function blockdream_3d:start</code> &nbsp;(<code>:stop</code> to pause)</li>
+          </ol>
+          <h3>Bedrock Edition</h3>
+          <p class="sub" style="margin:.2rem 0 .6rem">The CLI emits a <code>.mcpack</code> (double-click to import) or a <code>.mcstructure</code> (place with a structure block). Full steps for both editions: <a href="https://github.com/jackulau" target="_blank" rel="noopener">docs/load-into-minecraft.md</a>.</p>
+          <p class="keyhint">Tip: stand where you want the build to appear before running <code>setup</code>. The same volumes you see in the 3D viewer are what the datapack places, block-for-block.</p>
+        </div>
+      </section>
+
       <footer>
         <span>blockdream · neural Minecraft &amp; driving world models + block-art · runs locally</span>
         <span><a href="https://github.com/jackulau" target="_blank" rel="noopener">GitHub</a> · <a href="https://www.linkedin.com/in/-jacklau/" target="_blank" rel="noopener">LinkedIn</a></span>
