@@ -2,7 +2,7 @@
 dataset for training. Streams only a short window per segment via ffmpeg (the full
 mp4s are ~170 MB) and downloads the per-frame action .jsonl.
 
-    python -m mineworld_wm.prepare_vpt --segments 1 --seconds 8 --size 64 --fps 10 --out ml/data/vpt_sample
+    python -m blockdream_wm.prepare_vpt --segments 1 --seconds 8 --size 64 --fps 10 --out ml/data/vpt_sample
 """
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ def prepare(segments: int, seconds: float, fps: int, size: int, out: str, index_
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.prepare_vpt")
+    ap = argparse.ArgumentParser("blockdream_wm.prepare_vpt")
     ap.add_argument("--segments", type=int, default=1)
     ap.add_argument("--seconds", type=float, default=8.0)
     ap.add_argument("--fps", type=int, default=10)

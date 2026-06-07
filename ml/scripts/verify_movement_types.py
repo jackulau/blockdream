@@ -14,8 +14,8 @@ import sys
 
 import torch
 
-from mineworld_wm.movement import MOVEMENT_TYPES, skill_id
-from mineworld_wm.serve import load_real_checkpoint
+from blockdream_wm.movement import MOVEMENT_TYPES, skill_id
+from blockdream_wm.serve import load_real_checkpoint
 
 
 @torch.no_grad()

@@ -7,8 +7,8 @@ import json
 
 import pytest
 
-from mineworld_wm.serve import RolloutServer
-from mineworld_wm.demos import build_demo_session
+from blockdream_wm.serve import RolloutServer
+from blockdream_wm.demos import build_demo_session
 
 websockets = pytest.importorskip("websockets")
 

@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mineworld-wm"
+name = "blockdream-wm"
 version = "0.0.0"
-description = "mineworld — neural Minecraft world model (server AR + browser latent-diffusion)"
+description = "blockdream — neural Minecraft world model (server AR + browser latent-diffusion)"
 requires-python = ">=3.10"
 dependencies = [
   "torch>=2.4",
@@ -20,7 +20,7 @@ serve = ["websockets>=12.0"]
 export = ["onnx>=1.16"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mineworld_wm"]
+packages = ["src/blockdream_wm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

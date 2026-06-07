@@ -1,4 +1,4 @@
-"""The five mineworld demos.
+"""The five blockdream demos.
 
 Each demo conditions the world model two ways:
   1. an ACTION SUBSET — only the buttons that skill uses are exposed

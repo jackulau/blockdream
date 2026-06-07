@@ -32,7 +32,7 @@ def build(dev):
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.drive.train")
+    ap = argparse.ArgumentParser("blockdream_wm.drive.train")
     ap.add_argument("--pool", default="ml/data/drive_pool")
     ap.add_argument("--rollouts", type=int, default=40)
     ap.add_argument("--steps", type=int, default=200)

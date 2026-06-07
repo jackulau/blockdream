@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from mineworld_wm import train_long
-from mineworld_wm.data_pool import load_pool
-from mineworld_wm.serve import load_real_checkpoint
+from blockdream_wm import train_long
+from blockdream_wm.data_pool import load_pool
+from blockdream_wm.serve import load_real_checkpoint
 
 
 def _tiny_pool(d, n_seg=2, T=6, S=32, seed=0):

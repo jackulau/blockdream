@@ -1,8 +1,8 @@
 import torch
 
-from mineworld_wm.config import ActionConfig
-from mineworld_wm.actions import ActionEncoder, bin_camera, unbin_camera, mask_inactive_buttons
-from mineworld_wm.data import MovingDotEnv, make_rollouts, InverseDynamicsModel
+from blockdream_wm.config import ActionConfig
+from blockdream_wm.actions import ActionEncoder, bin_camera, unbin_camera, mask_inactive_buttons
+from blockdream_wm.data import MovingDotEnv, make_rollouts, InverseDynamicsModel
 
 
 def test_action_encoder_shapes_both_modes():

@@ -12,8 +12,8 @@
 #   Stop everything:   touch ml/runs/overnight/STOP
 #   Watch:             tail -f ml/runs/overnight/overnight.log
 #                      ml/runs/m4/log.csv   ml/runs/drive/log.csv
-#   Serve results:     ml/.venv/bin/python -m mineworld_wm.serve --real ml/runs/m4/latest.pt
-#                      ml/.venv/bin/python -m mineworld_wm.drive.serve --checkpoint ml/runs/drive/latest.pt
+#   Serve results:     ml/.venv/bin/python -m blockdream_wm.serve --real ml/runs/m4/latest.pt
+#                      ml/.venv/bin/python -m blockdream_wm.drive.serve --checkpoint ml/runs/drive/latest.pt
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 export PYTORCH_ENABLE_MPS_FALLBACK=1
@@ -47,7 +47,7 @@ propagate_stop() { [ -f "$STOP" ] && { touch "$MC_OUT/STOP" "$DR_OUT/STOP"; retu
 log "Phase A: Minecraft WM (pool=$MC_POOL)"
 if [ -z "$(ls "$MC_POOL"/*.npz 2>/dev/null || true)" ]; then
   log "Phase A: building VPT pool (100 segments)…"
-  "$PY" -m mineworld_wm.data_pool --segments 100 --seconds 30 --size 128 --fps 10 --out "$MC_POOL" --skill general
+  "$PY" -m blockdream_wm.data_pool --segments 100 --seconds 30 --size 128 --fps 10 --out "$MC_POOL" --skill general
 fi
 END_A=$(( $(date +%s) + MC_MIN * 60 ))
 while :; do
@@ -55,7 +55,7 @@ while :; do
   REM=$(( (END_A - $(date +%s)) / 60 ))
   [ "$REM" -le 0 ] && { log "Phase A budget exhausted"; break; }
   log "Phase A: train_long, ${REM}m remaining"
-  if "$PY" -m mineworld_wm.train_long --pool "$MC_POOL" --out "$MC_OUT" \
+  if "$PY" -m blockdream_wm.train_long --pool "$MC_POOL" --out "$MC_OUT" \
         --preset m4 --device mps --tok-steps 40000 --ar-steps 5000000 \
         --ckpt-every-min 30 --batch 16 --max-minutes "$REM"; then
     log "Phase A: trainer returned 0 (time budget or step targets) — advancing"
@@ -71,7 +71,7 @@ log "Phase B: Driving WM (pool=$DR_POOL)"
 NPZ=$(ls "$DR_POOL"/*.npz 2>/dev/null | wc -l | tr -d ' ')
 if [ "$NPZ" -lt 120 ]; then
   log "Phase B: scaling driving pool to 160 rollouts (have $NPZ)…"
-  "$PY" -m mineworld_wm.drive.collect --rollouts 160 --steps 220 --out "$DR_POOL"
+  "$PY" -m blockdream_wm.drive.collect --rollouts 160 --steps 220 --out "$DR_POOL"
 fi
 END_B=$(( $(date +%s) + DRIVE_MIN * 60 ))
 while :; do
@@ -79,7 +79,7 @@ while :; do
   REM=$(( (END_B - $(date +%s)) / 60 ))
   [ "$REM" -le 0 ] && { log "Phase B budget exhausted"; break; }
   log "Phase B: drive.train_long, ${REM}m remaining"
-  if "$PY" -m mineworld_wm.drive.train_long --pool "$DR_POOL" --out "$DR_OUT" \
+  if "$PY" -m blockdream_wm.drive.train_long --pool "$DR_POOL" --out "$DR_OUT" \
         --device mps --tok-steps 4000 --ar-steps 200000 \
         --ckpt-every-min 20 --batch 16 --max-minutes "$REM"; then
     log "Phase B: trainer returned 0 (time budget or step targets) — done"
@@ -90,5 +90,5 @@ while :; do
 done
 
 log "overnight done."
-log "  Minecraft: $MC_OUT/latest.pt   serve: $PY -m mineworld_wm.serve --real $MC_OUT/latest.pt"
-log "  Driving:   $DR_OUT/latest.pt   serve: $PY -m mineworld_wm.drive.serve --checkpoint $DR_OUT/latest.pt"
+log "  Minecraft: $MC_OUT/latest.pt   serve: $PY -m blockdream_wm.serve --real $MC_OUT/latest.pt"
+log "  Driving:   $DR_OUT/latest.pt   serve: $PY -m blockdream_wm.drive.serve --checkpoint $DR_OUT/latest.pt"

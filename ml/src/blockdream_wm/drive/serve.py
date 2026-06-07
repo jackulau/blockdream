@@ -97,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     import argparse
     import asyncio
 
-    ap = argparse.ArgumentParser("mineworld_wm.drive.serve")
+    ap = argparse.ArgumentParser("blockdream_wm.drive.serve")
     ap.add_argument("--checkpoint", default="ml/checkpoints/drive.pt")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8766)

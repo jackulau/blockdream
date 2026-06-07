@@ -7,8 +7,8 @@ import time
 
 import torch
 
-from mineworld_wm.config import DynamicsConfig
-from mineworld_wm.transition_ar import ARTransition
+from blockdream_wm.config import DynamicsConfig
+from blockdream_wm.transition_ar import ARTransition
 
 
 def _model(n_tokens, dim, depth, heads, codebook, seed=0, action_dim=24):

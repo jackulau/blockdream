@@ -9,12 +9,12 @@ import time
 
 import torch
 
-from mineworld_wm.config import Config, TokenizerConfig, ActionConfig, DynamicsConfig
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.actions import ActionEncoder
-from mineworld_wm.transition_ar import ARTransition
-from mineworld_wm.transition_diffusion import LatentDiffusionTransition
-from mineworld_wm.serve import WorldModelSession
+from blockdream_wm.config import Config, TokenizerConfig, ActionConfig, DynamicsConfig
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.actions import ActionEncoder
+from blockdream_wm.transition_ar import ARTransition
+from blockdream_wm.transition_diffusion import LatentDiffusionTransition
+from blockdream_wm.serve import WorldModelSession
 
 
 def _session(kind: str) -> WorldModelSession:

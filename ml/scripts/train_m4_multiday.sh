@@ -8,7 +8,7 @@
 #   bash ml/scripts/train_m4_multiday.sh --dry-run
 #
 # Watch progress: ml/runs/m4/log.csv and ml/runs/m4/samples/*.png
-# Serve the latest:  ml/.venv/bin/python -m mineworld_wm.serve --real ml/runs/m4/latest.pt
+# Serve the latest:  ml/.venv/bin/python -m blockdream_wm.serve --real ml/runs/m4/latest.pt
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 export PYTORCH_ENABLE_MPS_FALLBACK=1
@@ -40,13 +40,13 @@ if [ "$DRY" = "1" ]; then echo "[multiday] --dry-run: nothing launched."; exit 0
 # 1) build/extend the pool (resumable — skips already-cached segments).
 # Tagged "general" (VPT contractor = walking/mining). Add elytra/boat/pig by building
 # more tagged pools and passing --pools (see docs/movement-types.md).
-"$PY" -m mineworld_wm.data_pool --segments "$SEGMENTS" --seconds "$SECONDS_" --size "$SIZE" --fps "$FPS" --out "$POOL" --skill general
+"$PY" -m blockdream_wm.data_pool --segments "$SEGMENTS" --seconds "$SECONDS_" --size "$SIZE" --fps "$FPS" --out "$POOL" --skill general
 
 # 2) train, auto-restarting on crash (resume is automatic), until STOP or step targets
 mkdir -p "$OUT"
 while true; do
   if [ -f "$OUT/STOP" ]; then echo "[multiday] STOP file present — exiting."; break; fi
-  if "$PY" -m mineworld_wm.train_long --pool "$POOL" --out "$OUT" --preset m4 --device mps \
+  if "$PY" -m blockdream_wm.train_long --pool "$POOL" --out "$OUT" --preset m4 --device mps \
         --tok-steps "$TOK_STEPS" --ar-steps "$AR_STEPS" --ckpt-every-min "$CKPT_MIN" --batch 16; then
     echo "[multiday] trainer returned 0 (step targets reached) — done."
     break
@@ -55,4 +55,4 @@ while true; do
     sleep 15
   fi
 done
-echo "[multiday] finished. Serve:  $PY -m mineworld_wm.serve --real $OUT/latest.pt"
+echo "[multiday] finished. Serve:  $PY -m blockdream_wm.serve --real $OUT/latest.pt"

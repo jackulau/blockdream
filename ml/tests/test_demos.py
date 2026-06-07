@@ -1,6 +1,6 @@
 import torch
 
-from mineworld_wm.demos import DEMOS, build_demo_session
+from blockdream_wm.demos import DEMOS, build_demo_session
 
 
 def test_five_demos_registered():

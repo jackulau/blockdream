@@ -5,9 +5,9 @@ checkpoints load unchanged), and threads through the skill-conditioned encoder +
 
 import torch
 
-from mineworld_wm.config import ActionConfig
-from mineworld_wm.actions import ActionEncoder
-from mineworld_wm.movement import SkillRealEncoder, skill_id
+from blockdream_wm.config import ActionConfig
+from blockdream_wm.actions import ActionEncoder
+from blockdream_wm.movement import SkillRealEncoder, skill_id
 
 
 def _buttons_camera(b=2, n=9):
@@ -59,10 +59,10 @@ def test_skill_encoder_threads_orientation_and_skill():
 
 def test_server_accepts_orientation_message():
     # the server path should accept (and use) an optional orientation in an action message
-    from mineworld_wm.config import Config, TokenizerConfig, ActionConfig, DynamicsConfig
-    from mineworld_wm.tokenizer import Tokenizer
-    from mineworld_wm.transition_ar import ARTransition
-    from mineworld_wm.serve import WorldModelSession, RolloutServer
+    from blockdream_wm.config import Config, TokenizerConfig, ActionConfig, DynamicsConfig
+    from blockdream_wm.tokenizer import Tokenizer
+    from blockdream_wm.transition_ar import ARTransition
+    from blockdream_wm.serve import WorldModelSession, RolloutServer
 
     torch.manual_seed(0)
     cfg = Config()

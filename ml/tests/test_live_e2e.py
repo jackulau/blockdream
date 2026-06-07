@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from mineworld_wm.serve import RolloutServer, load_demo_session
-from mineworld_wm import train_demo
+from blockdream_wm.serve import RolloutServer, load_demo_session
+from blockdream_wm import train_demo
 
 websockets = pytest.importorskip("websockets")
 

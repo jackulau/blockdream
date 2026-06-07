@@ -10,7 +10,7 @@ WITHOUT scarce real footage; real per-skill footage drops into the same layout t
 Usage:
   python scripts/gen_movement_data.py --skills walk,boat,elytra --segments 6 --len 64 --size 64 --out data
 Then train conditioned on them:
-  python -m mineworld_wm.train_long --pools data/pool_synth_walk,data/pool_synth_boat,...
+  python -m blockdream_wm.train_long --pools data/pool_synth_walk,data/pool_synth_boat,...
 """
 
 from __future__ import annotations

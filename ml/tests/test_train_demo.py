@@ -8,8 +8,8 @@ from pathlib import Path
 
 import torch
 
-from mineworld_wm.train_demo import main
-from mineworld_wm.serve import load_demo_session
+from blockdream_wm.train_demo import main
+from blockdream_wm.serve import load_demo_session
 
 
 def test_train_demo_writes_loadable_checkpoint(tmp_path):

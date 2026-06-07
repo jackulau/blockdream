@@ -2,7 +2,7 @@
 decoder. The browser runs the few-step Euler loop in JS, calling transition.onnx
 K times then decoder.onnx once (see ml/web/rollout.js).
 
-    python -m mineworld_wm.export_onnx --config configs/toy.yaml --out onnx/
+    python -m blockdream_wm.export_onnx --config configs/toy.yaml --out onnx/
 """
 
 from __future__ import annotations
@@ -88,7 +88,7 @@ def export(config: str | None, out_dir: str, checkpoint: str | None = None) -> l
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.export_onnx")
+    ap = argparse.ArgumentParser("blockdream_wm.export_onnx")
     ap.add_argument("--config", type=str, default=None)
     ap.add_argument("--out", type=str, default="onnx")
     ap.add_argument("--checkpoint", type=str, default=None, help="trained diffusion checkpoint (real weights)")

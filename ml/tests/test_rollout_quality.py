@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import torch
 
-from mineworld_wm.config import TokenizerConfig, ActionConfig, DynamicsConfig
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.actions import ActionEncoder
-from mineworld_wm.data import MovingDotEnv
-from mineworld_wm.transition_ar import ARTransition
+from blockdream_wm.config import TokenizerConfig, ActionConfig, DynamicsConfig
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.actions import ActionEncoder
+from blockdream_wm.data import MovingDotEnv
+from blockdream_wm.transition_ar import ARTransition
 
 SIZE = 32
 DIRS = {0: ("up", 0, -1), 1: ("down", 0, 1), 2: ("left", -1, 0), 3: ("right", 1, 0)}

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from mineworld_wm.drive.commavq import load_segment, pseudo_control, TOKENS_PER_FRAME
+from blockdream_wm.drive.commavq import load_segment, pseudo_control, TOKENS_PER_FRAME
 
 
 def test_load_segment_flattens_tokens(tmp_path):

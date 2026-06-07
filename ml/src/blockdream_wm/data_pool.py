@@ -2,7 +2,7 @@
 already-fetched ones), then load the pool with valid within-segment consecutive
 pairs for training.
 
-    python -m mineworld_wm.data_pool --segments 80 --seconds 30 --size 128 --fps 10 --out ml/data/pool128
+    python -m blockdream_wm.data_pool --segments 80 --seconds 30 --size 128 --fps 10 --out ml/data/pool128
 """
 
 from __future__ import annotations
@@ -106,7 +106,7 @@ def load_pools(dirs: list[str]) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.data_pool")
+    ap = argparse.ArgumentParser("blockdream_wm.data_pool")
     ap.add_argument("--segments", type=int, default=80)
     ap.add_argument("--seconds", type=float, default=30.0)
     ap.add_argument("--fps", type=int, default=10)

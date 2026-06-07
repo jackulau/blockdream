@@ -36,7 +36,7 @@ log "pools = $POOLS"
 # latest.pt from a different preset has a different token count → shape crash on resume).
 rm -rf runs/skills
 log "training skill-conditioned model -> runs/skills (preset=quick, best-by-val, strong signal, ~28min)…"
-"$PY" -m mineworld_wm.train_long --pools "$POOLS" --out runs/skills \
+"$PY" -m blockdream_wm.train_long --pools "$POOLS" --out runs/skills \
   --preset quick --device mps --tok-steps 5000 --ar-steps 14000 \
   --ckpt-every-min 3 --batch 16 --max-minutes 28 2>&1 | tee -a "$LOG"
 rc=$?

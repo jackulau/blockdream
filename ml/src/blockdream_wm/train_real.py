@@ -7,7 +7,7 @@ checkpoint the tester serves (via serve.load_real_checkpoint).
 Toy/CPU scale here (small data, few steps) → a real-but-weak model; `--full` and a
 GPU scale it to quality. The pipeline is identical at any scale.
 
-    python -m mineworld_wm.train_real --data ml/data/vpt_sample --steps 200 --out ml/checkpoints/vpt.pt
+    python -m blockdream_wm.train_real --data ml/data/vpt_sample --steps 200 --out ml/checkpoints/vpt.pt
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def load_data(data_dir: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.train_real")
+    ap = argparse.ArgumentParser("blockdream_wm.train_real")
     ap.add_argument("--data", default="ml/data/vpt_sample")
     ap.add_argument("--steps", type=int, default=200)
     ap.add_argument("--tok-steps", type=int, default=200)

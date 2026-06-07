@@ -1,9 +1,9 @@
 import torch
 
-from mineworld_wm.config import TokenizerConfig
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.drive.encoders import LidarCodec, ControlEncoder
-from mineworld_wm.drive.collect import collect_rollout
+from blockdream_wm.config import TokenizerConfig
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.drive.encoders import LidarCodec, ControlEncoder
+from blockdream_wm.drive.collect import collect_rollout
 
 
 def test_rgb_tokenizer_on_driving_frames():

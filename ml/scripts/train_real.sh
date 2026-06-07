@@ -7,7 +7,7 @@
 #   bash ml/scripts/train_real.sh --full        # many segments, big model (NVIDIA GPU)
 #
 # The checkpoint is served by:
-#   ml/.venv/bin/python -m mineworld_wm.serve --real ml/checkpoints/vpt.pt
+#   ml/.venv/bin/python -m blockdream_wm.serve --real ml/checkpoints/vpt.pt
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
 export PYTORCH_ENABLE_MPS_FALLBACK=1
@@ -33,15 +33,15 @@ echo "[train_real] mode=$MODE preset=$PRESET device=$DEVICE  segments=$SEGMENTS 
 
 # 1) fetch + prepare real VPT data (idempotent: skip if already prepared)
 if [ ! -f "$DATA/frames.npy" ]; then
-  "$PY" -m mineworld_wm.prepare_vpt --segments "$SEGMENTS" --seconds "$SECONDS_" \
+  "$PY" -m blockdream_wm.prepare_vpt --segments "$SEGMENTS" --seconds "$SECONDS_" \
     --size "$SIZE" --fps "$FPS" --out "$DATA"
 else
   echo "[train_real] reusing prepared data at $DATA"
 fi
 
 # 2) train on the real data
-"$PY" -m mineworld_wm.train_real --data "$DATA" --steps "$STEPS" --tok-steps "$TOK" \
+"$PY" -m blockdream_wm.train_real --data "$DATA" --steps "$STEPS" --tok-steps "$TOK" \
   --preset "$PRESET" --device "$DEVICE" --out "$CKPT"
 
 echo "[train_real] done → $CKPT"
-echo "[train_real] serve it:  $PY -m mineworld_wm.serve --real $CKPT"
+echo "[train_real] serve it:  $PY -m blockdream_wm.serve --real $CKPT"

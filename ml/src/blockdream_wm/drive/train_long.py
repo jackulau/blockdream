@@ -2,11 +2,11 @@
 
 Two-phase (RGB tokenizer -> multimodal transition), atomic time-based checkpoints,
 train/val loss logging, a --max-minutes wall-clock budget, and automatic resume from
-out/latest.pt. The checkpoint it writes is serve-compatible: `mineworld_wm.drive.serve
+out/latest.pt. The checkpoint it writes is serve-compatible: `blockdream_wm.drive.serve
 --checkpoint <out>/latest.pt` loads it directly. Built to survive overnight MPS runs
 that get interrupted by sleep/crash (re-run the same command to continue).
 
-    python -m mineworld_wm.drive.train_long --pool ml/data/drive_pool --out ml/runs/drive \
+    python -m blockdream_wm.drive.train_long --pool ml/data/drive_pool --out ml/runs/drive \
         --tok-steps 4000 --ar-steps 200000 --ckpt-every-min 20 --max-minutes 75
 
 Stop early: touch <out>/STOP  (or Ctrl-C; the last checkpoint is intact).
@@ -62,7 +62,7 @@ def build(dev):
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.drive.train_long")
+    ap = argparse.ArgumentParser("blockdream_wm.drive.train_long")
     ap.add_argument("--pool", default="ml/data/drive_pool")
     ap.add_argument("--out", required=True)
     ap.add_argument("--rollouts", type=int, default=160, help="collected only if pool is empty")

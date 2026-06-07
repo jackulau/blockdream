@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mineworld_wm.vpt_actions import parse_vpt_action, CAMERA_DENOM
+from blockdream_wm.vpt_actions import parse_vpt_action, CAMERA_DENOM
 
 
 def test_movement_keys_map_to_buttons():

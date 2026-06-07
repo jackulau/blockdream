@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import torch
 
-from mineworld_wm.config import Config, TokenizerConfig, ActionConfig, DynamicsConfig
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.movement import SkillRealEncoder, N_MOVEMENT, skill_id
-from mineworld_wm.transition_ar import ARTransition
-from mineworld_wm.serve import WorldModelSession, RolloutServer
+from blockdream_wm.config import Config, TokenizerConfig, ActionConfig, DynamicsConfig
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.movement import SkillRealEncoder, N_MOVEMENT, skill_id
+from blockdream_wm.transition_ar import ARTransition
+from blockdream_wm.serve import WorldModelSession, RolloutServer
 
 
 def _conditioned_session() -> WorldModelSession:

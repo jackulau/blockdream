@@ -1,5 +1,5 @@
 """Train the browser-lineage latent-diffusion world model on REAL footage, then it can be exported
-to ONNX (mineworld_wm.export_onnx --checkpoint) for the server-free in-browser engine. This is the
+to ONNX (blockdream_wm.export_onnx --checkpoint) for the server-free in-browser engine. This is the
 ">=30fps route": the whole frame's latent is denoised in a few parallel Euler steps (resolution-
 independent), unlike the AR path's sequential per-token decode.
 
@@ -21,13 +21,13 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from mineworld_wm.actions import ActionEncoder
-from mineworld_wm.data_pool import load_pools
-from mineworld_wm.device import device_name, pick_device
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.train_long import _atomic_save, _log
-from mineworld_wm.train_real import make_config
-from mineworld_wm.transition_diffusion import LatentDiffusionTransition
+from blockdream_wm.actions import ActionEncoder
+from blockdream_wm.data_pool import load_pools
+from blockdream_wm.device import device_name, pick_device
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.train_long import _atomic_save, _log
+from blockdream_wm.train_real import make_config
+from blockdream_wm.transition_diffusion import LatentDiffusionTransition
 
 
 def main(argv: list[str] | None = None) -> int:

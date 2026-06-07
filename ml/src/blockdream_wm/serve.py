@@ -208,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     import argparse
     import asyncio
 
-    ap = argparse.ArgumentParser("mineworld_wm.serve")
+    ap = argparse.ArgumentParser("blockdream_wm.serve")
     ap.add_argument("--demo", default="walking")
     ap.add_argument("--checkpoint", default=None)
     ap.add_argument("--real", default=None, help="path to a train_real.py checkpoint (real VPT model)")

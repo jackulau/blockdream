@@ -19,7 +19,7 @@ log "D7 step 1/3 - training diffusion WM on real footage (pool_m4 @64px, bounded
   --ckpt-every-min 3 --max-minutes 25 2>&1 | tee -a "$LOG"
 
 log "D7 step 2/3 - exporting trained ONNX (real weights) -> ${ONNX_OUT}..."
-"$PY" -m mineworld_wm.export_onnx --checkpoint runs/diffusion/latest.pt --out "${ONNX_OUT}" 2>&1 | tee -a "$LOG"
+"$PY" -m blockdream_wm.export_onnx --checkpoint runs/diffusion/latest.pt --out "${ONNX_OUT}" 2>&1 | tee -a "$LOG"
 
 log "D7 step 3/3 - verifying the exported engine..."
 "$PY" scripts/verify_diffusion_export.py --onnx "${ONNX_OUT}" 2>&1 | tee -a "$LOG"

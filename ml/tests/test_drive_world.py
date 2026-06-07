@@ -6,11 +6,11 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from mineworld_wm.config import TokenizerConfig, DynamicsConfig
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.drive.sim import DriveSim
-from mineworld_wm.drive.physics import CarState
-from mineworld_wm.drive.transition import DriveTransition
+from blockdream_wm.config import TokenizerConfig, DynamicsConfig
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.drive.sim import DriveSim
+from blockdream_wm.drive.physics import CarState
+from blockdream_wm.drive.transition import DriveTransition
 
 LEFT = [1.0, 0.3, 0.0]
 RIGHT = [-1.0, 0.3, 0.0]

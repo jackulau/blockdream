@@ -1,7 +1,7 @@
-// Browser rollout harness for the mineworld diffusion world model.
+// Browser rollout harness for the blockdream diffusion world model.
 //
 // Loads transition.onnx + decoder.onnx (exported by `python -m
-// mineworld_wm.export_onnx`) and runs the interactive loop with onnxruntime-web
+// blockdream_wm.export_onnx`) and runs the interactive loop with onnxruntime-web
 // (WebGPU when available, else WASM). The few-step Euler integration runs in JS;
 // each step calls transition.onnx once, then decoder.onnx once per displayed frame.
 //

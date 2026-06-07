@@ -2,9 +2,9 @@ import math
 
 import numpy as np
 
-from mineworld_wm.drive.physics import CarParams, CarState, step
-from mineworld_wm.drive.sim import DriveSim, DriveConfig, make_oval_track
-from mineworld_wm.drive.collect import collect_rollout
+from blockdream_wm.drive.physics import CarParams, CarState, step
+from blockdream_wm.drive.sim import DriveSim, DriveConfig, make_oval_track
+from blockdream_wm.drive.collect import collect_rollout
 
 
 def test_throttle_accelerates():

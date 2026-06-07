@@ -1,4 +1,4 @@
-"""mineworld_wm — neural Minecraft world model.
+"""blockdream_wm — neural Minecraft world model.
 
 Two model lineages share this package:
   * server autoregressive (MineWorld-style: VQ tokens + transformer)

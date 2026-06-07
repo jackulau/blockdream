@@ -6,8 +6,8 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from mineworld_wm import train_real
-from mineworld_wm.serve import load_real_checkpoint
+from blockdream_wm import train_real
+from blockdream_wm.serve import load_real_checkpoint
 
 
 def test_train_real_then_serve(tmp_path):

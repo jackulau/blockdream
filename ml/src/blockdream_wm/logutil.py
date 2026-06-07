@@ -1,4 +1,4 @@
-"""Structured, leveled logging for the world-model server + trainers. Level via the MINEWORLD_LOG
+"""Structured, leveled logging for the world-model server + trainers. Level via the BLOCKDREAM_LOG
 env var (DEBUG | INFO | WARNING | ERROR), default INFO. Replaces scattered print() calls with one
 consistent, timestamped, name-tagged stream — and DEBUG turns on per-step latency timing without
 touching the hot path when it's off (logger.debug short-circuits on level)."""
@@ -18,7 +18,7 @@ def _configure() -> None:
     global _CONFIGURED
     if _CONFIGURED:
         return
-    level = os.environ.get("MINEWORLD_LOG", "INFO").upper()
+    level = os.environ.get("BLOCKDREAM_LOG", "INFO").upper()
     logging.basicConfig(
         level=getattr(logging, level, logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s | %(message)s",
@@ -29,7 +29,7 @@ def _configure() -> None:
 
 def get_logger(name: str) -> logging.Logger:
     _configure()
-    return logging.getLogger(f"mineworld_wm.{name}")
+    return logging.getLogger(f"blockdream_wm.{name}")
 
 
 @contextmanager

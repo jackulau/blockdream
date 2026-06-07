@@ -3,7 +3,7 @@
 Toy/CPU scale. The real run swaps `make_rollouts` for VPT/MineRL data, scales the
 configs, and runs on multi-GPU — the loop is the same.
 
-    python -m mineworld_wm.train --config configs/toy.yaml --max-steps 50
+    python -m blockdream_wm.train --config configs/toy.yaml --max-steps 50
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def transition_loss(cfg, tok, enc, trans, rolls):
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.train")
+    ap = argparse.ArgumentParser("blockdream_wm.train")
     ap.add_argument("--config", type=str, default=None)
     ap.add_argument("--max-steps", type=int, default=None)
     ap.add_argument("--kind", type=str, default=None, choices=["ar", "diffusion"])

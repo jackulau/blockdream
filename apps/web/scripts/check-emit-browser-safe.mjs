@@ -1,4 +1,4 @@
-// Assert the @mineworld/emit-commands default entry is browser-safe: no `node:` builtin is
+// Assert the @blockdream/emit-commands default entry is browser-safe: no `node:` builtin is
 // reachable through its import graph (so vite can bundle the in-browser datapack export).
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -13,7 +13,7 @@ function resolveSpec(fromFile, spec) {
     if (!p.endsWith(".ts") && !p.endsWith(".mjs")) p += ".ts";
     return p;
   }
-  const m = /^@mineworld\/([^/]+)$/.exec(spec);
+  const m = /^@blockdream\/([^/]+)$/.exec(spec);
   if (m) return join(repo, "packages", m[1], "src", "index.ts"); // follow workspace deps too
   return null; // external (e.g. fflate) — assumed browser-safe
 }

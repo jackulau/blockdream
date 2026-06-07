@@ -1,7 +1,7 @@
 import torch
 
-from mineworld_wm.config import ActionConfig
-from mineworld_wm.movement import MOVEMENT_TYPES, SKILL_ID, skill_id, SkillRealEncoder, N_MOVEMENT
+from blockdream_wm.config import ActionConfig
+from blockdream_wm.movement import MOVEMENT_TYPES, SKILL_ID, skill_id, SkillRealEncoder, N_MOVEMENT
 
 
 def test_taxonomy_covers_all_movement_types():

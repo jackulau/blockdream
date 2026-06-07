@@ -11,9 +11,9 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import eval_drive as ed  # noqa: E402
 
-from mineworld_wm.config import TokenizerConfig
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.drive.sim import make_track, TRACK_KINDS, DriveSim, DriveConfig
+from blockdream_wm.config import TokenizerConfig
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.drive.sim import make_track, TRACK_KINDS, DriveSim, DriveConfig
 
 
 def test_multiple_track_shapes_are_valid_corridors():

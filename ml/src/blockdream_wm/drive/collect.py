@@ -85,7 +85,7 @@ def load_pool(out: str):
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.drive.collect")
+    ap = argparse.ArgumentParser("blockdream_wm.drive.collect")
     ap.add_argument("--rollouts", type=int, default=40)
     ap.add_argument("--steps", type=int, default=200)
     ap.add_argument("--out", default="ml/data/drive_pool")

@@ -1,6 +1,6 @@
 import pytest
 
-from mineworld_wm.export_onnx import export
+from blockdream_wm.export_onnx import export
 
 onnx = pytest.importorskip("onnx")
 

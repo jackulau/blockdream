@@ -2,7 +2,7 @@
 WebSocket server loads. Toy/CPU scale on the deterministic MovingDot world — the
 served model genuinely moves the dot in the commanded direction.
 
-    python -m mineworld_wm.train_demo --demo walking --kind ar --out checkpoints/walking.pt
+    python -m blockdream_wm.train_demo --demo walking --kind ar --out checkpoints/walking.pt
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def build_pairs(size: int, n_buttons: int, n_pos: int, step: float, seed: int):
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.train_demo")
+    ap = argparse.ArgumentParser("blockdream_wm.train_demo")
     ap.add_argument("--demo", default="walking")
     ap.add_argument("--kind", default="ar", choices=["ar", "diffusion"])
     ap.add_argument("--steps", type=int, default=600)

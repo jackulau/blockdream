@@ -2,7 +2,7 @@
 hourly checkpoints, train/val loss logging, and periodic sample-frame dumps so you
 can watch Minecraft sharpen. Built for multi-day MPS runs that survive restarts.
 
-    python -m mineworld_wm.train_long --pool ml/data/pool128 --out ml/runs/m4 \
+    python -m blockdream_wm.train_long --pool ml/data/pool128 --out ml/runs/m4 \
         --preset m4 --tok-steps 40000 --ar-steps 400000 --ckpt-every-min 60
 
 Resume is automatic: re-run the same command and it continues from out/latest.pt.
@@ -58,7 +58,7 @@ def _dump_sample(tok: Tokenizer, frames: torch.Tensor, val_idx: np.ndarray, out:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser("mineworld_wm.train_long")
+    ap = argparse.ArgumentParser("blockdream_wm.train_long")
     ap.add_argument("--pool", default=None, help="single pool dir")
     ap.add_argument("--pools", default=None, help="comma-separated tagged pool dirs (multi-skill)")
     ap.add_argument("--out", required=True)

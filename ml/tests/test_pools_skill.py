@@ -1,7 +1,7 @@
 import numpy as np
 
-from mineworld_wm.data_pool import load_pools
-from mineworld_wm.movement import skill_id
+from blockdream_wm.data_pool import load_pools
+from blockdream_wm.movement import skill_id
 
 
 def _pool(d, skill, T=5, S=32, seed=0):

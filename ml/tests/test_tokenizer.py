@@ -1,7 +1,7 @@
 import torch
 
-from mineworld_wm.config import TokenizerConfig
-from mineworld_wm.tokenizer import Tokenizer
+from blockdream_wm.config import TokenizerConfig
+from blockdream_wm.tokenizer import Tokenizer
 
 
 def toy_cfg(vq: int) -> TokenizerConfig:

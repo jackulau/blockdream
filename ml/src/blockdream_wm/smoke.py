@@ -24,7 +24,7 @@ def main() -> int:
     loss.backward()
     grad_ok = all(p.grad is not None for p in net.parameters())
 
-    print(f"mineworld_wm {__version__}")
+    print(f"blockdream_wm {__version__}")
     print(f"python {sys.version.split()[0]} | torch {torch.__version__} | numpy {np.__version__}")
     print(f"device {cfg.train.device} | latent_size {cfg.latent_size} | smoke loss {loss.item():.4f}")
     print(f"autograd ok: {grad_ok}")

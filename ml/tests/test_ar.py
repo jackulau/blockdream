@@ -1,10 +1,10 @@
 import torch
 
-from mineworld_wm.config import TokenizerConfig, ActionConfig, DynamicsConfig
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.actions import ActionEncoder
-from mineworld_wm.data import make_rollouts
-from mineworld_wm.transition_ar import ARTransition
+from blockdream_wm.config import TokenizerConfig, ActionConfig, DynamicsConfig
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.actions import ActionEncoder
+from blockdream_wm.data import make_rollouts
+from blockdream_wm.transition_ar import ARTransition
 
 
 def _setup():

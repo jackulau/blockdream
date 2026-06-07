@@ -1,9 +1,9 @@
 import torch
 
-from mineworld_wm.config import TokenizerConfig, DynamicsConfig
-from mineworld_wm.tokenizer import Tokenizer
-from mineworld_wm.drive.transition import DriveTransition
-from mineworld_wm.drive.collect import collect_rollout
+from blockdream_wm.config import TokenizerConfig, DynamicsConfig
+from blockdream_wm.tokenizer import Tokenizer
+from blockdream_wm.drive.transition import DriveTransition
+from blockdream_wm.drive.collect import collect_rollout
 
 
 def _setup():

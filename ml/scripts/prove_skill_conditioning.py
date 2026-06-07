@@ -18,9 +18,9 @@ import sys
 
 import torch
 
-from mineworld_wm.config import ActionConfig, DynamicsConfig
-from mineworld_wm.movement import SkillRealEncoder, skill_id
-from mineworld_wm.transition_ar import ARTransition
+from blockdream_wm.config import ActionConfig, DynamicsConfig
+from blockdream_wm.movement import SkillRealEncoder, skill_id
+from blockdream_wm.transition_ar import ARTransition
 
 K = 16          # codebook size
 GRID = 6        # 6x6 = 36 tokens/frame
