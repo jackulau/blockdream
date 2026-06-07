@@ -75,7 +75,11 @@ const mcViewer = new Viewer({
 });
 $<HTMLButtonElement>("mc-reset").addEventListener("click", () => mcViewer.reset());
 mcSkill.addEventListener("change", () => {
-  if (mcViewer.connected) mcViewer.reset();
+  if (mcViewer.connected) {
+    mcViewer.reset();
+    // keep the status pill in sync with the selected skill (it was stale: "live · walk" while pig)
+    pill(mcStatus, `live · ${mcSkill.value}`, "ok");
+  }
 });
 
 // --- Driving world model -------------------------------------------------------
@@ -86,6 +90,11 @@ const drHud = $<HTMLDivElement>("dr-hud");
 const drStatus = $<HTMLSpanElement>("dr-status");
 const drHeld = heldFor(drRgb);
 let drTel: number[] = [];
+
+// Defensive telemetry guard: the drive server sanitizes its emit (drive D1), but never let a
+// NaN/Inf or off-physical value reach the HUD — map non-finite → 0 and clamp to physical ranges.
+const finiteClamp = (x: number, lo: number, hi: number): number =>
+  Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : 0;
 
 function drawBev(lidar: number[]): void {
   const S = drBev.width;
@@ -113,9 +122,11 @@ const drViewer = new Viewer({
     drTel = (msg.telemetry as number[]) ?? drTel;
   },
   onStats: ({ displayFps, genFps, latencyMs }) => {
+    const speed = finiteClamp((drTel[3] ?? 0) * 30, 0, 60);
+    const yawRate = finiteClamp(drTel[2] ?? 0, -6, 6);
     drHud.textContent =
       `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(0)} fps · ${latencyMs.toFixed(0)} ms\n` +
-      `speed ${((drTel[3] ?? 0) * 30).toFixed(1)} m/s · yaw-rate ${(drTel[2] ?? 0).toFixed(2)}`;
+      `speed ${speed.toFixed(1)} m/s · yaw-rate ${yawRate.toFixed(2)}`;
   },
   onStatus: (t, cls) => pill(drStatus, cls === "ok" ? "live" : t, cls),
 });

@@ -54,10 +54,12 @@ const viewer = new Viewer({
   },
   onStats: ({ displayFps, genFps, latencyMs }) => {
     const c = controlFromKeys(held);
-    const speed = (tel[3] ?? 0) * 30;
+    // Defensive: map NaN/Inf → 0 and clamp to physical ranges so garbage telemetry never reaches the HUD.
+    const speed = Number.isFinite(tel[3]) ? Math.min(60, Math.max(0, (tel[3] ?? 0) * 30)) : 0;
+    const yawRate = Number.isFinite(tel[2]) ? Math.min(6, Math.max(-6, tel[2] ?? 0)) : 0;
     hud.textContent =
       `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(0)} fps · ${latencyMs.toFixed(0)} ms\n` +
-      `speed ${speed.toFixed(1)} m/s   yaw-rate ${(tel[2] ?? 0).toFixed(2)}\n` +
+      `speed ${speed.toFixed(1)} m/s   yaw-rate ${yawRate.toFixed(2)}\n` +
       `control  steer ${c[0]}  throttle ${c[1]}  brake ${c[2]}`;
   },
   onStatus: setStatus,
