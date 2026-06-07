@@ -13,6 +13,9 @@ import {
   imageToVolume,
   imageToSolid,
   objToVolume,
+  objSequenceToFrames,
+  gltfToFrames,
+  glbToFrames,
   generateSequence,
   TRANSFORM_ANIMS,
   type SequenceAnimName,
@@ -353,22 +356,36 @@ async function setup3dViewer(): Promise<void> {
     hud.textContent = `${label} · ${frames.length} frame${frames.length > 1 ? "s" : ""} · drag to orbit`;
   }
 
-  // import a .obj model (→ voxel shell) or an animated .gif (→ block animation)
+  // import a real animation → block animation: a Blender glTF/.glb (node-TRS animation sampled to
+  // frames), an .obj-per-frame sequence (select multiple), a single .obj model, or an animated .gif.
   $<HTMLInputElement>("v3-import").addEventListener("change", async (ev) => {
-    const file = (ev.target as HTMLInputElement).files?.[0];
-    if (!file) return;
+    const files = Array.from((ev.target as HTMLInputElement).files ?? []);
+    if (!files.length) return;
     viewer.pause(); // stop the render loop overwriting the status line
     playBtn.textContent = "play";
-    hud.textContent = `importing ${file.name}…`;
+    hud.textContent = `importing ${files.length > 1 ? `${files.length} files` : files[0]!.name}…`;
     try {
-      if (/\.obj$/i.test(file.name)) {
-        showFrames([objToVolume(await file.text(), { resolution: 32, mapColorId: grayId })], `model ${file.name}`);
-      } else {
-        const { canvases, durationsMs } = await decodeGif(file);
+      const objs = files.filter((f) => /\.obj$/i.test(f.name));
+      const glb = files.find((f) => /\.glb$/i.test(f.name));
+      const gltf = files.find((f) => /\.gltf$/i.test(f.name));
+      const gif = files.find((f) => /\.gif$/i.test(f.name) || f.type === "image/gif");
+      if (glb) {
+        showFrames(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId }), `glb ${glb.name}`);
+      } else if (gltf) {
+        showFrames(gltfToFrames(await gltf.text(), { frames: 24, resolution: 40, mapColorId: grayId }), `glTF ${gltf.name}`);
+      } else if (objs.length > 1) {
+        const texts = await Promise.all(objs.sort((a, b) => a.name.localeCompare(b.name)).map((f) => f.text()));
+        showFrames(objSequenceToFrames(texts, { resolution: 40, mapColorId: grayId }), `obj-seq ×${texts.length}`);
+      } else if (objs.length === 1) {
+        showFrames([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true })], `model ${objs[0]!.name}`);
+      } else if (gif) {
+        const { canvases, durationsMs } = await decodeGif(gif);
         const frames = canvases.map((c) =>
           imageToVolume(quantizeFrame(rgbImageFromCanvas(c, 28), pal3d, { method: "none" }), { mode: "flat", depth: 2 }),
         );
-        showFrames(frames, `gif ${file.name}`, durationsMs);
+        showFrames(frames, `gif ${gif.name}`, durationsMs);
+      } else {
+        hud.textContent = "unsupported file — use .gltf/.glb, .obj (one or many), or .gif";
       }
     } catch (err) {
       hud.textContent = `import failed: ${(err as Error).message}`;

@@ -32,8 +32,9 @@ log "pools = $POOLS"
 # preset=quick → 256 tokens/frame at 64px (downsample 4) — 4x the spatial detail of m4's 64
 # tokens, so the per-skill colour cast/scroll actually render; smaller dim192 net converges faster.
 # Strong tokenizer (8k steps) is essential: the first run gave the tokenizer ~1min → mushy decode
-# that collapsed all skills to the same blur. Fresh run (preset change → can't resume old state).
-rm -f runs/skills/latest.pt runs/skills/log.csv
+# that collapsed all skills to the same blur. Full-wipe the dir on a fresh run (a stale tokens.pt /
+# latest.pt from a different preset has a different token count → shape crash on resume).
+rm -rf runs/skills
 log "training skill-conditioned model -> runs/skills (preset=quick, bounded ~55min)…"
 "$PY" -m mineworld_wm.train_long --pools "$POOLS" --out runs/skills \
   --preset quick --device mps --tok-steps 8000 --ar-steps 30000 \
