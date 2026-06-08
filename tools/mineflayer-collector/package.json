@@ -7,7 +7,11 @@
     "collect": "node collect.mjs"
   },
   "dependencies": {
-    "mineflayer": "^4.20.0",
-    "prismarine-viewer": "^1.28.0"
+    "canvas": "^3.2.3",
+    "gl": "^8.1.6",
+    "mineflayer": "^4.37.1",
+    "mineflayer-pathfinder": "^2.4.5",
+    "prismarine-viewer": "^1.33.0",
+    "rcon-client": "^4.2.5"
   }
 }
