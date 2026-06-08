@@ -17,7 +17,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"   # repo root
 ML="$ROOT/ml"
 PY="$ML/.venv/bin/python"
 
-MC_CKPT="${MC_CKPT:-$ML/runs/skills_hi/latest.pt}"   # skill-distinct MC checkpoint (override: MC_CKPT=...)
+MC_CKPT="${MC_CKPT:-$ML/runs/skills_real/latest.pt}"   # skill-distinct MC checkpoint (override: MC_CKPT=...)
 DRIVE_CKPT="${DRIVE_CKPT:-$ML/runs/drive/latest.pt}"
 MC_PORT="${MC_PORT:-8765}"
 DRIVE_PORT="${DRIVE_PORT:-8766}"
