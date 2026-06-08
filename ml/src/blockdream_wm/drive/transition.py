@@ -72,6 +72,32 @@ class DriveTransition(nn.Module):
         tel_loss = F.mse_loss(self.bound_tel(self.telemetry_head(c)), next_tel)
         return rgb_loss + lidar_loss + tel_loss, {"rgb": rgb_loss.item(), "lidar": lidar_loss.item(), "tel": tel_loss.item()}
 
+    def rollout_loss(self, tel0, lidar0, controls, tel_targets, lidar_targets, history=None):
+        """Multi-step recursive (scheduled-sampling) loss on the telemetry + LiDAR feedback path.
+
+        Starting from a REAL state (tel0, lidar0), roll the model K steps under the real control
+        sequence using its OWN bounded predictions as feedback (exactly as inference does), and
+        supervise every step against the real future. Single-step teacher forcing lets the model
+        cheat with "next_tel ≈ prev_tel" (consecutive telemetry barely changes) and so it ignores
+        control + drifts/collapses over a long rollout. Rolling its own predictions forward makes
+        that shortcut accumulate error, forcing it to actually USE the control and stay on-trajectory
+        — the fix for the flat, control-independent speed/yaw. RGB tokens stay single-step (AR decode
+        is too expensive to roll in-loop and is not the unstable modality).
+
+        Shapes: tel0 (B,n_tel), lidar0 (B,n_lidar), controls (B,K,n_control),
+        tel_targets (B,K,n_tel), lidar_targets (B,K,n_lidar).
+        """
+        tel, lidar = tel0, lidar0
+        k = controls.shape[1]
+        tel_loss = lidar_loss = controls.new_zeros(())
+        for t in range(k):
+            c = self._fuse(controls[:, t], lidar, tel, history)
+            tel = self.bound_tel(self.telemetry_head(c))
+            lidar = torch.sigmoid(self.lidar_head(c))
+            tel_loss = tel_loss + F.mse_loss(tel, tel_targets[:, t])
+            lidar_loss = lidar_loss + F.mse_loss(lidar, lidar_targets[:, t])
+        return (tel_loss + lidar_loss) / k, {"roll_tel": tel_loss.item() / k, "roll_lidar": lidar_loss.item() / k}
+
     @torch.no_grad()
     def step(self, prev_tokens, prev_lidar, prev_tel, control, history=None):
         """One recursive world-model step → (next_tokens, next_lidar, next_telemetry)."""

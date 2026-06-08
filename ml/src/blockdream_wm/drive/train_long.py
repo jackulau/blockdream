@@ -27,7 +27,7 @@ from ..config import TokenizerConfig, DynamicsConfig
 from ..tokenizer import Tokenizer
 from ..device import pick_device, device_name
 from .transition import DriveTransition
-from .collect import prepare_pool, load_pool
+from .collect import prepare_pool, load_pool, load_windows
 
 IMAGE = 64
 DOWNSAMPLE = 8          # 64/8 = 8 -> 64 tokens
@@ -73,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--lr", type=float, default=2e-3)
     ap.add_argument("--ckpt-every-min", type=float, default=20.0)
     ap.add_argument("--max-minutes", type=float, default=0.0)  # 0 = until step targets
+    ap.add_argument("--roll-k", type=int, default=12, help="multi-step recursive rollout horizon for the telemetry/LiDAR loss (0 disables → pure single-step teacher forcing)")
+    ap.add_argument("--roll-weight", type=float, default=1.0, help="weight of the recursive rollout loss vs the single-step loss")
     ap.add_argument("--val-frac", type=float, default=0.05)
     ap.add_argument("--device", default="auto")
     ap.add_argument("--seed", type=int, default=0)
@@ -96,6 +98,9 @@ def main(argv: list[str] | None = None) -> int:
     perm = rng.permutation(len(pairs))
     n_val = max(1, int(len(pairs) * args.val_frac))
     val_pairs, train_pairs = pairs[perm[:n_val]], pairs[perm[n_val:]]
+
+    # contiguous K-step windows for the recursive rollout loss (controllability + stability)
+    windows = load_windows(args.pool, args.roll_k) if args.roll_k > 0 else None
 
     tcfg, dcfg, tok, trans = build(dev)
     tok_opt = torch.optim.Adam(tok.parameters(), lr=args.lr)
@@ -195,9 +200,19 @@ def main(argv: list[str] | None = None) -> int:
         return i0, i1
 
     # ---- PHASE 2: multimodal transition ----
+    def roll_batch():
+        """Sample a batch of K-step windows → (tel0, lidar0, controls, tel_targets, lidar_targets)."""
+        w = torch.from_numpy(windows[np.random.randint(0, len(windows), args.batch)]).to(dev)
+        ctrls = ctl[w[:, :-1]]          # (B,K,3) control applied at each step
+        return tel[w[:, 0]], lidar[w[:, 0]], ctrls, tel[w[:, 1:]], lidar[w[:, 1:]]
+
     while phase == "ar" and ar_step < args.ar_steps and not time_up():
         i0, i1 = ar_batch(train_pairs)
         loss, _ = trans.loss(tokens[i0], tokens[i1], lidar[i0], tel[i0], ctl[i0], lidar[i1], tel[i1])
+        if windows is not None:  # recursive multi-step loss on the telemetry/LiDAR feedback path
+            t0_, l0_, cw, tt, lt = roll_batch()
+            rloss, _ = trans.rollout_loss(t0_, l0_, cw, tt, lt)
+            loss = loss + args.roll_weight * rloss
         tr_opt.zero_grad(); loss.backward(); tr_opt.step()
         ar_step += 1
         if ar_step % 50 == 0 or (time.time() - last_ckpt) / 60 >= args.ckpt_every_min:

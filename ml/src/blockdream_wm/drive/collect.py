@@ -29,14 +29,27 @@ def _pursuit_action(sim: DriveSim, rng: np.random.Generator, target_speed: float
     return float(np.clip(steer, -1, 1)), float(np.clip(throttle, 0, 1)), brake
 
 
-def collect_rollout(steps: int, seed: int, cfg: DriveConfig | None = None) -> dict:
+def _cruise_action(sim: DriveSim, rng: np.random.Generator, throttle_hold: float) -> tuple[float, float, float]:
+    """Pursuit STEERING but an OPEN-LOOP throttle held at a fixed level (no speed regulation). Across
+    rollouts this makes the car settle at DIFFERENT speeds for different throttle holds, giving the
+    model a causal throttle→cruise-speed signal the speed-regulated pursuit autopilot erases."""
+    cl = sim.centerline
+    car = np.array([sim.state.x, sim.state.y])
+    i = int(np.argmin(((cl - car) ** 2).sum(1)))
+    ego = sim._to_ego(cl[(i + 6) % len(cl)][None])[0]
+    steer = float(np.clip(1.6 * math.atan2(ego[1], ego[0]), -1, 1)) + float(rng.normal(0, 0.05))
+    return float(np.clip(steer, -1, 1)), float(np.clip(throttle_hold + rng.normal(0, 0.03), 0, 1)), 0.0
+
+
+def collect_rollout(steps: int, seed: int, cfg: DriveConfig | None = None,
+                    target_speed: float = 11.0, mode: str = "pursuit", throttle_hold: float = 0.5) -> dict:
     sim = DriveSim(cfg, seed=seed)
     rng = np.random.default_rng(seed + 1)
     sim.reset()
     rgb, lidar, tel, ctrl = [], [], [], []
     for _ in range(steps):
         obs = sim.observation()
-        a = _pursuit_action(sim, rng)
+        a = _cruise_action(sim, rng, throttle_hold) if mode == "cruise" else _pursuit_action(sim, rng, target_speed)
         rgb.append((obs["rgb"] * 255).astype(np.uint8))
         lidar.append(obs["lidar"])
         tel.append(obs["telemetry"])
@@ -58,9 +71,19 @@ def prepare_pool(rollouts: int, steps: int, out: str, seed: int = 0) -> int:
         if f.exists():
             continue
         track = TRACK_KINDS[i % len(TRACK_KINDS)]  # span track shapes for richer dynamics
-        r = collect_rollout(steps, seed + i, DriveConfig(track=track))
+        # Diversify SPEED so the model learns throttle→speed (not a fixed ~11 m/s attractor): half the
+        # rollouts regulate to a target spanning 5..23 m/s, half hold an open-loop throttle spanning
+        # 0..1 (settling at the matching cruise speed). Both span steering via the pursuit lookahead.
+        if i % 2 == 0:
+            target = 5.0 + 18.0 * ((i // 2) % 6) / 5.0
+            r = collect_rollout(steps, seed + i, DriveConfig(track=track), target_speed=target, mode="pursuit")
+            tag = f"pursuit@{target:.0f}m/s"
+        else:
+            hold = ((i // 2) % 6) / 5.0
+            r = collect_rollout(steps, seed + i, DriveConfig(track=track), mode="cruise", throttle_hold=hold)
+            tag = f"cruise@thr{hold:.1f}"
         np.savez_compressed(f, **r)
-        print(f"[drive.collect] {i + 1}/{rollouts}: {steps} steps ({track})")
+        print(f"[drive.collect] {i + 1}/{rollouts}: {steps} steps ({track}, {tag})")
     n = len(list(out_dir.glob("roll_*.npz")))
     print(f"[drive.collect] {n} rollouts in {out_dir}")
     return n
@@ -82,6 +105,24 @@ def load_pool(out: str):
         offset += T
     return (np.concatenate(rgb), np.concatenate(lid), np.concatenate(tel),
             np.concatenate(ctl), np.asarray(pairs, dtype=np.int64))
+
+
+def load_windows(out: str, k: int) -> np.ndarray:
+    """→ windows (W, k+1) of GLOBAL frame indices, each k+1 consecutive frames within a SINGLE
+    rollout (no window straddles a rollout boundary). Feeds the multi-step recursive rollout loss."""
+    rolls = sorted(Path(out).glob("roll_*.npz"))
+    if not rolls:
+        raise FileNotFoundError(f"no rollouts in {out}")
+    windows = []
+    offset = 0
+    for r in rolls:
+        T = int(np.load(r)["rgb"].shape[0])
+        for t in range(T - k):
+            windows.append(list(range(offset + t, offset + t + k + 1)))
+        offset += T
+    if not windows:
+        raise ValueError(f"rollouts in {out} too short for window length k={k}")
+    return np.asarray(windows, dtype=np.int64)
 
 
 def main(argv: list[str] | None = None) -> int:
