@@ -24,8 +24,18 @@ import canvasWebgl from "node-canvas-webgl";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { Rcon } from "rcon-client"; // deterministic world setup (fill water / summon saddled mobs)
 import { createRequire } from "node:module"; // setupSkill needs require() (prismarine-item / vec3) in ESM
 const require = createRequire(import.meta.url);
+
+const RCON_PORT = parseInt(argvRcon(), 10);
+function argvRcon () { const i = process.argv.indexOf("--rcon-port"); return i >= 0 ? process.argv[i + 1] : "25575"; }
+const RCON_PASS = (() => { const i = process.argv.indexOf("--rcon-pass"); return i >= 0 ? process.argv[i + 1] : "blockdream"; })();
+let _rcon = null;
+async function rcon (command) {
+  if (!_rcon) _rcon = await Rcon.connect({ host: HOST, port: RCON_PORT, password: RCON_PASS });
+  return _rcon.send(command);
+}
 
 // prismarine-viewer's worker + mesher read these off the global scope at runtime (lazily, after import).
 global.THREE = THREE;
@@ -52,10 +62,20 @@ const SKILL_CONTROLS = {
   jump: { forward: true, jump: true },
   swim: { forward: true }, // submerged (setupSkill builds a water column)
   boat: { forward: true }, // mounted on a boat (setupSkill places + mounts)
-  elytra: { forward: true }, // gliding (setupSkill equips elytra + gains altitude)
+  elytra: {}, // airborne flight drives motion (sustainSkill), not ground controls
   pig: { forward: true }, // riding a saddled pig (setupSkill spawns + saddles + mounts)
   minecart: {}, // rolling in a minecart (setupSkill lays rails + mounts)
 };
+
+// The state that DEFINES a skill — used to VERIFY setup worked and to score each clip (skill_ok).
+function inExpectedState (bot, skill) {
+  const e = bot.entity;
+  if (!e) return false;
+  if (skill === "swim") return !!e.isInWater;
+  if (skill === "elytra") return !e.onGround;
+  if (skill === "boat" || skill === "pig" || skill === "minecart") return !!bot.vehicle;
+  return true; // walk/sprint/jump: always "in state"
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -70,70 +90,75 @@ async function give (bot, name, count = 1, nbt = undefined) {
   return item;
 }
 
-// Set up the world/bot for a skill in CREATIVE (no op/commands needed). Best-effort: each step is
-// guarded so a partial failure still records whatever the bot ends up doing. Operator-gated render
-// (prismarine-viewer headless) is the only piece this can't self-verify — the setup logic itself is
-// pure mineflayer creative API (give / placeBlock / mount / equip / flyTo).
+// Set up the world/bot so it GENUINELY performs the skill (pure mineflayer creative API — give /
+// placeBlock / mount / equip / flyTo). Each mount is VERIFIED (bot.vehicle) with retries; setup
+// returns once the bot is in the skill's defining state (or best-effort after retries).
 async function setupSkill (bot, skill) {
   const { Vec3 } = require('vec3');
   const at = (dx, dy, dz) => bot.entity.position.offset(dx, dy, dz).floored();
+  const near = (re) => Object.values(bot.entities).find((e) => re.test(e.name || "") && e.position && e.position.distanceTo(bot.entity.position) < 6);
   const placeAt = async (pos, item) => {
     await give(bot, item);
     const ref = bot.blockAt(pos.offset(0, -1, 0));
     if (ref) await bot.placeBlock(ref, new Vec3(0, 1, 0)).catch(() => {});
   };
+  const useItem = () => { try { bot.activateItem(); } catch {} }; // activateItem() is void here (no .catch)
+  // mount the nearest matching entity, retrying until bot.vehicle is set
+  const mountVerified = async (re, tries = 4) => {
+    for (let i = 0; i < tries && !bot.vehicle; i++) {
+      const ent = near(re);
+      if (ent) { try { bot.mount(ent); } catch {} await sleep(700); }
+      else await sleep(350);
+    }
+    return !!bot.vehicle;
+  };
+  const P = bot.entity.position;
+  const [X, Y, Z] = [Math.floor(P.x), Math.floor(P.y), Math.floor(P.z)]; // bot coords for RCON
   try {
-    if (skill === 'swim' || skill === 'boat') {
-      // carve a WIDE 7x7x2 basin and flood it so the POV is open water (not cramped dirt walls) —
-      // the bot is submerged (swim) / a boat floats on the surface, with water + horizon in view.
-      const R = 3;
-      for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) for (let dy = -1; dy >= -2; dy--) {
-        const b = bot.blockAt(at(dx, dy, dz));
-        if (b && b.name !== 'air') await bot.dig(b, true).catch(() => {});
-      }
-      // flood from a grid of sources so the whole basin fills (one source won't reach 7x7x2)
-      for (let dx = -R; dx <= R; dx += 2) for (let dz = -R; dz <= R; dz += 2) {
-        await give(bot, 'water_bucket');
-        await bot.lookAt(at(dx, -2, dz), true);
-        await bot.activateItem().catch(() => {});
-      }
-      await sleep(600);
-      if (skill === 'boat') {
-        await give(bot, 'oak_boat');
-        await bot.lookAt(at(0, -1, 0), true);
-        await bot.activateItem(); // place boat on the water
-        await sleep(500);
-        const boat = Object.values(bot.entities).find((e) => /boat/.test(e.name || '') && e.position.distanceTo(bot.entity.position) < 4);
-        if (boat) await bot.mount(boat);
-      }
-    } else if (skill === 'pig') {
-      await give(bot, 'pig_spawn_egg');
-      await bot.lookAt(at(1, -1, 0), true);
-      await bot.activateItem(); // spawn a pig
-      await sleep(700);
-      const pig = Object.values(bot.entities).find((e) => e.name === 'pig' && e.position.distanceTo(bot.entity.position) < 5);
-      if (pig) {
-        await give(bot, 'saddle');
-        await bot.useOn(pig).catch(() => {}); // saddle it
-        await sleep(300);
-        await bot.mount(pig);
-        await give(bot, 'carrot_on_a_stick'); // steers a saddled pig forward
-      }
-    } else if (skill === 'minecart') {
-      for (let i = 0; i < 8; i++) await placeAt(at(0, -1, i), 'rail'); // lay a short track
-      await placeAt(at(0, 0, 0), 'minecart');
-      await sleep(400);
-      const cart = Object.values(bot.entities).find((e) => /minecart/.test(e.name || '') && e.position.distanceTo(bot.entity.position) < 4);
-      if (cart) await bot.mount(cart);
-    } else if (skill === 'elytra') {
-      await give(bot, 'elytra');
-      await bot.equip(bot.registry.itemsByName.elytra.id, 'torso').catch(() => {});
-      await give(bot, 'firework_rocket', 64);
-      await bot.creative.flyTo(bot.entity.position.offset(0, 30, 0)).catch(() => {}); // gain altitude, then glide
+    if (skill === "swim") {
+      // RCON: fill a BIG deep water box so the bot stays submerged (inWater) through the clip and
+      // can't swim out the edge. peaceful = no drowning.
+      await rcon(`fill ${X - 7} ${Y - 4} ${Z - 7} ${X + 7} ${Y + 3} ${Z + 7} minecraft:water`);
+      await sleep(900);
+    } else if (skill === "boat") {
+      await rcon(`fill ${X - 4} ${Y - 2} ${Z - 4} ${X + 4} ${Y + 1} ${Z + 4} minecraft:water`); // pond
       await sleep(500);
+      await rcon(`summon minecraft:boat ${X} ${Y} ${Z}`); // floats on the pond
+      await sleep(600);
+      await mountVerified(/boat/);
+    } else if (skill === "pig") {
+      await rcon(`summon minecraft:pig ${X} ${Y} ${Z} {Saddle:1b}`); // saddled → rideable
+      await sleep(800);
+      await mountVerified(/pig/);
+      await give(bot, "carrot_on_a_stick"); // held → steers the saddled pig forward
+    } else if (skill === "minecart") {
+      await rcon(`fill ${X} ${Y} ${Z} ${X} ${Y} ${Z + 9} minecraft:rail`); // rail line at feet level
+      await sleep(300);
+      await rcon(`summon minecraft:minecart ${X} ${Y} ${Z}`); // snaps onto the rail
+      await sleep(600);
+      await mountVerified(/minecart/);
+    } else if (skill === "elytra") {
+      await give(bot, "elytra");
+      await bot.equip(bot.registry.itemsByName.elytra.id, "torso").catch(() => {});
+      await give(bot, "firework_rocket", 64);
+      await bot.creative.flyTo(bot.entity.position.offset(0, 40, 0)).catch(() => {}); // gain altitude
+      await sleep(400);
     }
   } catch (e) {
     console.error(`[collect] ${skill} setup partial: ${e.message}`);
+  }
+}
+
+// Keep the skill's state alive DURING recording (called each frame). elytra: fly forward at altitude
+// so the bot stays airborne with an aerial POV (flyTo re-targets ahead every ~1s). Mounts persist
+// on their own. Returns nothing; best-effort + non-blocking.
+let _lastFly = 0;
+function sustainSkill (bot, skill, frame) {
+  if (skill === "elytra" && frame - _lastFly >= 10) {
+    _lastFly = frame;
+    const p = bot.entity.position;
+    const ahead = p.offset(-Math.sin(bot.entity.yaw) * 16, 0, Math.cos(bot.entity.yaw) * 16);
+    bot.creative.flyTo(ahead).catch(() => {}); // keep aloft + moving forward
   }
 }
 
@@ -171,14 +196,16 @@ async function recordSkill(skill) {
   // warm up the chunk-mesh workers so geometry exists before frame 0
   for (let i = 0; i < 150; i++) { aimCamera(); viewer.update(); renderer.render(viewer.scene, viewer.camera); await sleep(15); }
 
-  // per-tick action + physics telemetry, aligned to wall time so the importer can resample to FPS
+  // telemetry logged PER FRAME — NOT physicsTick, which stops firing while the bot rides a vehicle
+  // (boat/pig/minecart), which previously left those clips with 0 telemetry ticks.
   const log = [];
   const t0 = Date.now();
-  const onTick = () => {
+  const snapshot = () => {
     const e = bot.entity;
     if (!e) return;
     log.push({
       t: (Date.now() - t0) / 1000,
+      inState: inExpectedState(bot, skill), // is the bot actually DOING this skill right now?
       buttons: {
         forward: !!controls.forward, back: false, left: false, right: false,
         jump: !!controls.jump, sneak: false, sprint: !!controls.sprint, use: false, attack: false,
@@ -189,36 +216,39 @@ async function recordSkill(skill) {
         vel: [e.velocity.x, e.velocity.y, e.velocity.z],
         yaw: e.yaw, pitch: e.pitch,
         onGround: !!e.onGround,
-        inWater: !!bot.entity.isInWater,
+        inWater: !!e.isInWater,
+        mounted: !!bot.vehicle,
         speed: Math.hypot(e.velocity.x, e.velocity.z),
       },
     });
   };
-  bot.on("physicsTick", onTick);
 
-  // perform the movement while capturing PNG frames at FPS
+  // perform the movement while capturing PNG frames + per-frame telemetry at FPS
   for (const [k, v] of Object.entries(controls)) bot.setControlState(k, v);
   const frameDir = join(OUT, `_${skill}_frames`);
   rmSync(frameDir, { recursive: true, force: true });
   mkdirSync(frameDir, { recursive: true });
   const nFrames = SECONDS * FPS;
   for (let f = 0; f < nFrames; f++) {
+    sustainSkill(bot, skill, f); // keep elytra aloft / skill state alive
     await wv.updatePosition(bot.entity.position); // load chunks the bot moved into
     aimCamera();
     viewer.update();
     renderer.render(viewer.scene, viewer.camera);
     writeFileSync(join(frameDir, `f${String(f).padStart(5, "0")}.png`), canvas.toBuffer("image/png"));
+    snapshot(); // telemetry aligned with this frame (works while mounted)
     await sleep(1000 / FPS);
   }
   for (const k of Object.keys(controls)) bot.setControlState(k, false);
-  bot.removeListener("physicsTick", onTick);
 
   // assemble PNG frames → mp4 (explicit args — reliable, unlike the headless stdin pipe)
   const mp4 = join(OUT, `${skill}.mp4`);
   execFileSync("ffmpeg", ["-y", "-framerate", String(FPS), "-i", join(frameDir, "f%05d.png"), "-pix_fmt", "yuv420p", mp4], { stdio: "ignore" });
   rmSync(frameDir, { recursive: true, force: true });
-  writeFileSync(join(OUT, `${skill}.json`), JSON.stringify({ skill, fps: FPS, size: SIZE, seconds: SECONDS, ticks: log }, null, 0));
-  console.log(`[collect] ${skill}: wrote ${log.length} ticks + ${mp4}`);
+  // skill_ok = fraction of ticks the bot was genuinely in the skill state (inWater / mounted / airborne)
+  const skillOk = log.length ? log.filter((t) => t.inState).length / log.length : 0;
+  writeFileSync(join(OUT, `${skill}.json`), JSON.stringify({ skill, fps: FPS, size: SIZE, seconds: SECONDS, skill_ok: skillOk, ticks: log }, null, 0));
+  console.log(`[collect] ${skill}: wrote ${log.length} ticks + ${mp4}  skill_ok=${(skillOk * 100).toFixed(0)}%`);
   bot.quit();
   await sleep(1500);
 }
@@ -230,5 +260,6 @@ for (const skill of SKILLS) {
     console.error(`[collect] ${skill} FAILED: ${e.message}`);
   }
 }
+if (_rcon) await _rcon.end().catch(() => {}); // close the shared RCON socket so the process can exit
 console.log("[collect] done. Import with ml/scripts/import_mineflayer.py");
 process.exit(0);

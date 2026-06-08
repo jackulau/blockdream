@@ -12,8 +12,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-echo "[setup] installing mineflayer + prismarine-viewer + pathfinder + canvas + gl…"
-npm install mineflayer prismarine-viewer mineflayer-pathfinder canvas gl
+echo "[setup] installing mineflayer + prismarine-viewer + pathfinder + canvas + gl + rcon-client…"
+npm install mineflayer prismarine-viewer mineflayer-pathfinder canvas gl rcon-client
 
 # Provide node-canvas-webgl from the working canvas+gl via the vendored shim.
 SHIM_DIR=node_modules/node-canvas-webgl/lib
