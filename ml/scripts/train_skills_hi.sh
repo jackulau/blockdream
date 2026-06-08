@@ -27,10 +27,10 @@ if [ ! -f data/pool_real_sprint64/skill.txt ]; then
   "$PY" scripts/extract_real_from_vpt.py --src data/pool_m4
 fi
 
-# 2. pools in movement-type order. walk/general/sprint/jump are REAL human VPT footage (button-labeled);
-# swim/boat/elytra/pig/minecart stay synthetic stand-ins (no real action-labeled footage — VPT is
-# walking-gameplay and the mineflayer renderer is operator-gated; see tools/mineflayer-collector).
-POOLS="data/pool_real_general64,data/pool_real_walk64,data/pool_real_sprint64,data/pool_real_jump64,data/pool_synth_swim,data/pool_synth_boat,data/pool_synth_elytra,data/pool_synth_pig,data/pool_synth_minecart"
+# 2. pools in movement-type order — ALL 9 types are now REAL footage:
+#    walk/general/sprint/jump = real human VPT (button-labeled); swim/boat/elytra/pig/minecart = real
+#    mineflayer-rendered footage (tools/mineflayer-collector, imported via import_mineflayer.py).
+POOLS="data/pool_real_general64,data/pool_real_walk64,data/pool_real_sprint64,data/pool_real_jump64,data/pool_real_swim,data/pool_real_boat,data/pool_real_elytra,data/pool_real_pig,data/pool_real_minecart"
 echo "[skills_hi] pools = $POOLS"
 
 # 3. train — strong tokenizer (real texture needs it; a weak tokenizer collapses all skills to blur)

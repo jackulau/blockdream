@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 
 N_BUTTONS = 9
-BUTTON_ORDER = ["forward", "back", "left", "right", "jump", "sneak", "sprint", "use", "attack"]
+BUTTON_ORDER = ["forward", "back", "left", "right", "jump", "sneak", "sprint", "attack", "use"]  # matches vpt_actions (attack=7, use=8)
 PHYS_DIM = 11  # pos(3) + vel(3) + yaw + pitch + onGround + inWater + speed
 
 

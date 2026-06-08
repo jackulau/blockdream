@@ -8,41 +8,49 @@ on-ground, in-water, speed). A Python importer turns that into the trainer's tag
 the world model learns *real* per-skill dynamics instead of the synthetic stand-ins used to prove
 the conditioning mechanism.
 
-## Status (verified 2026-06-07 on macOS arm64, M4)
+## Status — WORKING end to end (verified 2026-06-08 on macOS arm64, M4)
 
-What is wired + verified end-to-end on this machine:
-- **Server**: vanilla 1.18.2 **and** 1.20.4 run headless on **JDK 17** (creative / superflat / offline).
-- **Bot**: mineflayer connects + spawns in creative; per-skill setup is pure creative API
+Produces real textured first-person mp4s for every movement type.
+
+- **Server**: run a **1.16.5** server headless on **JDK 8** (creative / flat / offline). Version
+  matters — see the render gotcha below.
+- **Bot**: mineflayer connects + spawns creative; per-skill setup is pure creative API
   (`give` / `placeBlock` / `mount` / `equip` / `creative.flyTo`) — no op/commands needed (`setupSkill`).
-- **Deps + render stack**: `canvas` (3.x) + headless-gl (`gl` 8.x) build + run; `node-canvas-webgl`
-  won't build, so `setup.sh` drops in `canvas-webgl-shim.js` (a faithful bridge — THREE renders into a
-  headless-gl context, we readPixels→blit→encode, and patch `gl.texImage2D` for ImageData/Canvas
-  texture sources). Entity rendering works.
-- **Known blocker (operator-gated)**: prismarine-viewer's **block-terrain meshing renders blank** in
-  this environment — both headless (mesh objects build with **0 vertices**) and the web viewer
-  (entities render, blocks don't), across 1.18.2/1.20.4, even though the block atlas + blockStates
-  load (HTTP 200). So the bot/server/deps/shim/setup are all ready, but capturing *textured terrain*
-  needs an environment where prismarine-viewer meshes blocks (a different GL/driver, a Linux box, or a
-  real Minecraft client recording). Run `setup.sh` + `collect.mjs` there to produce the mp4s.
+- **Render**: `canvas` (3.x) + headless-gl (`gl` 8.x) + the `canvas-webgl-shim.js` bridge (THREE renders
+  into a headless-gl context; we readPixels→blit→encode and patch `gl.texImage2D` for ImageData/Canvas
+  texture sources). `collect.mjs` rolls its own capture: render each frame to PNG (camera set DIRECTLY —
+  `setFirstPersonCamera` tweens over 50ms, so re-calling it per frame strands the camera at the origin),
+  then assemble with `ffmpeg`. (prismarine-viewer's built-in `headless()` mp4 path finalised empty here.)
 
-**Real footage you can get with NO renderer (already done):** walk / sprint / jump are
-button-distinguishable in OpenAI VPT, so `ml/scripts/extract_real_from_vpt.py` mines real,
-action-labeled runs straight out of `pool_m4` → `pool_real_{sprint,jump,walk}64`. The
-swim/boat/elytra/pig/minecart types are the ones that need this renderer.
+### Render gotcha — use a pre-1.18 version (1.16.5)
+prismarine-viewer **1.33** `worldrenderer.addColumn` only marks sections `y = 0..255` dirty, so a
+**1.18+** world (superflat ground at **y≈-60**, a *negative-Y* section) is never meshed → blank sky
+(entities still render, which is the tell). A **pre-1.18** world (1.16.5: ground at y≈4, positive Y) is
+meshed correctly. So the collector targets 1.16.5. (On 1.18+ you'd have to patch the section-Y loop to
+cover negative Y.) `render-probe.mjs` is the one-frame check: prints `NONBLANK` when terrain renders.
+
+**No-renderer path (walk/sprint/jump):** these are button-distinguishable in OpenAI VPT, so
+`ml/scripts/extract_real_from_vpt.py` mines real action-labeled runs from `pool_m4` directly. The
+renderer above is what gets the other five (swim/boat/elytra/pig/minecart).
 
 The data contract (`ml/scripts/import_mineflayer.py`'s `ticks_to_arrays`) is unit tested
-(`ml/tests/test_import_mineflayer.py`); the bot/render path is exercised against your server.
+(`ml/tests/test_import_mineflayer.py`).
 
 ## 1. A server to play on
 
-Easiest is a local flat creative server (offline-mode) you control:
+A local **1.16.5** flat creative server (offline-mode) you control — pre-1.18 so terrain meshes (see
+the render gotcha above):
 
-- Vanilla/Paper 1.21 `server.properties`: `online-mode=false`, `gamemode=creative`,
-  `level-type=minecraft:flat`, `allow-flight=true` (needed for elytra), then accept the EULA.
-- For `boat` / `pig` / `minecart` / `elytra`: place the vehicle/give the items near spawn first
-  (or extend `SKILL_CONTROLS` + the spawn setup in `collect.mjs` to mount them). The bundled script
-  records the *controls + physics* for every skill; the richer per-vehicle mounting is yours to wire
-  to your server's setup.
+```bash
+# download the 1.16.5 server.jar from the Mojang version manifest, then:
+echo "eula=true" > eula.txt
+printf 'gamemode=creative\nlevel-type=flat\ndifficulty=peaceful\nonline-mode=false\nallow-flight=true\n' > server.properties
+java -Xmx2G -jar server.jar --nogui        # 1.16.5 runs on JDK 8
+```
+
+`setupSkill` in `collect.mjs` handles the per-skill world setup itself in creative (water column for
+swim/boat, spawn+saddle+mount a pig, lay rails + a minecart, equip elytra + gain altitude) — no manual
+server prep needed.
 
 ## 2. Collect
 

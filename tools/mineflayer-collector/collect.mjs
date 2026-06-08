@@ -17,9 +17,21 @@
 // NOTE: server rules/anti-cheat may restrict some movements; run on your own creative/flat server.
 
 import { createBot } from "mineflayer";
-import { headless } from "prismarine-viewer";
-import { mkdirSync, writeFileSync } from "node:fs";
+import * as THREE from "three";
+import { Worker } from "node:worker_threads";
+import viewerPkg from "prismarine-viewer/viewer/index.js"; // CJS — default import then destructure
+import canvasWebgl from "node-canvas-webgl";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module"; // setupSkill needs require() (prismarine-item / vec3) in ESM
+const require = createRequire(import.meta.url);
+
+// prismarine-viewer's worker + mesher read these off the global scope at runtime (lazily, after import).
+global.THREE = THREE;
+global.Worker = Worker;
+const { Viewer, WorldView } = viewerPkg;
+const { createCanvas } = canvasWebgl;
 
 const argv = Object.fromEntries(
   process.argv.slice(2).map((a, i, arr) => (a.startsWith("--") ? [a.slice(2), arr[i + 1]] : [null, null])).filter(([k]) => k),
@@ -134,9 +146,25 @@ async function recordSkill(skill) {
   await setupSkill(bot, skill); // creative: give item / place water·rails / mount / equip elytra
   await sleep(500);
 
-  // headless POV recorder -> mp4 (prismarine-viewer renders the bot's first-person view offscreen)
-  const mp4 = join(OUT, `${skill}.mp4`);
-  headless(bot, { output: mp4, frames: SECONDS * FPS, width: SIZE, height: SIZE, viewDistance: 6, firstPerson: true });
+  // Offscreen first-person renderer. We roll our own capture (not prismarine-viewer's headless(),
+  // whose ffmpeg-stdin pipe finalised empty here): render each frame into a node-canvas-webgl canvas
+  // and write PNGs, then assemble with ffmpeg. Camera is set DIRECTLY (setFirstPersonCamera tweens
+  // over 50ms — re-calling it per frame restarts the tween so the camera never reaches the bot).
+  const canvas = createCanvas(SIZE, SIZE);
+  const renderer = new THREE.WebGLRenderer({ canvas });
+  const viewer = new Viewer(renderer);
+  viewer.setVersion(bot.version);
+  const wv = new WorldView(bot.world, 6, bot.entity.position);
+  viewer.listen(wv);
+  wv.listenToBot(bot); // stream new chunks + entities as the bot moves
+  await wv.init(bot.entity.position);
+  const aimCamera = () => {
+    const p = bot.entity.position;
+    viewer.camera.position.set(p.x, p.y + 1.6, p.z); // eye height
+    viewer.camera.rotation.set(bot.entity.pitch, bot.entity.yaw, 0, "ZYX"); // the bot's real look
+  };
+  // warm up the chunk-mesh workers so geometry exists before frame 0
+  for (let i = 0; i < 150; i++) { aimCamera(); viewer.update(); renderer.render(viewer.scene, viewer.camera); await sleep(15); }
 
   // per-tick action + physics telemetry, aligned to wall time so the importer can resample to FPS
   const log = [];
@@ -146,13 +174,11 @@ async function recordSkill(skill) {
     if (!e) return;
     log.push({
       t: (Date.now() - t0) / 1000,
-      // action (buttons) — what we commanded this tick
       buttons: {
         forward: !!controls.forward, back: false, left: false, right: false,
         jump: !!controls.jump, sneak: false, sprint: !!controls.sprint, use: false, attack: false,
       },
       camera: [e.yaw, e.pitch],
-      // PHYSICS telemetry (the "comma signals") — real ground-truth dynamics
       physics: {
         pos: [e.position.x, e.position.y, e.position.z],
         vel: [e.velocity.x, e.velocity.y, e.velocity.z],
@@ -165,12 +191,27 @@ async function recordSkill(skill) {
   };
   bot.on("physicsTick", onTick);
 
-  // perform the movement
+  // perform the movement while capturing PNG frames at FPS
   for (const [k, v] of Object.entries(controls)) bot.setControlState(k, v);
-  await sleep(SECONDS * 1000);
+  const frameDir = join(OUT, `_${skill}_frames`);
+  rmSync(frameDir, { recursive: true, force: true });
+  mkdirSync(frameDir, { recursive: true });
+  const nFrames = SECONDS * FPS;
+  for (let f = 0; f < nFrames; f++) {
+    await wv.updatePosition(bot.entity.position); // load chunks the bot moved into
+    aimCamera();
+    viewer.update();
+    renderer.render(viewer.scene, viewer.camera);
+    writeFileSync(join(frameDir, `f${String(f).padStart(5, "0")}.png`), canvas.toBuffer("image/png"));
+    await sleep(1000 / FPS);
+  }
   for (const k of Object.keys(controls)) bot.setControlState(k, false);
   bot.removeListener("physicsTick", onTick);
 
+  // assemble PNG frames → mp4 (explicit args — reliable, unlike the headless stdin pipe)
+  const mp4 = join(OUT, `${skill}.mp4`);
+  execFileSync("ffmpeg", ["-y", "-framerate", String(FPS), "-i", join(frameDir, "f%05d.png"), "-pix_fmt", "yuv420p", mp4], { stdio: "ignore" });
+  rmSync(frameDir, { recursive: true, force: true });
   writeFileSync(join(OUT, `${skill}.json`), JSON.stringify({ skill, fps: FPS, size: SIZE, seconds: SECONDS, ticks: log }, null, 0));
   console.log(`[collect] ${skill}: wrote ${log.length} ticks + ${mp4}`);
   bot.quit();
