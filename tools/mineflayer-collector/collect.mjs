@@ -33,20 +33,92 @@ const SIZE = parseInt(argv.size || "128", 10);
 const OUT = argv.out || "./out";
 mkdirSync(OUT, { recursive: true });
 
-// Per-skill control script: which buttons to hold. The bot loops these while we record.
-// (boat/pig/minecart/elytra need the right vehicle/item on the server; documented in README.)
+// Per-skill control script: which buttons to hold while recording.
 const SKILL_CONTROLS = {
   walk: { forward: true },
   sprint: { forward: true, sprint: true },
   jump: { forward: true, jump: true },
-  swim: { forward: true }, // run in water
-  boat: { forward: true }, // mount a boat first
-  elytra: { forward: true, jump: true }, // glide
-  pig: { forward: true }, // ride a saddled pig
-  minecart: {}, // sit in a moving minecart
+  swim: { forward: true }, // submerged (setupSkill builds a water column)
+  boat: { forward: true }, // mounted on a boat (setupSkill places + mounts)
+  elytra: { forward: true }, // gliding (setupSkill equips elytra + gains altitude)
+  pig: { forward: true }, // riding a saddled pig (setupSkill spawns + saddles + mounts)
+  minecart: {}, // rolling in a minecart (setupSkill lays rails + mounts)
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// give an item to the (creative) bot's hotbar slot 36 and return the Item
+async function give (bot, name, count = 1, nbt = undefined) {
+  const mcData = bot.registry;
+  const id = mcData.itemsByName[name]?.id;
+  if (id == null) throw new Error(`unknown item ${name}`);
+  const Item = require('prismarine-item')(bot.version);
+  const item = new Item(id, count, undefined, nbt);
+  await bot.creative.setInventorySlot(36, item);
+  return item;
+}
+
+// Set up the world/bot for a skill in CREATIVE (no op/commands needed). Best-effort: each step is
+// guarded so a partial failure still records whatever the bot ends up doing. Operator-gated render
+// (prismarine-viewer headless) is the only piece this can't self-verify — the setup logic itself is
+// pure mineflayer creative API (give / placeBlock / mount / equip / flyTo).
+async function setupSkill (bot, skill) {
+  const { Vec3 } = require('vec3');
+  const at = (dx, dy, dz) => bot.entity.position.offset(dx, dy, dz).floored();
+  const placeAt = async (pos, item) => {
+    await give(bot, item);
+    const ref = bot.blockAt(pos.offset(0, -1, 0));
+    if (ref) await bot.placeBlock(ref, new Vec3(0, 1, 0)).catch(() => {});
+  };
+  try {
+    if (skill === 'swim' || skill === 'boat') {
+      // carve a 2-deep pit and fill with water so the bot is submerged / a boat floats
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy >= -2; dy--) {
+        const b = bot.blockAt(at(dx, dy, dz));
+        if (b && b.name !== 'air') await bot.dig(b, true).catch(() => {});
+      }
+      await give(bot, 'water_bucket');
+      await bot.lookAt(at(0, -2, 0), true);
+      await bot.activateItem(); // empty bucket → water source
+      await sleep(500);
+      if (skill === 'boat') {
+        await give(bot, 'oak_boat');
+        await bot.lookAt(at(0, -1, 0), true);
+        await bot.activateItem(); // place boat on the water
+        await sleep(500);
+        const boat = Object.values(bot.entities).find((e) => /boat/.test(e.name || '') && e.position.distanceTo(bot.entity.position) < 4);
+        if (boat) await bot.mount(boat);
+      }
+    } else if (skill === 'pig') {
+      await give(bot, 'pig_spawn_egg');
+      await bot.lookAt(at(1, -1, 0), true);
+      await bot.activateItem(); // spawn a pig
+      await sleep(700);
+      const pig = Object.values(bot.entities).find((e) => e.name === 'pig' && e.position.distanceTo(bot.entity.position) < 5);
+      if (pig) {
+        await give(bot, 'saddle');
+        await bot.useOn(pig).catch(() => {}); // saddle it
+        await sleep(300);
+        await bot.mount(pig);
+        await give(bot, 'carrot_on_a_stick'); // steers a saddled pig forward
+      }
+    } else if (skill === 'minecart') {
+      for (let i = 0; i < 8; i++) await placeAt(at(0, -1, i), 'rail'); // lay a short track
+      await placeAt(at(0, 0, 0), 'minecart');
+      await sleep(400);
+      const cart = Object.values(bot.entities).find((e) => /minecart/.test(e.name || '') && e.position.distanceTo(bot.entity.position) < 4);
+      if (cart) await bot.mount(cart);
+    } else if (skill === 'elytra') {
+      await give(bot, 'elytra');
+      await bot.equip(bot.registry.itemsByName.elytra.id, 'torso').catch(() => {});
+      await give(bot, 'firework_rocket', 64);
+      await bot.creative.flyTo(bot.entity.position.offset(0, 30, 0)).catch(() => {}); // gain altitude, then glide
+      await sleep(500);
+    }
+  } catch (e) {
+    console.error(`[collect] ${skill} setup partial: ${e.message}`);
+  }
+}
 
 async function recordSkill(skill) {
   const controls = SKILL_CONTROLS[skill] || { forward: true };
@@ -57,6 +129,10 @@ async function recordSkill(skill) {
     bot.once("error", rej);
     bot.once("end", () => rej(new Error("disconnected before spawn")));
   });
+
+  await sleep(2500); // let chunks load
+  await setupSkill(bot, skill); // creative: give item / place water·rails / mount / equip elytra
+  await sleep(500);
 
   // headless POV recorder -> mp4 (prismarine-viewer renders the bot's first-person view offscreen)
   const mp4 = join(OUT, `${skill}.mp4`);

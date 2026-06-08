@@ -8,9 +8,30 @@ on-ground, in-water, speed). A Python importer turns that into the trainer's tag
 the world model learns *real* per-skill dynamics instead of the synthetic stand-ins used to prove
 the conditioning mechanism.
 
-This is **operator-gated**: it needs a reachable Minecraft server and Node deps, so it can't run in
-the build sandbox. The data contract (`ml/scripts/import_mineflayer.py`'s `ticks_to_arrays`) is unit
-tested (`ml/tests/test_import_mineflayer.py`); the bot/render path is exercised against your server.
+## Status (verified 2026-06-07 on macOS arm64, M4)
+
+What is wired + verified end-to-end on this machine:
+- **Server**: vanilla 1.18.2 **and** 1.20.4 run headless on **JDK 17** (creative / superflat / offline).
+- **Bot**: mineflayer connects + spawns in creative; per-skill setup is pure creative API
+  (`give` / `placeBlock` / `mount` / `equip` / `creative.flyTo`) — no op/commands needed (`setupSkill`).
+- **Deps + render stack**: `canvas` (3.x) + headless-gl (`gl` 8.x) build + run; `node-canvas-webgl`
+  won't build, so `setup.sh` drops in `canvas-webgl-shim.js` (a faithful bridge — THREE renders into a
+  headless-gl context, we readPixels→blit→encode, and patch `gl.texImage2D` for ImageData/Canvas
+  texture sources). Entity rendering works.
+- **Known blocker (operator-gated)**: prismarine-viewer's **block-terrain meshing renders blank** in
+  this environment — both headless (mesh objects build with **0 vertices**) and the web viewer
+  (entities render, blocks don't), across 1.18.2/1.20.4, even though the block atlas + blockStates
+  load (HTTP 200). So the bot/server/deps/shim/setup are all ready, but capturing *textured terrain*
+  needs an environment where prismarine-viewer meshes blocks (a different GL/driver, a Linux box, or a
+  real Minecraft client recording). Run `setup.sh` + `collect.mjs` there to produce the mp4s.
+
+**Real footage you can get with NO renderer (already done):** walk / sprint / jump are
+button-distinguishable in OpenAI VPT, so `ml/scripts/extract_real_from_vpt.py` mines real,
+action-labeled runs straight out of `pool_m4` → `pool_real_{sprint,jump,walk}64`. The
+swim/boat/elytra/pig/minecart types are the ones that need this renderer.
+
+The data contract (`ml/scripts/import_mineflayer.py`'s `ticks_to_arrays`) is unit tested
+(`ml/tests/test_import_mineflayer.py`); the bot/render path is exercised against your server.
 
 ## 1. A server to play on
 
@@ -27,7 +48,7 @@ Easiest is a local flat creative server (offline-mode) you control:
 
 ```bash
 cd tools/mineflayer-collector
-npm install
+bash setup.sh            # installs deps + the canvas-webgl render shim (see Status)
 node collect.mjs --host localhost --port 25565 \
   --skills walk,sprint,jump,swim,boat,elytra,pig,minecart \
   --seconds 30 --fps 10 --size 128

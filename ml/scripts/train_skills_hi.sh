@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."        # → ml/
 PY=.venv/bin/python
-OUT=runs/skills_hi
+OUT="${OUT:-runs/skills_hi}"
 DEVICE="${DEVICE:-mps}"
 MAX_MIN="${MAX_MIN:-22}"
 
@@ -21,9 +21,16 @@ if [ ! -f data/pool_real_walk64/skill.txt ]; then
   echo "[skills_hi] building real 64px walk/general pools from pool_m4…"
   "$PY" scripts/prep_real_skill_pools.py --src data/pool_m4 --frames-per 2560
 fi
+# real sprint/jump pools from VPT's labeled buttons (idempotent)
+if [ ! -f data/pool_real_sprint64/skill.txt ]; then
+  echo "[skills_hi] extracting real sprint/jump/walk from VPT (pool_m4)…"
+  "$PY" scripts/extract_real_from_vpt.py --src data/pool_m4
+fi
 
-# 2. pools in movement-type order: general+walk REAL, exotic skills synthetic
-POOLS="data/pool_real_general64,data/pool_real_walk64,data/pool_synth_sprint,data/pool_synth_jump,data/pool_synth_swim,data/pool_synth_boat,data/pool_synth_elytra,data/pool_synth_pig,data/pool_synth_minecart"
+# 2. pools in movement-type order. walk/general/sprint/jump are REAL human VPT footage (button-labeled);
+# swim/boat/elytra/pig/minecart stay synthetic stand-ins (no real action-labeled footage — VPT is
+# walking-gameplay and the mineflayer renderer is operator-gated; see tools/mineflayer-collector).
+POOLS="data/pool_real_general64,data/pool_real_walk64,data/pool_real_sprint64,data/pool_real_jump64,data/pool_synth_swim,data/pool_synth_boat,data/pool_synth_elytra,data/pool_synth_pig,data/pool_synth_minecart"
 echo "[skills_hi] pools = $POOLS"
 
 # 3. train — strong tokenizer (real texture needs it; a weak tokenizer collapses all skills to blur)
