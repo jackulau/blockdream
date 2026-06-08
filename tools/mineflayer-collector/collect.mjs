@@ -84,15 +84,20 @@ async function setupSkill (bot, skill) {
   };
   try {
     if (skill === 'swim' || skill === 'boat') {
-      // carve a 2-deep pit and fill with water so the bot is submerged / a boat floats
-      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy >= -2; dy--) {
+      // carve a WIDE 7x7x2 basin and flood it so the POV is open water (not cramped dirt walls) —
+      // the bot is submerged (swim) / a boat floats on the surface, with water + horizon in view.
+      const R = 3;
+      for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) for (let dy = -1; dy >= -2; dy--) {
         const b = bot.blockAt(at(dx, dy, dz));
         if (b && b.name !== 'air') await bot.dig(b, true).catch(() => {});
       }
-      await give(bot, 'water_bucket');
-      await bot.lookAt(at(0, -2, 0), true);
-      await bot.activateItem(); // empty bucket → water source
-      await sleep(500);
+      // flood from a grid of sources so the whole basin fills (one source won't reach 7x7x2)
+      for (let dx = -R; dx <= R; dx += 2) for (let dz = -R; dz <= R; dz += 2) {
+        await give(bot, 'water_bucket');
+        await bot.lookAt(at(dx, -2, dz), true);
+        await bot.activateItem().catch(() => {});
+      }
+      await sleep(600);
       if (skill === 'boat') {
         await give(bot, 'oak_boat');
         await bot.lookAt(at(0, -1, 0), true);
