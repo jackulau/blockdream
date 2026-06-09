@@ -6,7 +6,8 @@ For each <skill>.mp4 + <skill>.json under --in:
   • decode the mp4 to frames (ffmpeg, forced size, resampled to the clip fps)
   • align each frame with the nearest per-tick action (9 buttons + 2 camera) and PHYSICS telemetry
     (pos, vel, yaw/pitch, on-ground, in-water, speed) by timestamp
-  • write data/pool_real_<skill>/seg_00000.npz (frames, actions), skill.txt, and physics.npy
+  • write data/pool_real_<skill>/seg_NNNNN.npz (frames, actions), skill.txt, and physics.npy —
+    the seg index auto-increments past existing segments so re-imports append, never overwrite
 
     ml/.venv/bin/python scripts/import_mineflayer.py --in ../tools/mineflayer-collector/out --out data
 Then train on the real pools:
@@ -55,6 +56,13 @@ def ticks_to_arrays(ticks: list[dict], n_frames: int, seconds: float) -> tuple[n
     return actions, physics
 
 
+def next_seg_index(pool: Path) -> int:
+    """Next free seg index in `pool` (max existing seg_NNNNN.npz + 1, else 0) so re-imports
+    append new segments instead of silently clobbering previously imported real data."""
+    taken = [int(p.stem.split("_", 1)[1]) for p in pool.glob("seg_*.npz") if p.stem.split("_", 1)[1].isdigit()]
+    return max(taken, default=-1) + 1
+
+
 def decode_mp4(path: Path, size: int) -> np.ndarray:
     """ffmpeg -> (N, size, size, 3) uint8."""
     out = subprocess.run(
@@ -86,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         actions, physics = ticks_to_arrays(meta.get("ticks", []), frames.shape[0], float(meta.get("seconds", 30)))
         out = Path(args.out) / f"pool_real_{skill}"
         out.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(out / "seg_00000.npz", frames=frames, actions=actions)
+        np.savez_compressed(out / f"seg_{next_seg_index(out):05d}.npz", frames=frames, actions=actions)
         np.save(out / "physics.npy", physics)
         (out / "skill.txt").write_text(skill)
         print(f"[import] {skill}: {frames.shape[0]} frames @ {size}px -> {out} (+physics {physics.shape})")
