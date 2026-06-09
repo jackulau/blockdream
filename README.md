@@ -67,6 +67,12 @@ pnpm --filter web dev                     # the web demo on :5173
 cd ml && .venv/bin/python -m pytest       # world-model tests
 ```
 
+The canonical gate is **`bash scripts/verify-all.sh`** — it chains every suite above plus the
+ML runtime gates (movement types DISTINCT, driving CONTROLLABLE, diffusion ONNX), the web build,
+the docs gate, and the Fabric mod build. Checks needing gitignored single-copy artifacts
+(textures, checkpoints, ONNX) or JDK 21 print `⏭ SKIP` with the regen command instead of failing;
+any check that runs and fails exits nonzero. Checkpoint provenance lives in `ml/CHECKPOINTS.md`.
+
 ## Colour foundation
 
 The renderer authors a filled map's `colors` byte array **directly**, so the game does **not**
