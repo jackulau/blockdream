@@ -90,3 +90,25 @@ Now the served model both **looks like real Minecraft** and produces **distinct 
 dynamics** — the photoreal-and-conditioned result that synthetic data alone can't give (and the
 `physics.npy` telemetry is there to train a physics-conditioned, multimodal variant next, exactly
 like the driving model's RGB+LiDAR+telemetry stack).
+
+## bridge-e2e — headless proof of the NO-MOD live path
+
+`bridge-e2e.mjs` proves the whole no-mod live Minecraft pipeline end to end in one command,
+with **no mods, no Microsoft account, no GPU**: it boots a throwaway STOCK vanilla 1.21.1
+server (`scripts/vanilla-server.sh`, offline-mode + RCON, localhost-only), joins a mineflayer
+bot (`bridgebot`) as the "player", launches the rcon-bridge sidecar
+(`packages/cli/src/rcon-bridge-cli.ts --mock-wm`, so no checkpoint/WS server is needed),
+walks + turns the bot while the sidecar polls its pose and paints 6 generated frames as a
+64×64 block wall at `(10,-60,10)` — then asserts over RCON that sampled wall cells genuinely
+changed from flat-world air to palette blocks. Exit 0 = painted; nonzero keeps the temp
+server dir and prints its path for debugging.
+
+```bash
+node tools/mineflayer-collector/bridge-e2e.mjs
+# [bridge-e2e] PASS in ~13 s — no-mod live path proven end-to-end (temp dir removed)
+```
+
+Needs JDK 21 (`/usr/libexec/java_home -v 21`). The one-time ~50MB Mojang server-jar download
+is skipped when a sha1-valid `server.jar` is cached in `/tmp/bd-server-d2` or
+`.vanilla-server/`. mineflayer 4.37+ (already in this package's `node_modules`) speaks
+protocol 1.21.1 natively via `minecraft-data`.
