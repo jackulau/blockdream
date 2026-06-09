@@ -47,3 +47,7 @@ runs pass them. The movement gate's mean |Δ| = **0.1104** matches the recorded 
 - `goal/012-movement-control-fidelity` — roll/yaw/pitch + camera control + per-frame movement tags (5 commits). Deliberately unmerged: changes the action schema across serve.py / InputCapture.java / web and needs a data migration + retrain. Re-open as its own goal when ready.
 - `goal/021-backup-pre-mlclean` — snapshot backup taken before an ml/ cleanup (2 commits); keep as a backup, never merge.
 - `goal/013-insanely-good-demo`, `goal/020-3d-anim-video-worldmodels-rebrand`, `goal/021-every-version-blockart-playback`, `goal/021-movement-driving-wm-quality` — fully merged into the consolidated line (verified with `git branch --merged`); branches safe to delete.
+
+## Distribution
+
+- `runs/skills_real/latest.pt` ships as a GitHub release asset: https://github.com/jackulau/blockdream/releases/tag/v0.1.0 — fetch with `bash scripts/fetch-checkpoint.sh` (idempotent; `BLOCKDREAM_CKPT_DIR`/`BLOCKDREAM_RELEASE` overrides).
