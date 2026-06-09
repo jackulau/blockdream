@@ -42,6 +42,10 @@ apps/web/public/onnx/
 mods/java-fabric/.gradle/
 mods/java-fabric/build/
 
+# local vanilla server sandbox (scripts/vanilla-server.sh) — Mojang-licensed server jar
+# + world data, downloaded by the USER from Mojang; must never be committed (repo is public)
+.vanilla-server/
+
 # browser-automation session dumps
 .playwright-mcp
 
