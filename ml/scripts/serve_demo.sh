@@ -2,13 +2,14 @@
 # serve_demo.sh — launch the full browser world-model demo with the CORRECT checkpoints.
 #
 # One command brings up everything the single-page demo (apps/web) needs:
-#   1. Minecraft WM server   ws://127.0.0.1:8765  ← runs/skills (skill-DISTINCT; pig/elytra/boat differ)
-#   2. Driving WM server     ws://127.0.0.1:8766  ← runs/drive  (telemetry bounded, drive D1)
+#   1. Minecraft WM server   ws://127.0.0.1:8765  ← runs/skills_real (skill-DISTINCT; pig/elytra/boat differ)
+#   2. Driving WM server     ws://127.0.0.1:8766  ← runs/drive       (telemetry bounded, drive D1)
 #   3. Web dev server        http://127.0.0.1:5173
 #
-# IMPORTANT: serve runs/skills, NOT runs/m4. The m4 checkpoint is real-VPT walking-only — its skill
-# embeddings are dead (verify_movement_types.py → 0/36 distinct), so every movement type renders
-# identical. runs/skills is skill-conditioned (29/36 distinct) so the movement dropdown actually works.
+# IMPORTANT: serve runs/skills_real, NOT runs/m4. The m4 checkpoint is real-VPT walking-only — its skill
+# embeddings are dead (verify_movement_types.py → 0/36 distinct), so every movement type renders identical.
+# runs/skills_real is skill-conditioned and trained on genuine real footage for all 9 movement types
+# (verify_movement_types.py → 36/36 distinct, mean |Δ| 0.11), so the movement dropdown actually works.
 #
 # Ctrl-C stops all three. Requires the venv (ml/.venv) and the checkpoints to exist.
 set -euo pipefail

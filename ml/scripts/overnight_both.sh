@@ -12,8 +12,8 @@
 #   Stop everything:   touch ml/runs/overnight/STOP
 #   Watch:             tail -f ml/runs/overnight/overnight.log
 #                      ml/runs/m4/log.csv   ml/runs/drive/log.csv
-#   Serve results:     ml/.venv/bin/python -m blockdream_wm.serve --real ml/runs/m4/latest.pt
-#                      ml/.venv/bin/python -m blockdream_wm.drive.serve --checkpoint ml/runs/drive/latest.pt
+#   Serve the demo:    bash ml/scripts/serve_demo.sh   (serves ml/runs/skills_real — do NOT serve
+#                      ml/runs/m4 directly: its skill embeddings are dead, 0/36 distinct)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 export PYTORCH_ENABLE_MPS_FALLBACK=1
@@ -90,5 +90,6 @@ while :; do
 done
 
 log "overnight done."
-log "  Minecraft: $MC_OUT/latest.pt   serve: $PY -m blockdream_wm.serve --real $MC_OUT/latest.pt"
-log "  Driving:   $DR_OUT/latest.pt   serve: $PY -m blockdream_wm.drive.serve --checkpoint $DR_OUT/latest.pt"
+log "  Minecraft: $MC_OUT/latest.pt   (training artifact only — do NOT serve it: dead skill embeddings, 0/36 distinct)"
+log "  Driving:   $DR_OUT/latest.pt"
+log "  Serve the demo: bash ml/scripts/serve_demo.sh   (MC ← ml/runs/skills_real, driving ← $DR_OUT)"

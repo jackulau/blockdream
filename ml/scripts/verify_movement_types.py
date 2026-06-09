@@ -34,7 +34,7 @@ def rollout(session, skill_name: str, steps: int) -> torch.Tensor:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("verify_movement_types")
-    ap.add_argument("--checkpoint", default="runs/skills/latest.pt")
+    ap.add_argument("--checkpoint", default="runs/skills_real/latest.pt")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--steps", type=int, default=24, help="rollout length; per-skill dynamics accumulate over the rollout (as in continuous demo use), so a representative length is needed to measure divergence")
     ap.add_argument("--thresh", type=float, default=0.02, help="min mean pairwise |Δframe| to pass")
