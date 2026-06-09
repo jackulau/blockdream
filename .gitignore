@@ -57,3 +57,6 @@ tasks/
 !tools/mineflayer-collector/out/
 tools/mineflayer-collector/out/*
 !tools/mineflayer-collector/out/*.json
+
+# internal planning scratch — never publish
+PLAN.md

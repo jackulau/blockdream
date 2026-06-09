@@ -83,5 +83,23 @@ note "collector syntax"
 node --check tools/mineflayer-collector/collect.mjs
 ok "node --check collect.mjs"
 
+note "no-Fabric play paths"
+bash -n scripts/cast.sh
+ok "bash -n cast.sh"
+bash -n scripts/vanilla-server.sh
+ok "bash -n vanilla-server.sh"
+bash -n scripts/fabric-install.sh
+ok "bash -n fabric-install.sh"
+npx tsx packages/cli/src/rcon-bridge-cli.ts --help >/dev/null
+ok "rcon-bridge-cli --help"
+node --check tools/mineflayer-collector/bridge-e2e.mjs
+ok "node --check bridge-e2e.mjs"
+if [ "${BLOCKDREAM_E2E:-}" = "1" ]; then
+  node tools/mineflayer-collector/bridge-e2e.mjs >/dev/null
+  ok "bridge-e2e live run (vanilla server + bot + sidecar)"
+else
+  skipped "bridge-e2e live run — set BLOCKDREAM_E2E=1 (needs network for the Mojang server jar + Java 21; ~15s)"
+fi
+
 printf '\nverify-all: %d passed, %d skipped — ' "$pass" "$skip"
 if [ "$skip" -eq 0 ]; then echo "ALL GATES GREEN (nothing skipped)"; else echo "green with $skip skip(s) — see ⏭ lines above for regen commands"; fi
