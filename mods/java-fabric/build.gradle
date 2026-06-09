@@ -24,6 +24,10 @@ dependencies {
 }
 
 java {
+    // Toolchain: compile with a real JDK 21 even if Gradle itself runs on an older JVM
+    // (e.g. macOS `/usr/libexec/java_home -v 21` silently falls back when 21 is brew-only).
+    // Detection hint for the Homebrew install lives in gradle.properties.
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
 }

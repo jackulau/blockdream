@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,11 +41,12 @@ public class BlockdreamMod implements ModInitializer {
     private String skill;
     private int actionEveryTicks = 1; // send an action this often (1 = every tick = 20 Hz)
     private int actionCounter;
+    private boolean bridgeUp; // last surfaced bridge state (server thread only)
 
     @Override
     public void onInitialize() {
         ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
-        ServerLifecycleEvents.SERVER_STOPPING.register(s -> { if (bridge != null) bridge.close(); });
+        ServerLifecycleEvents.SERVER_STOPPING.register(s -> { if (bridge != null) bridge.shutdown(); });
         ServerTickEvents.END_SERVER_TICK.register(renderer::tick);
         ServerTickEvents.END_SERVER_TICK.register(this::driveLive);
         LOGGER.info("[blockdream] map-wall renderer registered");
@@ -80,10 +82,23 @@ public class BlockdreamMod implements ModInitializer {
 
     /** Each tick (in live mode), capture the controlling player's action and send it. */
     private void driveLive(MinecraftServer server) {
-        if (bridge == null || !bridge.isOpen()) return;
+        if (bridge == null) return;
+        ServerPlayerEntity player = server.getPlayerManager().getPlayerList().stream().findFirst().orElse(null);
+
+        // Surface bridge state transitions (reconnect loop lives in WorldModelClient):
+        // a log line + action-bar message when the bridge drops or comes back.
+        boolean up = bridge.isConnected();
+        if (up != bridgeUp) {
+            bridgeUp = up;
+            String note = up ? "world-model bridge connected"
+                    : "world-model bridge down (" + bridge.stateString() + ")";
+            LOGGER.info("[blockdream] {}", note);
+            if (player != null) player.sendMessage(Text.literal("[blockdream] " + note), true);
+        }
+        if (!up) return;
+
         if (++actionCounter < actionEveryTicks) return;
         actionCounter = 0;
-        ServerPlayerEntity player = server.getPlayerManager().getPlayerList().stream().findFirst().orElse(null);
         if (player == null) return;
         String action = input.actionJson(player, skill); // null on the very first tick (no prev pose)
         if (action != null) bridge.sendAction(action);
