@@ -14,6 +14,7 @@ animates the WM's dream on a block wall.
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +26,30 @@ from blockdream_wm.serve import load_real_checkpoint
 from blockdream_wm.movement import skill_id, MOVEMENT_TYPES
 
 
+def preflight_errors(checkpoint: str | Path) -> list[str]:
+    """Check external prerequisites up front. Returns one actionable line per missing piece
+    (empty list = all good) so main() can fail fast instead of dying mid-pipeline."""
+    errors: list[str] = []
+    if shutil.which("ffmpeg") is None:
+        errors.append(
+            "ffmpeg not found on PATH — install it (macOS: `brew install ffmpeg`; "
+            "Debian/Ubuntu: `apt install ffmpeg`) so frames can be encoded to mp4"
+        )
+    if shutil.which("npx") is None:
+        errors.append(
+            "npx not found on PATH — install Node.js >= 18 (https://nodejs.org or `brew install node`); "
+            "the datapack emitter runs via `npx tsx packages/cli/src/index.ts`"
+        )
+    ckpt = Path(checkpoint)
+    if not ckpt.is_file():
+        errors.append(
+            f"checkpoint not found: {ckpt} — run from ml/ so the default "
+            "`runs/skills_real/latest.pt` resolves, or pass --checkpoint <path> "
+            "(train one with scripts/train_real.sh if you have none)"
+        )
+    return errors
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("cast_wm_to_datapack")
     ap.add_argument("--checkpoint", default="runs/skills_real/latest.pt")
@@ -34,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default="/tmp/wmcast")
     ap.add_argument("--device", default="cpu")
     args = ap.parse_args(argv)
+
+    errors = preflight_errors(args.checkpoint)
+    if errors:
+        for e in errors:
+            print(f"[cast] preflight: {e}", file=sys.stderr)
+        return 1
 
     out = Path(args.out)
     frames_dir = out / "_frames"

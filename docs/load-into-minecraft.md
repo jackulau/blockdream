@@ -83,6 +83,27 @@ scripts/frames.js
 
 ---
 
+## Casting the world model's dream (offline)
+
+You can also feed the pipeline straight from the **neural world model** — no source clip
+needed. `ml/scripts/cast_wm_to_datapack.py` rolls the skill-conditioned WM checkpoint N
+steps, encodes the generated frames with ffmpeg, and drives the same CLI to emit a vanilla
+Java datapack animation of the dream:
+
+```bash
+cd ml && .venv/bin/python scripts/cast_wm_to_datapack.py --skill walk --steps 24 --out /tmp/wmcast
+# → /tmp/wmcast/blockdream.zip — drop into <World>/datapacks/, /reload,
+#   /function blockdream:setup, then start playback as above
+```
+
+One command, one droppable `.zip`. The script preflights ffmpeg / npx / the checkpoint up
+front and tells you exactly what's missing. This is the **offline twin** of the live path:
+the Fabric mod (`mods/java-fabric`, see [`live-control.md`](./live-control.md)) streams and
+*controls* the WM in a running game, while this casts a fixed rollout into a mod-free,
+shareable datapack. Smoke-tested in `ml/tests/test_cast_datapack.py`.
+
+---
+
 ## Verifying without a client
 
 Every pack is proven in CI without a running game:
