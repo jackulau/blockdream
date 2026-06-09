@@ -8,8 +8,8 @@ Checkpoints/data/runs are gitignored (local only).
 
 | model | code | what it is | served from |
 |---|---|---|---|
-| **Minecraft AR** (primary) | `transition_ar.py` `ARTransition` | MineWorld-style: next-frame VQ tokens from `[action, prev tokens]`, autoregressive, KV-cached | `runs/m4/latest.pt` |
-| **Skill-conditioned AR** | `movement.py` `SkillRealEncoder` + `train_long.py` | adds a per-movement-type embedding so the 9 movement types produce distinct dynamics | `runs/skills/latest.pt` |
+| **Minecraft AR** (base) | `transition_ar.py` `ARTransition` | MineWorld-style: next-frame VQ tokens from `[action, prev tokens]`, autoregressive, KV-cached | `runs/m4` is **not served** (walking-only — dead skill embeddings) |
+| **Skill-conditioned AR** (primary, served) | `movement.py` `SkillRealEncoder` + `train_long.py` | adds a per-movement-type embedding so the 9 movement types produce distinct dynamics; trained on genuine per-skill footage | `runs/skills_real/latest.pt` |
 | **Latent diffusion** (browser) | `transition_diffusion.py` `LatentDiffusionTransition` | rectified-flow over continuous VAE latents, few-step Euler — the >=30fps in-browser route | exported ONNX |
 | **Driving** | `drive/transition.py` `DriveTransition` | multimodal driving world model (RGB + LiDAR + telemetry) | `runs/drive/latest.pt` |
 
@@ -42,9 +42,10 @@ stops cleanly on `--max-minutes` or a `<out>/STOP` file.
 bash ml/scripts/serve_demo.sh
 
 # …or individually. Minecraft AR over WebSocket (CPU beats MPS for sequential token decode).
-# Serve runs/skills (skill-conditioned) so the movement dropdown works — NOT runs/m4, whose skill
-# embeddings are dead (real-VPT walking-only → every movement type renders identical).
-.venv/bin/python -m blockdream_wm.serve --real runs/skills/latest.pt --device cpu  # :8765
+# Serve runs/skills_real (skill-conditioned, real footage) so the movement dropdown works — NOT
+# runs/m4, whose skill embeddings are dead (real-VPT walking-only → every movement type renders
+# identical).
+.venv/bin/python -m blockdream_wm.serve --real runs/skills_real/latest.pt --device cpu  # :8765
 # Driving
 .venv/bin/python -m blockdream_wm.drive.serve --checkpoint runs/drive/latest.pt # :8766
 ```
@@ -52,7 +53,7 @@ bash ml/scripts/serve_demo.sh
 The web demo (`apps/web`, `pnpm --filter web dev`) auto-connects to both. Display is **decoupled**
 from generation: a rAF loop redraws the latest frame every refresh (smooth display fps) while a
 pump requests the next frame only when the previous arrives (true gen fps). Logging level via
-`MINEWORLD_LOG=DEBUG` (per-step latency).
+`BLOCKDREAM_LOG=DEBUG` (per-step latency).
 
 ## Movement types
 
@@ -62,9 +63,10 @@ contractor data is walking/general only, so the other skills need their own grad
 - **Synthetic, fast, provable:** `scripts/gen_movement_data.py` writes per-skill pools with
   distinct learnable dynamics (colour cast + scroll speed + bob) in the real on-disk format;
   `goal020_train_skills.sh` trains one skill-conditioned model on all 9.
-- **Verify it works:** `scripts/verify_movement_types.py --checkpoint runs/skills/latest.pt` rolls
-  every type out from the same seed and asserts the rollouts diverge (the embedding actually steers
-  the world). Real per-skill footage drops into the same pool layout to scale up.
+- **Verify it works:** `scripts/verify_movement_types.py --checkpoint runs/skills_real/latest.pt`
+  rolls every type out from the same seed and asserts the rollouts diverge (the embedding actually
+  steers the world). Real per-skill footage drops into the same pool layout — that's how the served
+  `runs/skills_real` checkpoint was trained (all 9 types on genuine footage, see below).
 
 ## Real data (Mineflayer) — the comma.ai path
 

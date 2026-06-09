@@ -82,8 +82,8 @@ plus **Oasis/MineWorld** for stable real-time recursive rollout.
 
 ## Run it
 ```bash
-python -m blockdream_wm.drive.train --rollouts 40 --device mps --out ml/checkpoints/drive.pt
-python -m blockdream_wm.drive.serve --checkpoint ml/checkpoints/drive.pt --port 8766
+python -m blockdream_wm.drive.train --rollouts 40 --device mps --out ml/runs/drive/latest.pt
+python -m blockdream_wm.drive.serve --checkpoint ml/runs/drive/latest.pt --port 8766
 # open apps/web /driving.html → Connect → drive with arrows (RGB + LiDAR BEV + telemetry HUD)
 ```
 

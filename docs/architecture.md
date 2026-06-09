@@ -9,7 +9,7 @@ sharing a colour-matching core and a custom voxel engine.
   OKLab, emitted for both Java and Bedrock (maps, structures, datapacks, behaviour packs). 2D
   (flat walls) and 3D (voxel builds) outputs.
 - **Workstream B — Neural world model.** Action-conditioned, interactive Minecraft world model.
-  An autoregressive (AR) VQ-token model (served from `ml/runs/m4`) plus a latent-diffusion track
+  A skill-conditioned autoregressive (AR) VQ-token model (served from `ml/runs/skills_real`) plus a latent-diffusion track
   exported to ONNX for a server-free, in-browser ">=30fps" engine. A separate driving world model
   reuses the same core. See [world-models-guide.md](./world-models-guide.md).
 

@@ -6,7 +6,7 @@ Verified June 2026 (HuggingFace API status + file manifests, not just model card
 
 | Model | Repo | Status | Size | License | Hardware |
 |---|---|---|---|---|---|
-| **MineWorld** (Microsoft, our namesake) | `microsoft/mineworld` | ❌ **weights 401 / taken down** (May 2025, still down) — code only | — | MIT (code) | — |
+| **MineWorld** (Microsoft, our original namesake pre-rebrand) | `microsoft/mineworld` | ❌ **weights 401 / taken down** (May 2025, still down) — code only | — | MIT (code) | — |
 | **Oasis-500m** (Etched/Decart) | `Etched/oasis-500m` | ✅ gated (1-click accept) | 3.35 GB | MIT | ~8–10 GB VRAM; CPU very slow |
 | **Matrix-Game 1.0** (Skywork) | `Skywork/Matrix-Game` | ✅ public, highest fidelity | **87 GB** (17B) | MIT | A100/H100 only |
 | **Lucid v1** | `ramimmo/lucidv1` | ✅ public, realtime on 4090 | 3.45 GB | CC-BY-NC (non-commercial) | RTX 4090 |
@@ -39,7 +39,7 @@ fetch VPT (video + actions)  →  extract frames + map actions  →  train  → 
   real-but-blurry model (proven: recon-mse 0.0035; learns sky/grass/horizon).
 - `bash ml/scripts/train_real.sh --full` — 20 segments, 128px, 4000 steps → run on
   a GPU for Minecraft-quality fidelity. Same code, scaled.
-- Serve: `python -m mineworld_wm.serve --real ml/checkpoints/vpt.pt`, then drive it
+- Serve: `python -m blockdream_wm.serve --real ml/checkpoints/vpt.pt`, then drive it
   in the web tester (`/world-model.html`).
 
 ### VPT action format → our action space (`vpt_actions.py`)
@@ -85,7 +85,7 @@ bash ml/scripts/train_real.sh --m4 80 80000
 
 (data prep = ~172 MB/segment download + ffmpeg extract; tokenizer trains first,
 then the AR transition — the AR steps dominate). Serve when done:
-`python -m mineworld_wm.serve --real ml/checkpoints/vpt.pt`.
+`python -m blockdream_wm.serve --real ml/checkpoints/vpt.pt`.
 
 ### Multi-day run (hardened, hourly checkpoints)
 For a long, days-long run use the production trainer (`train_long.py`) via:
@@ -105,9 +105,12 @@ It is built for unattended multi-day training:
 - **Two-phase** — tokenizer first (40k steps), tokens cached, then AR ~forever.
 - Stop gracefully any time: `touch ml/runs/m4/STOP` (saves a final checkpoint).
 
-Run it under `nohup`/`tmux` (or just leave the terminal open); serve the latest
-checkpoint while it trains: `python -m mineworld_wm.serve --real ml/runs/m4/latest.pt`.
-More `segments` = more data = sharper (bounded by the 24 GB / 128px ceiling).
+Run it under `nohup`/`tmux` (or just leave the terminal open). More `segments` =
+more data = sharper (bounded by the 24 GB / 128px ceiling). Note this `m4` run is
+real-VPT walking-only — its skill embeddings are dead, so don't serve it for the
+demo; serve the skill-conditioned real-footage checkpoint instead:
+`python -m blockdream_wm.serve --real ml/runs/skills_real/latest.pt` (or just run
+`bash ml/scripts/serve_demo.sh`, which picks the correct checkpoints).
 
 ## Honest limits
 - CPU-only here → small data + few steps → blurry. The pipeline is real and
