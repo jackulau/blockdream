@@ -1,3 +1,4 @@
+export * from "./block-resolver";
 export * from "./delta";
 export * from "./chunk";
 export * from "./validate";
