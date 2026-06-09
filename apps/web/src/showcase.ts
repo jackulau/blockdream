@@ -9,6 +9,8 @@ import { createBlockArt } from "./blockart-core";
 import { preparePalette, quantizeFrame, type RgbImage } from "@blockdream/color-core";
 import javaMapPalette from "@blockdream/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@blockdream/palette";
+// Pure-data subpath (no node:fs/url) so the browser bundle never pulls in the fs-based palette loaders.
+import { JAVA_DATAPACK_SUPPORTED } from "@blockdream/palette/versions";
 import {
   imageToSolid,
   objToVolume,
@@ -173,7 +175,10 @@ baDrop.addEventListener("drop", (ev) => {
 $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
   const q = ba.getFrame();
   if (!q) return;
-  const pack = generateJavaDatapack([q], resolveBlock, { namespace: "blockdream_art" });
+  const pack = generateJavaDatapack([q], resolveBlock, {
+    namespace: "blockdream_art",
+    supportedFormats: JAVA_DATAPACK_SUPPORTED,
+  });
   $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream_art:setup`;
   downloadDatapack("blockdream-blockart-datapack", pack.files);
 });
@@ -410,6 +415,7 @@ async function setup3dViewer(): Promise<void> {
     if (!current3d.length) return;
     const pack = generateVoxelDatapack(current3d, resolveBlock, {
       namespace: "blockdream_3d",
+      supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
     });
     const cmds = pack.totalCommands ?? pack.totalSetblocks;

@@ -1,5 +1,8 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { PALETTE_DATA } from "./versions";
+
+export * from "./versions";
 
 /** A single renderable Minecraft map color. */
 export interface MapColor {
@@ -32,19 +35,38 @@ const DATA_DIR = fileURLToPath(new URL("../data/", import.meta.url));
 const cache = new Map<string, MapPalette>();
 
 /**
+ * Resolve a requested version to the palette data file that carries those colors.
+ * Tries `<prefix>-<version>.json` first (so a future version-specific file wins
+ * if added later), then falls back to the canonical file for the supported line.
+ * The map-color table and solid-block colors are stable across all of 1.21.x, so
+ * any patch version aliases cleanly to the canonical file instead of an ENOENT.
+ */
+function resolveFileKey(prefix: string, version: string, canonical: string): string {
+  const candidates = version === canonical ? [version] : [version, canonical];
+  for (const v of candidates) {
+    const fileKey = `${prefix}-${v}`;
+    if (existsSync(`${DATA_DIR}${fileKey}.json`)) return fileKey;
+  }
+  throw new Error(`no palette data for ${prefix} version "${version}" (have "${canonical}")`);
+}
+
+function loadJson<T>(fileKey: string): T {
+  return JSON.parse(readFileSync(`${DATA_DIR}${fileKey}.json`, "utf8")) as T;
+}
+
+/**
  * Load the Java map-color palette for a pinned version (default 1.21.9).
  *
  * These are the colors written directly into a filled map's `colors` byte array.
  * Because we author that array ourselves, the game does NOT biome-tint them — all
  * 244 ids (61 bases × 4 shades) are usable verbatim on both Java and Bedrock.
  */
-export function getJavaMapPalette(version = "1.21.9"): MapPalette {
-  const key = `java-map-colors-${version}`;
-  const hit = cache.get(key);
+export function getJavaMapPalette(version: string = PALETTE_DATA.javaMap): MapPalette {
+  const fileKey = resolveFileKey("java-map-colors", version, PALETTE_DATA.javaMap);
+  const hit = cache.get(fileKey);
   if (hit) return hit;
-  const raw = readFileSync(`${DATA_DIR}${key}.json`, "utf8");
-  const parsed = JSON.parse(raw) as MapPalette;
-  cache.set(key, parsed);
+  const parsed = loadJson<MapPalette>(fileKey);
+  cache.set(fileKey, parsed);
   return parsed;
 }
 
@@ -58,13 +80,12 @@ export function indexByMapColorId(p: MapPalette): Map<number, MapColor> {
  * editions, and direct-written maps are not biome-tinted on either edition, so
  * this is the same RGB table as Java — verified equal by test.
  */
-export function getBedrockMapPalette(version = "1.21"): MapPalette {
-  const key = `bedrock-map-colors-${version}`;
-  const hit = cache.get(key);
+export function getBedrockMapPalette(version: string = PALETTE_DATA.bedrockMap): MapPalette {
+  const fileKey = resolveFileKey("bedrock-map-colors", version, PALETTE_DATA.bedrockMap);
+  const hit = cache.get(fileKey);
   if (hit) return hit;
-  const raw = readFileSync(`${DATA_DIR}${key}.json`, "utf8");
-  const parsed = JSON.parse(raw) as MapPalette;
-  cache.set(key, parsed);
+  const parsed = loadJson<MapPalette>(fileKey);
+  cache.set(fileKey, parsed);
   return parsed;
 }
 
@@ -142,13 +163,12 @@ export interface BlockColorPalette {
 }
 
 /** The wide-gamut biome-independent solid-block color set (~301 blocks). */
-export function getFullBlockColorPalette(version = "1.21"): BlockColorPalette {
-  const key = `java-block-colors-${version}`;
-  const hit = cache.get(key) as unknown as BlockColorPalette | undefined;
+export function getFullBlockColorPalette(version: string = PALETTE_DATA.block): BlockColorPalette {
+  const fileKey = resolveFileKey("java-block-colors", version, PALETTE_DATA.block);
+  const hit = cache.get(fileKey) as unknown as BlockColorPalette | undefined;
   if (hit) return hit;
-  const raw = readFileSync(`${DATA_DIR}${key}.json`, "utf8");
-  const parsed = JSON.parse(raw) as BlockColorPalette;
-  cache.set(key, parsed as unknown as MapPalette);
+  const parsed = loadJson<BlockColorPalette>(fileKey);
+  cache.set(fileKey, parsed as unknown as MapPalette);
   return parsed;
 }
 
@@ -183,13 +203,12 @@ export function getFullBlockMapPalette(version = "1.21"): {
   };
 }
 
-export function getJavaBlockPalette(version = "1.21"): BlockPalette {
-  const key = `java-block-palette-${version}`;
-  const hit = cache.get(key) as BlockPalette | undefined;
+export function getJavaBlockPalette(version: string = PALETTE_DATA.block): BlockPalette {
+  const fileKey = resolveFileKey("java-block-palette", version, PALETTE_DATA.block);
+  const hit = cache.get(fileKey) as unknown as BlockPalette | undefined;
   if (hit) return hit;
-  const raw = readFileSync(`${DATA_DIR}${key}.json`, "utf8");
-  const parsed = JSON.parse(raw) as BlockPalette;
-  cache.set(key, parsed as unknown as MapPalette);
+  const parsed = loadJson<BlockPalette>(fileKey);
+  cache.set(fileKey, parsed as unknown as MapPalette);
   return parsed;
 }
 

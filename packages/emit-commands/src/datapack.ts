@@ -8,6 +8,12 @@ export interface DatapackOptions {
   namespace?: string;
   /** pack_format: 48 = MC 1.21.0 (singular folder layout). Override per target. */
   packFormat?: number;
+  /**
+   * `supported_formats` range written to pack.mcmeta so a SINGLE datapack loads
+   * without the "incompatible" warning across the whole supported version line
+   * (the function content is uniform across 1.21.x). Omitted if undefined.
+   */
+  supportedFormats?: { min_inclusive: number; max_inclusive: number };
   description?: string;
   /** world origin of the wall's bottom-left, +Z facing. Default {x:0,y:64,z:0}. */
   origin?: { x: number; y: number; z: number };
@@ -181,19 +187,16 @@ export function generateJavaDatapack(
     JSON.stringify({ values: [`${ns}:driver`] }, null, 2) + "\n",
   );
 
-  files.set(
-    "pack.mcmeta",
-    JSON.stringify(
-      {
-        pack: {
-          pack_format: packFormat,
-          description: opts.description ?? `blockdream block-art video (${W}×${H}, ${frames.length} frames)`,
-        },
-      },
-      null,
-      2,
-    ) + "\n",
-  );
+  const packMeta: {
+    pack_format: number;
+    description: string;
+    supported_formats?: { min_inclusive: number; max_inclusive: number };
+  } = {
+    pack_format: packFormat,
+    description: opts.description ?? `blockdream block-art video (${W}×${H}, ${frames.length} frames)`,
+  };
+  if (opts.supportedFormats) packMeta.supported_formats = opts.supportedFormats;
+  files.set("pack.mcmeta", JSON.stringify({ pack: packMeta }, null, 2) + "\n");
 
   return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks, totalCommands };
 }

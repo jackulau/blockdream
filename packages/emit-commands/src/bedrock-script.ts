@@ -48,6 +48,12 @@ system.runInterval(() => {
   applyFrame(frameIndex);
 });
 
+// Frames are delta-encoded (frame 0 is the full keyframe, later frames only the
+// changed cells). Draw frame 0 once on load — deferred a tick so the world is
+// ready — so autoplay starts from the keyframe instead of applying frame 1's
+// delta onto an empty wall. (Manual !mw start calls reset() itself.)
+system.run(() => { if (playing) reset(); });
+
 world.afterEvents.chatSend?.subscribe((ev) => {
   const msg = ev.message.trim();
   if (!msg.startsWith("!mw")) return;

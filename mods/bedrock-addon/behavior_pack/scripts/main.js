@@ -56,6 +56,13 @@ system.runInterval(() => {
   applyFrame(frameIndex);
 });
 
+// Draw the keyframe once on load (deferred a tick so the world is ready) so
+// autoplay starts from frame 0 instead of applying frame 1's delta onto an
+// empty wall. Manual `!mw start` calls reset() itself.
+system.run(() => {
+  if (playing) reset();
+});
+
 world.afterEvents.chatSend?.subscribe((ev) => {
   const msg = ev.message.trim();
   if (!msg.startsWith("!mw")) return;
