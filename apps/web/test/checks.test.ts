@@ -2,6 +2,8 @@
 // These are texture-free, source-only checks:
 //  - browser-safe: the emit-commands "." entry pulls in no node: builtins (vite must bundle it)
 //  - render-loop: the viewer's display is decoupled from generation (smooth canvas regardless of gen rate)
+//  - docs gate (repo-root scripts/check-docs.mjs): required docs + sections, no stale serve paths,
+//    no pre-rebrand identifiers, python -m snippets map to real modules
 // (check-texture-coverage.mjs needs the gitignored local block textures, so it stays a manual `pnpm check`.)
 
 import { describe, it, expect } from "vitest";
@@ -9,10 +11,11 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const scripts = fileURLToPath(new URL("../scripts/", import.meta.url));
+const rootScripts = fileURLToPath(new URL("../../../scripts/", import.meta.url));
 
-function run(name: string): { code: number; out: string } {
+function run(name: string, cwd: string = scripts): { code: number; out: string } {
   try {
-    const out = execFileSync("node", [name], { cwd: scripts, encoding: "utf8" });
+    const out = execFileSync("node", [name], { cwd, encoding: "utf8" });
     return { code: 0, out };
   } catch (e) {
     const err = e as { status?: number; stdout?: string; stderr?: string };
@@ -30,6 +33,13 @@ describe("web invariant checks (wired into CI)", () => {
   it("viewer display loop is decoupled from generation", () => {
     const r = run("check-render-loop.mjs");
     expect(r.out).toContain("decoupled");
+    expect(r.code).toBe(0);
+  });
+
+  it("docs are fresh: required docs present, no stale serve paths or pre-rebrand identifiers", () => {
+    const r = run("check-docs.mjs", rootScripts);
+    expect(r.out).toContain("required docs present");
+    expect(r.out).toContain("no pre-rebrand identifiers or stale serve paths");
     expect(r.code).toBe(0);
   });
 });
