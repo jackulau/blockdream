@@ -251,15 +251,37 @@ async function recordSkill(skill) {
   console.log(`[collect] ${skill}: wrote ${log.length} ticks + ${mp4}  skill_ok=${(skillOk * 100).toFixed(0)}%`);
   bot.quit();
   await sleep(1500);
+  return skillOk;
 }
 
+// Run every skill, continuing past per-skill failures, but TRACK each outcome so a bad run can't
+// masquerade as a good one (previously this always exited 0, even if every skill failed).
+const SKILL_OK_MIN = 0.8; // a clip that was in-state < 80% of ticks is not trustworthy training data
+const results = []; // { skill, status: "ok" | "low_score" | "failed", skillOk?, error? }
 for (const skill of SKILLS) {
+  const name = skill.trim();
   try {
-    await recordSkill(skill.trim());
+    const skillOk = await recordSkill(name);
+    results.push({ skill: name, status: skillOk >= SKILL_OK_MIN ? "ok" : "low_score", skillOk });
   } catch (e) {
-    console.error(`[collect] ${skill} FAILED: ${e.message}`);
+    console.error(`[collect] ${name} FAILED: ${e.message}`);
+    results.push({ skill: name, status: "failed", error: e.message });
   }
 }
 if (_rcon) await _rcon.end().catch(() => {}); // close the shared RCON socket so the process can exit
-console.log("[collect] done. Import with ml/scripts/import_mineflayer.py");
-process.exit(0);
+
+// Final summary: one line per skill, then exit nonzero if ANY skill failed or self-verified weakly.
+console.log("\n[collect] ===== summary =====");
+console.log(`  ${"skill".padEnd(10)} ${"status".padEnd(10)} skill_ok`);
+for (const r of results) {
+  const score = r.skillOk != null ? `${(r.skillOk * 100).toFixed(0)}%` : "-";
+  const detail = r.status === "failed" ? `  (${r.error})` : r.status === "low_score" ? `  (< ${SKILL_OK_MIN * 100}%)` : "";
+  console.log(`  ${r.skill.padEnd(10)} ${r.status.padEnd(10)} ${score}${detail}`);
+}
+const failures = results.filter((r) => r.status !== "ok");
+if (failures.length) {
+  console.error(`[collect] ${failures.length}/${results.length} skill(s) failed or scored skill_ok < ${SKILL_OK_MIN} — NOT a clean run.`);
+} else {
+  console.log("[collect] all skills ok. Import with ml/scripts/import_mineflayer.py");
+}
+process.exit(failures.length ? 1 : 0);

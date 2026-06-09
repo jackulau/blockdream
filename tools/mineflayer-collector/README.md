@@ -63,6 +63,11 @@ node collect.mjs --host localhost --port 25565 \
 # -> out/<skill>.mp4  +  out/<skill>.json   (frames + per-tick action & physics)
 ```
 
+> **Back up `out/` — it is irreplaceable SOURCE footage.** `out/*.mp4` + `out/*.json` are the raw
+> recordings everything downstream is derived from, and they are swallowed by the generic `out/`
+> gitignore (never committed). Copy them somewhere safe before deleting anything or re-running the
+> collector — a re-run **overwrites** existing `out/<skill>.mp4` / `out/<skill>.json` in place.
+
 ## 3. Import into the trainer's pool format
 
 ```bash
