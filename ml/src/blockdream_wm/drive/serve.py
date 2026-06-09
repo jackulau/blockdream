@@ -52,6 +52,16 @@ class DriveSession:
         self.step_idx += 1
         return self._decode()
 
+    def fork(self) -> "DriveSession":
+        """Independent recursive state (tokens/LiDAR/telemetry) over the SAME model
+        weights — one per WebSocket connection. Skips __init__ so the checkpoint is
+        not re-loaded; reset() clones the shared init tensors into fresh state."""
+        s = object.__new__(DriveSession)
+        s.device, s.tok, s.trans, s.grid, s._init = self.device, self.tok, self.trans, self.grid, self._init
+        s.step_idx = 0
+        s.reset()
+        return s
+
 
 def _finite4(x: float) -> float:
     """Round to 4 dp, mapping NaN/Inf → 0.0 so the JSON we emit is always valid + plottable
@@ -63,6 +73,10 @@ def _finite4(x: float) -> float:
 class DriveServer:
     def __init__(self, session: DriveSession):
         self.session = session
+
+    def fork(self) -> "DriveServer":
+        """A server over an independent session (shared weights) — one per connection."""
+        return DriveServer(self.session.fork())
 
     def handle(self, msg: dict) -> dict:
         t = msg.get("type")
@@ -86,17 +100,37 @@ def load_drive_session(path: str, device: str = "auto") -> DriveSession:
     return DriveSession(torch.load(path, map_location="cpu", weights_only=False), device=device)
 
 
-async def run_ws(server: DriveServer, host: str = "127.0.0.1", port: int = 8766):  # pragma: no cover
-    import asyncio
+def ws_handler(server: DriveServer):
+    """Per-connection WebSocket handler factory (same hardening as ..serve.ws_handler):
+    each connection drives its OWN forked session so concurrent clients cannot corrupt
+    each other's recursive state, and malformed messages get an {"error": ...} reply
+    instead of tearing the connection down."""
     import json
-    import websockets
 
     async def handler(ws):
-        async for raw in ws:
-            await ws.send(json.dumps(server.handle(json.loads(raw))))
+        conn = server.fork()  # per-connection rollout state (weights shared)
+        try:
+            async for raw in ws:
+                try:
+                    msg = json.loads(raw)
+                    if not isinstance(msg, dict):
+                        raise TypeError(f"expected a JSON object, got {type(msg).__name__}")
+                    reply = conn.handle(msg)
+                except Exception as e:  # bad message: report it, keep the socket alive
+                    reply = {"type": "error", "error": f"{type(e).__name__}: {e}".splitlines()[0]}
+                await ws.send(json.dumps(reply))
+        finally:
+            conn.session.tokens = conn.session.lidar = conn.session.tel = None  # free state
+
+    return handler
+
+
+async def run_ws(server: DriveServer, host: str = "127.0.0.1", port: int = 8766):  # pragma: no cover
+    import asyncio
+    import websockets
 
     print(f"[drive.serve] driving world model on ws://{host}:{port}")
-    async with websockets.serve(handler, host, port):
+    async with websockets.serve(ws_handler(server), host, port):
         await asyncio.Future()
 
 

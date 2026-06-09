@@ -102,12 +102,28 @@ class WorldModelSession:
         self.step_idx += 1
         return StepResult(self.step_idx, frame)
 
+    def fork(self) -> "WorldModelSession":
+        """Independent rollout state over the SAME model weights.
+
+        Used to give each WebSocket connection its own session: `.to()` on a module is
+        in-place, so the constructor shares tok/enc/trans rather than copying them —
+        only the rollout cache (`_prev`), step counter and skill are per-fork.
+        """
+        s = WorldModelSession(self.cfg, self.tok, self.enc, self.trans, device=self.device)
+        s.default_init = self.default_init
+        s.skill = self.skill
+        return s
+
 
 class RolloutServer:
     """JSON message handler — same logic over in-process calls or a WebSocket."""
 
     def __init__(self, session: WorldModelSession):
         self.session = session
+
+    def fork(self) -> "RolloutServer":
+        """A server over an independent rollout session (shared weights) — one per connection."""
+        return RolloutServer(self.session.fork())
 
     def _set_skill(self, msg: dict) -> None:
         if "skill" in msg and msg["skill"] is not None:
@@ -139,22 +155,50 @@ class RolloutServer:
         }
 
 
+def ws_handler(server: RolloutServer):
+    """Per-connection WebSocket handler factory.
+
+    Each connection gets its OWN forked session (the browser demo and the Fabric mod
+    both default to ws://127.0.0.1:8765; interleaving reset/skill/step against one
+    shared rollout cache corrupts both streams). Model weights stay shared; only the
+    rollout state is per-connection, created on connect and dropped on disconnect.
+
+    Malformed messages (bad JSON, wrong field types) get an {"error": ...} reply and
+    the connection stays alive instead of the exception tearing the handler down.
+    """
+    import json
+
+    async def handler(ws):
+        conn = server.fork()  # per-connection rollout state (weights shared)
+        LOG.debug("client connected: forked session")
+        try:
+            async for raw in ws:
+                try:
+                    msg = json.loads(raw)
+                    if not isinstance(msg, dict):
+                        raise TypeError(f"expected a JSON object, got {type(msg).__name__}")
+                    reply = conn.handle(msg)
+                except Exception as e:  # bad message: report it, keep the socket alive
+                    reply = {"type": "error", "error": f"{type(e).__name__}: {e}".splitlines()[0]}
+                await ws.send(json.dumps(reply))
+        finally:
+            conn.session._prev = None  # free this connection's rollout cache
+            LOG.debug("client disconnected: session freed")
+
+    return handler
+
+
 async def run_ws(server: RolloutServer, host: str = "127.0.0.1", port: int = 8765) -> None:  # pragma: no cover
     """Serve over a real WebSocket (requires `pip install websockets`)."""
     import asyncio
-    import json
 
     try:
         import websockets
     except ImportError as e:  # pragma: no cover
         raise SystemExit("run_ws needs the 'websockets' package: pip install websockets") from e
 
-    async def handler(ws):
-        async for raw in ws:
-            await ws.send(json.dumps(server.handle(json.loads(raw))))
-
     LOG.info("world-model serving on ws://%s:%d (demo=%s)", host, port, server.session.cfg.demo.name)
-    async with websockets.serve(handler, host, port):
+    async with websockets.serve(ws_handler(server), host, port):
         await asyncio.Future()
 
 
