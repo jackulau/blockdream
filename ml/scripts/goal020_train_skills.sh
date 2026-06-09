@@ -32,9 +32,9 @@ log "pools = $POOLS"
 # preset=quick → 256 tokens/frame at 64px (downsample 4) — 4x the spatial detail of m4's 64
 # tokens, so the per-skill colour cast/scroll actually render; smaller dim192 net converges faster.
 # Strong tokenizer (8k steps) is essential: the first run gave the tokenizer ~1min → mushy decode
-# that collapsed all skills to the same blur. Full-wipe the dir on a fresh run (a stale tokens.pt /
+# that collapsed all skills to the same blur. Archive the dir aside on a fresh run (a stale tokens.pt /
 # latest.pt from a different preset has a different token count → shape crash on resume).
-rm -rf runs/skills
+if [ -d runs/skills ]; then mv runs/skills "runs/skills.bak.$(date +%Y%m%d%H%M%S)"; fi
 log "training skill-conditioned model -> runs/skills (preset=quick, best-by-val, strong signal, ~28min)…"
 "$PY" -m blockdream_wm.train_long --pools "$POOLS" --out runs/skills \
   --preset quick --device mps --tok-steps 5000 --ar-steps 14000 \
