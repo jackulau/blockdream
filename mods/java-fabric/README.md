@@ -5,6 +5,17 @@ frame (the vanilla datapack path), this swaps each filled map's 16384-byte color
 array per tick and lets the server resend the map packet — cheap enough for real
 video on a wall of item-frame maps.
 
+## Quick install
+This mod is the **high-fps alternative** — the project's primary paths need no
+Fabric at all (see [`../../docs/play-without-fabric.md`](../../docs/play-without-fabric.md)).
+If you want the upgrade, the helper script does the JDK 21 preflight + jar build
+and prints the manual install steps:
+
+```bash
+bash scripts/fabric-install.sh              # from the repo root
+bash scripts/fabric-install.sh --build-only # just the jar
+```
+
 ## Status
 **Code complete; builds locally.** Compiled with the pinned Gradle 8.10 wrapper on
 JDK 21 — Fabric Loom for Minecraft 1.21.1 requires that *Gradle itself* runs on
