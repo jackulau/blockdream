@@ -16,7 +16,12 @@
     "@blockdream/emit-java": "workspace:*",
     "@blockdream/emit-bedrock": "workspace:*",
     "@blockdream/emit-commands": "workspace:*",
-    "@blockdream/voxel": "workspace:*"
+    "@blockdream/voxel": "workspace:*",
+    "rcon-client": "^4.2.5",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
   },
   "files": ["src"]
 }
