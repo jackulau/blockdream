@@ -37,3 +37,19 @@ apps/web/scripts/.cache/
 
 # exported diffusion ONNX — generated artifact (ml/scripts/goal020_diffusion.sh), local-only
 apps/web/public/onnx/
+
+# gradle outputs (incl. Mojang-derived loom-cache jars — must NEVER be committed)
+mods/java-fabric/.gradle/
+mods/java-fabric/build/
+
+# browser-automation session dumps
+.playwright-mcp
+
+# per-developer workflow state (like .claude-workspace/)
+tasks/
+
+# collector telemetry JSON is small + irreplaceable source data — carve it out of the global out/ rule
+# (mp4s stay ignored; backup expectation documented in tools/mineflayer-collector/README.md)
+!tools/mineflayer-collector/out/
+tools/mineflayer-collector/out/*
+!tools/mineflayer-collector/out/*.json
