@@ -27,6 +27,7 @@ const REQUIRED = {
   "docs/world-models-guide.md": ["## Models", "## Train", "## Serve", "## Movement types", "## Browser diffusion"],
   "docs/driving-world-model.md": ["## Datasets found", "## Architecture", "## Run it"],
   "docs/live-control.md": ["## Architecture", "## Operator setup"],
+  "docs/play-without-fabric.md": ["## Offline cast (datapack)", "## Live bridge (RCON)", "## Security notes", "## Fabric alternative"],
   "docs/movement-types.md": ["## How conditioning works", "## Honest status"],
   "docs/load-into-minecraft.md": ["## Java Edition", "## Bedrock Edition"],
   "docs/results.md": ["## System", "## Measured results", "## Reproduce"],

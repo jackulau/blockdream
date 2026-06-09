@@ -4,9 +4,15 @@
 world model's* predicted world streams onto a wall of in-game maps in front of them — at
 map-resend speed, not setblock speed. The player's own movement is the model's control input.
 
-This is **Java-only** and needs the bundled Fabric mod (`mods/java-fabric`). Pure-vanilla
-command blocks cannot open a socket or paint map pixels, and Bedrock can do neither natively
-(see the bottom of this page). The data pipeline is proven headless in
+This high-FPS map-wall version is **Java-only** and needs the bundled Fabric mod
+(`mods/java-fabric`). The technical constraint is real: pure-vanilla command blocks cannot
+open a socket or paint map pixels, there is no client-side input capture without mods, and
+Bedrock can do none of it natively (see the bottom of this page). But there **is** a shipped
+no-mod live path: the **RCON sidecar** ([`packages/cli/src/rcon-bridge.ts`](../packages/cli/src/rcon-bridge.ts))
+runs *outside* the game, polls a stock vanilla server's player pose over RCON, and paints
+the model's frames as a solid-block wall — genuinely live at **~2 fps** (every block is an
+RCON round-trip). Setup: [`play-without-fabric.md`](./play-without-fabric.md). The data
+pipeline is proven headless in
 [`packages/cli/src/control-sim.ts`](../packages/cli/src/control-sim.ts) +
 `control-sim.test.ts` — no JVM/client needed to verify the contract.
 
@@ -39,6 +45,9 @@ command blocks cannot open a socket or paint map pixels, and Bedrock can do neit
 
 ## Operator setup (Java)
 
+> No Fabric? Follow [`play-without-fabric.md`](./play-without-fabric.md) instead — the
+> RCON sidecar needs only steps like these plus a stock vanilla server (`scripts/vanilla-server.sh`).
+
 1. **Run the world-model server** (from `ml/`):
    ```bash
    python -m blockdream_wm.serve --real runs/skills_real/latest.pt   # ws://127.0.0.1:8765
@@ -69,12 +78,17 @@ If `live.json` is absent the mod falls back to **static** `frames.bin` playback
 
 ## Why not pure vanilla, and why not Bedrock-native
 
-| Capability | Vanilla datapack | Java + Fabric mod | Bedrock |
-|---|---|---|---|
-| Open a socket to the model server | ❌ | ✅ | ❌ (no outbound socket in stable Script API) |
-| Read per-tick player input as control | ⚠️ scoreboard-only, coarse | ✅ (server pose delta) | ⚠️ Script API, limited |
-| Paint arbitrary pixels fast (map resend) | ❌ | ✅ (`MapState.colors`) | ❌ (no map-pixel API) |
-| **Live model control onto a screen** | ❌ | ✅ | ❌ natively |
+In-game vanilla mechanisms (command blocks / datapacks) still cannot do live control —
+nothing inside the game can open a socket. The loophole is to move the socket *outside*
+the game: the RCON sidecar talks to a stock server over the vanilla RCON protocol, so
+"vanilla + sidecar" gets real live control, just slowly (setblock walls, not map packets):
+
+| Capability | Vanilla datapack | Vanilla + RCON sidecar | Java + Fabric mod | Bedrock |
+|---|---|---|---|---|
+| Open a socket to the model server | ❌ | ✅ (sidecar process owns it) | ✅ | ❌ (no outbound socket in stable Script API) |
+| Read per-tick player input as control | ⚠️ scoreboard-only, coarse | ⚠️ pose polling (~2 Hz; sprint/jump inferred, no keyboard) | ✅ (server pose delta) | ⚠️ Script API, limited |
+| Paint arbitrary pixels fast (map resend) | ❌ | ❌ (`setblock`/`fill` wall, command-budgeted) | ✅ (`MapState.colors`) | ❌ (no map-pixel API) |
+| **Live model control onto a screen** | ❌ | ✅ at ~2 fps ([`play-without-fabric.md`](./play-without-fabric.md)) | ✅ high-FPS | ❌ natively |
 
 **Bedrock path:** the only way to get this on a Bedrock *client* is to join the Java server
 through **GeyserMC** (a Bedrock-protocol proxy). The Bedrock player then sees the Java map

@@ -5,9 +5,11 @@ real, droppable packs. The block-art plays as an animated wall of solid blocks, 
 entirely by command content (a `#minecraft:tick` datapack function on Java; `tick.json` +
 a binary dispatch tree on Bedrock; or the Script API).
 
-> For high-FPS *video on maps* and live world-model control, see
-> [`live-control.md`](./live-control.md) and [`fps-budget.md`](./fps-budget.md) — those need
-> the Java Fabric mod. This page is the cross-edition, mod-free path.
+> For high-FPS *video on maps*, see [`live-control.md`](./live-control.md) and
+> [`fps-budget.md`](./fps-budget.md) — that path needs the Java Fabric mod. Live
+> world-model control also works **without** any mod via the ~2 fps RCON sidecar
+> ([`play-without-fabric.md`](./play-without-fabric.md)). This page is the cross-edition,
+> mod-free path.
 
 Generate everything:
 
@@ -26,6 +28,12 @@ Each run prints exactly what to do next. `--speed <ticks>` sets playback rate (2
 ---
 
 ## Java Edition (1.21+)
+
+> **One command, straight from the world model:** `bash scripts/cast.sh` rolls the WM and
+> emits a droppable `blockdream.zip` datapack (preflights venv/ffmpeg/checkpoint for you) —
+> see [`play-without-fabric.md`](./play-without-fabric.md). No world to drop it into?
+> `bash scripts/vanilla-server.sh --datapack <zip>` bootstraps a throwaway localhost
+> vanilla 1.21.1 server with the pack pre-installed.
 
 The emitter writes both a **folder** and a ready-to-drop **`<namespace>.zip`** (same content;
 a zipped datapack is just as valid as a folder).
@@ -86,21 +94,23 @@ scripts/frames.js
 ## Casting the world model's dream (offline)
 
 You can also feed the pipeline straight from the **neural world model** — no source clip
-needed. `ml/scripts/cast_wm_to_datapack.py` rolls the skill-conditioned WM checkpoint N
-steps, encodes the generated frames with ffmpeg, and drives the same CLI to emit a vanilla
-Java datapack animation of the dream:
+needed. The one-command path is the wrapper script (works from anywhere; preflights
+venv / ffmpeg / checkpoint and passes the absolute checkpoint path for you):
 
 ```bash
-cd ml && .venv/bin/python scripts/cast_wm_to_datapack.py --skill walk --steps 24 --out /tmp/wmcast
+bash scripts/cast.sh --skill walk --steps 24 --out /tmp/wmcast
 # → /tmp/wmcast/blockdream.zip — drop into <World>/datapacks/, /reload,
 #   /function blockdream:setup, then start playback as above
+# (no world handy? bash scripts/vanilla-server.sh --datapack /tmp/wmcast/blockdream.zip)
 ```
 
-One command, one droppable `.zip`. The script preflights ffmpeg / npx / the checkpoint up
-front and tells you exactly what's missing. This is the **offline twin** of the live path:
-the Fabric mod (`mods/java-fabric`, see [`live-control.md`](./live-control.md)) streams and
-*controls* the WM in a running game, while this casts a fixed rollout into a mod-free,
-shareable datapack. Smoke-tested in `ml/tests/test_cast_datapack.py`.
+Under the hood it runs `ml/scripts/cast_wm_to_datapack.py`, which rolls the
+skill-conditioned WM checkpoint N steps, encodes the generated frames with ffmpeg, and
+drives the same CLI to emit a vanilla Java datapack animation of the dream. This is the
+**offline twin** of the live paths: the RCON sidecar / Fabric mod
+(see [`play-without-fabric.md`](./play-without-fabric.md) / [`live-control.md`](./live-control.md))
+stream and *control* the WM in a running game, while this casts a fixed rollout into a
+mod-free, shareable datapack. Smoke-tested in `ml/tests/test_cast_datapack.py`.
 
 ---
 
