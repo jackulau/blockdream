@@ -22,9 +22,13 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => held.delete(e.key.toLowerCase()));
 
-// demo selector → movement-type (skill) the conditioned model understands
+// demo selector → movement-type (skill) the conditioned model understands.
+// Covers all 9 movement types (same order as ml/src/blockdream_wm/movement.py
+// MOVEMENT_TYPES), plus the legacy demo names the selector has always offered.
 const DEMO_SKILL: Record<string, string> = {
-  walking: "walk", boat: "boat", elytra: "elytra", world: "general", gameplay: "general",
+  general: "general", walk: "walk", sprint: "sprint", jump: "jump", swim: "swim",
+  boat: "boat", elytra: "elytra", pig: "pig", minecart: "minecart",
+  walking: "walk", world: "general", gameplay: "general",
 };
 const skill = () => DEMO_SKILL[demoSel.value] ?? "general";
 
