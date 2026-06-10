@@ -21,6 +21,7 @@ const fail = (m) => {
 
 // required docs → section headers each must contain
 const REQUIRED = {
+  "docs/guide.md": ["## Install", "## Generate", "## Choose a target", "## Pick a Minecraft version", "## Import into Java (vanilla)", "## Import into Bedrock (vanilla)", "## Troubleshooting"],
   "docs/architecture.md": ["## Workstreams", "## Packages", "## Data flow"],
   "docs/3d-and-animation.md": ["## Image → 3D", "## Greedy meshing", "## Animation"],
   "docs/video-import.md": ["## glTF", "## Video"],
