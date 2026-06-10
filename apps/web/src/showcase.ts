@@ -7,8 +7,7 @@ import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt } from "./blockart-core";
 import { preparePalette, quantizeFrame, type RgbImage } from "@blockdream/color-core";
-import javaMapPalette from "@blockdream/palette/data/java-map-colors-1.21.9.json";
-import type { MapPalette } from "@blockdream/palette";
+import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 // Pure-data subpath (no node:fs/url) so the browser bundle never pulls in the fs-based palette loaders.
 import { JAVA_DATAPACK_SUPPORTED } from "@blockdream/palette/versions";
 import {
@@ -186,7 +185,12 @@ mcViewer.connect();
 drViewer.connect();
 
 // --- 3D voxel builder + replay -------------------------------------------------
-const pal3d = preparePalette(javaMapPalette as unknown as MapPalette);
+// The 3D path quantizes against the PLACEABLE solid-block color space (same OKLab matcher
+// as the 2D pixel-art path) so what the viewer shows is exactly what the datapack places.
+// Stills get the 2D path's error-diffusion dither; animation frames stay nearest+gamut
+// (per-frame dither speckle would defeat the temporal stabilizer).
+const pal3d = preparePalette(getSolidBlockMapPalette().palette);
+const QUANT3D_STILL = { method: "floyd-steinberg", gamutMap: 0.8 } as const;
 const hexByMap = new Map<number, number>();
 for (const e of pal3d.entries) {
   const c = e.color;
@@ -283,23 +287,6 @@ async function setup3dViewer(): Promise<void> {
   let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
   const isTransformAnim = (s: string) => (TRANSFORM_ANIMS as readonly string[]).includes(s);
 
-  // nearest-downscale a quantized frame so the voxel volume stays light (3D = W×H×depth × frames)
-  function downscale(q: ReturnType<typeof quantizeFrame>, maxW: number) {
-    if (q.width <= maxW) return q;
-    const s = q.width / maxW;
-    const w = maxW;
-    const h = Math.max(1, Math.round(q.height / s));
-    const mapColorId = new Uint8Array(w * h);
-    const paletteIndex = new Int32Array(w * h);
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const p = Math.min(q.height - 1, Math.floor(y * s)) * q.width + Math.min(q.width - 1, Math.floor(x * s));
-        mapColorId[y * w + x] = q.mapColorId[p]!;
-        paletteIndex[y * w + x] = q.paletteIndex[p]!;
-      }
-    return { width: w, height: h, mapColorId, paletteIndex };
-  }
-
   // Build a genuine 3D SOLID from the current source. imageToSolid isolates the subject from the
   // background, inflates thickness by silhouette shape (a rounded dome, not a brightness emboss),
   // and centers it on the mid-plane so it reads from EVERY angle. A real per-pixel depth map
@@ -337,13 +324,14 @@ async function setup3dViewer(): Promise<void> {
 
   // initial source = the preloaded sample image (higher res than the old 28px for a sharper solid)
   const img = new Image();
-  img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, { method: "none" }));
+  img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
   img.src = "/test-assets/pixelart.png";
 
-  // "build 3D from image" voxelizes the CURRENT block-art image (downscaled) one-click
+  // "build 3D from image" re-quantizes the SOURCE colors in the 3D palette — not a nearest
+  // subsample of the already-dithered 2D map-palette frame (which compounds two quantizers)
   $<HTMLButtonElement>("v3-rebuild").addEventListener("click", () => {
-    const q = ba.getFrame();
-    setSource(q ? downscale(q, 40) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 40), pal3d, { method: "none" }));
+    const rgb = ba.getSourceRgb(40);
+    setSource(rgb ? quantizeFrame(rgb, pal3d, QUANT3D_STILL) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
   });
   depth.addEventListener("input", () => rebuildVolume());
 
