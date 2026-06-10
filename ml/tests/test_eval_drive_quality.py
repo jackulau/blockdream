@@ -52,6 +52,23 @@ def test_drift_mae_scales_speed_to_mps():
     assert abs(yaw - 0.2) < 1e-6
 
 
+def test_history_rows_layout_and_padding():
+    import torch
+
+    ctl = torch.arange(12, dtype=torch.float32).view(4, 3)   # T=4 control rows
+    tel = torch.arange(24, dtype=torch.float32).view(4, 6) + 100.0
+    h = edq.history_rows(ctl, tel, n_history=2)
+    assert h.shape == (3, 2 * 9)
+    # t=0: no past frames → all zeros
+    assert torch.all(h[0] == 0)
+    # t=1: oldest slot (j=-1) zero-padded, newest slot = (ctl[0], tel[0])
+    assert torch.all(h[1, :9] == 0)
+    assert torch.equal(h[1, 9:12], ctl[0]) and torch.equal(h[1, 12:18], tel[0])
+    # t=2: slots = (ctl[0], tel[0]), (ctl[1], tel[1])
+    assert torch.equal(h[2, 0:3], ctl[0]) and torch.equal(h[2, 3:9], tel[0])
+    assert torch.equal(h[2, 9:12], ctl[1]) and torch.equal(h[2, 12:18], tel[1])
+
+
 def test_verdict_pass_and_fail():
     thresholds = {"a": 1.0, "b": 2.0}
     ok, lines = edq.verdict({"a": 0.5, "b": 1.9}, thresholds)

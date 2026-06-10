@@ -89,6 +89,22 @@ def drift_mae(model_tel: np.ndarray, phys_tel: np.ndarray) -> tuple[float, float
     return float(speed), float(yaw)
 
 
+def history_rows(ctl: torch.Tensor, tel: torch.Tensor, n_history: int) -> torch.Tensor:
+    """Teacher-forced flattened (control, telemetry) history windows for every prev index
+    t in 0..T-2, zero-padded before the rollout start — same layout as training/serve."""
+    T, n_ctl, n_tel = tel.shape[0], ctl.shape[1], tel.shape[1]
+    width = n_ctl + n_tel
+    out = torch.zeros((T - 1, n_history * width), dtype=tel.dtype, device=tel.device)
+    for t in range(T - 1):
+        for k in range(n_history, 0, -1):
+            j = t - k
+            if j >= 0:
+                col = (n_history - k) * width
+                out[t, col:col + n_ctl] = ctl[j]
+                out[t, col + n_ctl:col + width] = tel[j]
+    return out
+
+
 def verdict(measured: dict[str, float], thresholds: dict[str, float]) -> tuple[bool, list[str]]:
     """Compare measured metrics against thresholds → (all_ok, per-metric report lines)."""
     lines, ok = [], True
@@ -109,7 +125,9 @@ def one_step_errors(session, roll: dict, rgb_pairs: int) -> dict[str, float]:
     ctrl = torch.from_numpy(roll["control"]).to(dev)
     trans = session.trans
 
-    c = trans._fuse(ctrl[:-1], lidar[:-1], tel[:-1])
+    n_hist = getattr(trans, "n_history", 0)
+    hist = history_rows(ctrl, tel, n_hist) if n_hist > 0 else None
+    c = trans._fuse(ctrl[:-1], lidar[:-1], tel[:-1], hist)
     pred_tel = trans.bound_tel(trans.telemetry_head(c))
     pred_lidar = torch.sigmoid(trans.lidar_head(c))
     tel_mse = torch.mean((pred_tel - tel[1:]) ** 2).item()
