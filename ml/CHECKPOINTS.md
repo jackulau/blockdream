@@ -16,7 +16,7 @@ Historical claims are cited to `.claude-workspace/goals/021-movement-driving-wm-
 | artifact | serves | what it is | gate (2026-06-09) | regen |
 |---|---|---|---|---|
 | `runs/skills_real/latest.pt` (28.4 MB, = `best.pt`, 2026-06-08) | `ws://127.0.0.1:8765` (Minecraft WM) | Skill-conditioned Minecraft AR world model — all **9 movement types on genuine real footage** (walk/general/sprint/jump = button-labeled real VPT via `scripts/extract_real_from_vpt.py`; swim/boat/elytra/pig/minecart = real mineflayer-rendered footage via `tools/mineflayer-collector` + `scripts/import_mineflayer.py`). 64px `quick` preset, MPS. | `.venv/bin/python scripts/verify_movement_types.py --checkpoint runs/skills_real/latest.pt` → `mean pairwise |Δframe| = 0.1104 · 36/36 pairs distinct` → **`DISTINCT`**, exit 0 | Build pools (`extract_real_from_vpt.py`, mineflayer collector + `import_mineflayer.py`, `prep_real_skill_pools.py`), then `OUT=runs/skills_real bash scripts/train_skills_hi.sh` (the script's `POOLS` now lists the 9 all-real pools) |
-| `runs/drive/latest.pt` (12.7 MB, 2026-06-07) | `ws://127.0.0.1:8766` (driving WM) | Driving world model (RGB + LiDAR + telemetry). Telemetry **bounded** (per-channel `scale·tanh` head, 021 GOAL.md D1) and **controllable** under its own recursive rollout (K=12 scheduled-sampling rollout loss + speed-diverse data, 021 GOAL.md D2). | `.venv/bin/python scripts/eval_drive_control.py` (default ckpt is `runs/drive/latest.pt`) → coast 8.06 → throttle 10.81 m/s (responds), yaw left +0.479 > right −1.203 (responds), speed physical → **`CONTROLLABLE`**, exit 0 | `python -m blockdream_wm.drive.collect --rollouts 300 --steps 260 --out data/drive_pool`, then `python -m blockdream_wm.drive.train_long --pool data/drive_pool --out runs/drive_v2 --tok-steps 2000 --ar-steps 16000 --device mps`, promote `runs/drive_v2/best.pt → runs/drive/latest.pt`, re-gate with `eval_drive_control.py` |
+| `runs/drive/latest.pt` (12.7 MB, 2026-06-07) | `ws://127.0.0.1:8766` (driving WM) | Driving world model (RGB + LiDAR + telemetry). Telemetry **bounded** (per-channel `scale·tanh` head, 021 GOAL.md D1) and **controllable** under its own recursive rollout (K=12 scheduled-sampling rollout loss + speed-diverse data, 021 GOAL.md D2). | `.venv/bin/python scripts/eval_drive_control.py` (default ckpt is `runs/drive/latest.pt`) → coast 8.06 → throttle 10.81 m/s (responds), yaw left +0.479 > right −1.203 (responds), speed physical → **`CONTROLLABLE`**, exit 0. **Quality gate (2026-06-10)**: `.venv/bin/python scripts/eval_drive_quality.py --checkpoint runs/drive/latest.pt --quick` → worst-track tel MSE 0.0021 / lidar MSE 0.0058 / rgb CE 1.32, closed-loop drift vs physics 4.32 m/s speed / 0.158 rad/s yaw → **`QUALITY_OK`**, exit 0 (also a verify-all stanza) | `python -m blockdream_wm.drive.collect --rollouts 300 --steps 260 --out data/drive_pool`, then `python -m blockdream_wm.drive.train_long --pool data/drive_pool --out runs/drive_v2 --tok-steps 2000 --ar-steps 16000 --device mps`, promote `runs/drive_v2/best.pt → runs/drive/latest.pt`, re-gate with `eval_drive_control.py` + `eval_drive_quality.py` |
 | `apps/web/public/onnx/` (`transition.onnx` 6.4 MB + `decoder.onnx` 0.9 MB, exported 2026-06-06) | in-browser diffusion path (`ml/web/rollout.js`, onnxruntime-web; no server) | ONNX export of the latent rectified-flow diffusion WM (`runs/diffusion/latest.pt`, trained 2026-06-06: 14k trans steps on `pool_m4`, see `runs/diffusion/log.csv`). Few-step Euler in JS → the ≥30fps route. | `.venv/bin/python scripts/verify_diffusion_export.py --onnx ../apps/web/public/onnx --steps 8` → `frame (1, 3, 64, 64) ok · pixel spread 0.511 · 35.2 gen-fps` → **`PASS`**, exit 0 | `scripts/train_diffusion.py --pool data/pool_m4 --out runs/diffusion --size 64 --max-frames 8000 --max-minutes 40`, then `python -m blockdream_wm.export_onnx --checkpoint runs/diffusion/latest.pt --out ../apps/web/public/onnx` |
 
 Notes on today's gate values vs the goal log: the drive gate's absolute numbers drift run-to-run
@@ -26,6 +26,18 @@ runs pass them. The movement gate's mean |Δ| = **0.1104** matches the recorded 
 
 `bash ml/scripts/serve_demo.sh` launches all of the above with the correct checkpoints (MC →
 `runs/skills_real`, drive → `runs/drive`, web on 5173).
+
+### Temporal-context retrain experiment (2026-06-10, goal 027 — NOT promoted)
+
+`runs/drive_v3/` (`best.pt`, n_history=3, 58k AR steps / 38 min MPS) wired the proven temporal-context
+conditioning into production (`train_long --n-history`, sliding history in `rollout_loss`, history
+buffer in `DriveSession`; legacy checkpoints load unchanged). Head-to-head vs the served checkpoint
+(`eval_drive_quality --quick` + `eval_drive_control`): closed-loop **speed** drift improved
+(3.39 vs 4.32 m/s) and lidar MSE improved (0.0039 vs 0.0058), but rgb CE regressed (1.86 vs 1.32),
+yaw drift regressed (0.290 vs 0.158), and the throttle-vs-coast control margin thinned (1.09 vs
+2.75 m/s — one flaky run from the gate's 1.0 threshold). Promote-only-if-better → **kept the served
+checkpoint**; `pre_goal027_backup.pt` (= the served file) preserved in `runs/drive/`. The n_history
+plumbing ships for a future longer retrain.
 
 ## DEAD / ORPHAN (kept on disk, not served)
 

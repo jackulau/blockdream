@@ -71,9 +71,22 @@ loss for "quality". Improvements:
   single-step (`tests/test_eval_drive.py`).
 - **Real-data path**: `drive/commavq.py` ingests comma's tokenized real driving video for
   scale-up beyond the synthetic sim (table above).
+- **Served-checkpoint quality gate** (`scripts/eval_drive_quality.py`): unlike `eval_drive.py`
+  (throwaway scratch models validating the recipe), this loads the REAL served checkpoint and
+  gates it — per-modality one-step val error per track kind, plus closed-loop drift vs the
+  wall-free physics ground truth (telemetry dynamics are position-independent, so a CarState
+  reconstructed from the model's own init telemetry is an exact reference). `--quick` rides
+  `scripts/verify-all.sh` (<3 s); thresholds are measured-value + headroom, pinned by pytest.
+- **Production temporal context** (`train_long --n-history k`): the proven n_history
+  conditioning is wired through training (real history windows + 15% history-dropout for the
+  fresh-reset state, sliding window in the recursive rollout loss) and serving (`DriveSession`
+  keeps the (control, telemetry) window; legacy checkpoints load unchanged). A 38-min M4 retrain
+  improved closed-loop speed drift but regressed rgb CE / yaw drift / control margin, so the
+  served checkpoint was kept (promote-only-if-better) — see `ml/CHECKPOINTS.md`.
 
 ```bash
 python scripts/eval_drive.py            # per-modality + closed-loop drift, single vs temporal
+python scripts/eval_drive_quality.py --checkpoint runs/drive/latest.pt --quick   # served-ckpt gate
 ```
 
 Reference open models to deepen toward: **MUVO** (RGB+LiDAR+occupancy, open code+weights),
