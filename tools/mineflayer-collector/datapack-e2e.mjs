@@ -219,11 +219,16 @@ try {
   }
   if (!advanced) throw new Error(`frame counter never advanced after :start — macro driver not ticking (last: ${fLine})`);
   await rcon(`function ${NS}:stop`);
-  const mF = /has (\d+)/.exec(await rcon("scoreboard players get #f ma"));
-  if (!mF) throw new Error("could not read #f after :stop");
-  const N = Number(mF[1]);
+  const readF = async () => {
+    const m = /has (\d+)/.exec(await rcon("scoreboard players get #f ma"));
+    if (!m) throw new Error("could not read #f after :stop");
+    return Number(m[1]);
+  };
+  const N = await readF();
+  await sleep(600); // > speedTicks(2)·6 ticks — if :stop didn't take, #f would have moved
+  if ((await readF()) !== N) throw new Error(`:stop did not freeze the driver — #f still advancing past ${N}`);
   if (N < 0 || N >= FRAMES) throw new Error(`#f out of range after stop: ${N}`);
-  log(`animation ran and stopped deterministically at frame ${N}`);
+  log(`animation ran and stopped deterministically at frame ${N} (frozen across 600 ms)`);
 
   // assert the cells that CHANGED in deltas 1..N (the macro-dispatched ones); at N=0
   // (wrapped a whole loop) the keyframe repaint makes frame-0 state the truth again
