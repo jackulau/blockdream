@@ -113,11 +113,15 @@ npx tsx packages/cli/src/rcon-bridge-cli.ts --help >/dev/null
 ok "rcon-bridge-cli --help"
 node --check tools/mineflayer-collector/bridge-e2e.mjs
 ok "node --check bridge-e2e.mjs"
+node --check tools/mineflayer-collector/datapack-e2e.mjs
+ok "node --check datapack-e2e.mjs"
 if [ "${BLOCKDREAM_E2E:-}" = "1" ]; then
   node tools/mineflayer-collector/bridge-e2e.mjs >/dev/null
   ok "bridge-e2e live run (vanilla server + bot + sidecar)"
+  node tools/mineflayer-collector/datapack-e2e.mjs >/dev/null
+  ok "datapack-e2e live run (CLI render → vanilla server executes the datapack: /reload + setup + macro animation, cell-exact)"
 else
-  skipped_allowed "bridge-e2e live run — set BLOCKDREAM_E2E=1 (needs network for the Mojang server jar + Java 21; ~15s)"
+  skipped_allowed "bridge-e2e + datapack-e2e live runs — set BLOCKDREAM_E2E=1 (needs network for the Mojang server jar + Java 21 + ffmpeg; ~35s)"
 fi
 
 printf '\nverify-all: %d passed, %d skipped — ' "$pass" "$skip"

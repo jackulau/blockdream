@@ -41,21 +41,28 @@ a zipped datapack is just as valid as a folder).
 1. Find your world save folder:
    - **Singleplayer:** `.minecraft/saves/<World>/`
    - **Dedicated server:** `<server>/world/`
-2. Copy `blockdream_art.zip` (or the unzipped folder) into `…/<World>/datapacks/`.
+2. Copy `blockdream.zip` (or the unzipped folder) into `…/<World>/datapacks/`.
 3. In game: run `/reload` (or rejoin the world).
-4. Stand where you want the wall's bottom-left corner. The default origin is `0 64 0`,
-   `+Z` facing — pass a custom origin when generating if needed.
-5. `/function blockdream_art:setup` &nbsp;— one-time: scoreboards, force-loads the build area, paints frame 0.
-6. `/function blockdream_art:start` &nbsp;— begin playback. `/function blockdream_art:stop` to pause.
+4. The wall builds at the fixed origin `0 64 0` on the `z=0` plane (`+Z` facing) — fly
+   there to watch it. (A custom origin is an API option, `DatapackOptions.origin`, not a
+   CLI flag.)
+5. `/function blockdream:setup` &nbsp;— one-time: scoreboards, force-loads the build area, paints frame 0.
+6. `/function blockdream:start` &nbsp;— begin playback. `/function blockdream:stop` to pause.
+
+The 3D target works the same way with its own namespace: `blockdream render img.png
+--target voxel3d` emits `blockdream_3d.zip` → `/function blockdream_3d:setup` then
+`/function blockdream_3d:start`.
 
 What's inside the `.zip` (validated by `validateJavaDatapackArchive`):
 
 ```
-pack.mcmeta                                  ← at archive ROOT
+pack.mcmeta                                  ← at archive ROOT (pack_format + supported_formats)
 data/minecraft/tags/function/tick.json       ← runs the driver every tick
-data/blockdream_art/function/setup.mcfunction
-data/blockdream_art/function/driver.mcfunction
-data/blockdream_art/function/frames/0.mcfunction …  ← keyframe + delta frames (fill-batched)
+data/blockdream/function/setup.mcfunction    ← scoreboards + forceload + keyframe
+data/blockdream/function/driver.mcfunction   ← frame clock + vanilla-macro dispatch
+data/blockdream/function/play.mcfunction     ← $function blockdream:frames/$(idx)
+data/blockdream/function/start.mcfunction / stop.mcfunction
+data/blockdream/function/frames/0.mcfunction …  ← keyframe + delta frames (fill-batched)
 ```
 
 ---
@@ -124,5 +131,19 @@ Every pack is proven in CI without a running game:
   *simulate the emitted commands* (and the Script POOL) and reconstruct every animation
   frame, asserting it matches the source image cell-for-cell.
 
-So "it's a valid, droppable pack" and "the animation reconstructs correctly" are both
-machine-checked. Dropping it into a real client is the only operator step.
+And the Java path is additionally proven against a **real vanilla server** — no client,
+no mods: `tools/mineflayer-collector/datapack-e2e.mjs` renders a clip through the actual
+CLI, installs the `.zip` into a throwaway stock 1.21.1 server, and asserts over RCON that
+the pack is enabled (boot **and** after `/reload`), that `setup` paints the keyframe
+**cell-exactly**, and that `start` really animates (the tick driver's macro dispatch
+executes delta frames). Run it yourself:
+
+```bash
+BLOCKDREAM_E2E=1 bash scripts/verify-all.sh    # or directly:
+node tools/mineflayer-collector/datapack-e2e.mjs
+```
+
+So "valid droppable pack", "animation reconstructs correctly", **and** "a stock vanilla
+server actually executes it" are all machine-checked. (Bedrock has no headless
+server on macOS — its packs are validated by the simulators above; importing into a real
+Bedrock client is the one remaining operator step.)

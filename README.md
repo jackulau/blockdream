@@ -102,6 +102,8 @@ ml/               # Workstream B — world model (Python / PyTorch)
 
 ## Documentation
 
+- **[The guide](./docs/guide.md) — start here**: image/GIF/video → blocks in vanilla Minecraft, end to end
+  (install, generate, choose a target, import into Java/Bedrock, troubleshooting)
 - [Technical writeup & results](./docs/results.md) — architecture diagram, methods, graphics, measured numbers
 - [Architecture](./docs/architecture.md) — whole-system map, packages, data flow
 - [Play it in Minecraft without Fabric](./docs/play-without-fabric.md) — offline cast + live RCON bridge
@@ -111,7 +113,8 @@ ml/               # Workstream B — world model (Python / PyTorch)
 - Also: [colour theory](./docs/color-theory.md), [command-block optimization](./docs/command-block-optimization.md),
   [real world models](./docs/real-world-models.md), [movement types](./docs/movement-types.md),
   [driving world model](./docs/driving-world-model.md), [live control](./docs/live-control.md),
-  [load into Minecraft](./docs/load-into-minecraft.md), [fps budget](./docs/fps-budget.md)
+  [load into Minecraft](./docs/load-into-minecraft.md), [fps budget](./docs/fps-budget.md),
+  [vanilla command budgets](./docs/vanilla-command-budgets.md)
 
 ## Minecraft version support
 

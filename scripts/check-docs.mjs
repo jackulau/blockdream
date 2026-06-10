@@ -21,6 +21,7 @@ const fail = (m) => {
 
 // required docs → section headers each must contain
 const REQUIRED = {
+  "docs/guide.md": ["## Install", "## Generate", "## Choose a target", "## Pick a Minecraft version", "## Import into Java (vanilla)", "## Import into Bedrock (vanilla)", "## Troubleshooting"],
   "docs/architecture.md": ["## Workstreams", "## Packages", "## Data flow"],
   "docs/3d-and-animation.md": ["## Image → 3D", "## Greedy meshing", "## Animation"],
   "docs/video-import.md": ["## glTF", "## Video"],
@@ -33,12 +34,27 @@ const REQUIRED = {
   "docs/results.md": ["## System", "## Measured results", "## Reproduce"],
 };
 
+// required literal strings — the real artifact/function names users must be told.
+// If an emitter namespace ever changes, datapack-e2e fails live; if a doc drifts away
+// from the real names (the goal-028 `blockdream_art:` bug), THIS fails.
+const REQUIRED_LITERALS = {
+  "docs/load-into-minecraft.md": ["/function blockdream:setup", "/function blockdream_3d:setup", "blockdream.zip"],
+  "README.md": ["/function blockdream:setup"],
+};
+
 for (const [rel, sections] of Object.entries(REQUIRED)) {
   const p = join(ROOT, rel);
   if (!existsSync(p)) fail(`missing required doc: ${rel}`);
   const text = readFileSync(p, "utf8");
   for (const s of sections) if (!text.includes(s)) fail(`${rel} is missing section "${s}"`);
   if (text.length < 600) fail(`${rel} is too short to be a real writeup (${text.length} chars)`);
+}
+
+for (const [rel, literals] of Object.entries(REQUIRED_LITERALS)) {
+  const p = join(ROOT, rel);
+  if (!existsSync(p)) fail(`missing required doc: ${rel}`);
+  const text = readFileSync(p, "utf8");
+  for (const s of literals) if (!text.includes(s)) fail(`${rel} no longer documents the real name "${s}"`);
 }
 
 // only git-tracked markdown — scratch/untracked .md files must never fail (or be able to game) the gate
@@ -51,6 +67,10 @@ const tracked = execFileSync("git", ["ls-files", "*.md"], { cwd: ROOT, encoding:
 // rebrand-verification table intentionally quotes the old identifiers
 const PRE_REBRAND = /mineworld_wm|MINEWORLD_LOG|@mineworld/;
 const ALLOW_PRE_REBRAND = new Set(["docs/results.md"]);
+
+// namespaces that never shipped: real Java datapack namespaces are "blockdream" (2D)
+// and "blockdream_3d" (voxel3d). "blockdream_art" sent users to "Unknown function".
+const STALE_NAMESPACE = /blockdream_art/;
 
 // Stale-serve heuristic (deliberately simple, line-based):
 //  - `runs/skills/latest.pt` is the pre-skills_real checkpoint path; flag it on any line that
@@ -94,6 +114,8 @@ for (const rel of tracked) {
     const where = `${rel}:${i + 1}`;
     if (!ALLOW_PRE_REBRAND.has(rel) && PRE_REBRAND.test(line))
       fail(`${where} uses a pre-rebrand identifier (mineworld_wm/MINEWORLD_LOG/@mineworld): ${line.trim()}`);
+    if (STALE_NAMESPACE.test(line))
+      fail(`${where} references the never-shipped namespace blockdream_art (real: blockdream / blockdream_3d): ${line.trim()}`);
     if (line.includes("runs/skills/latest.pt") && SERVE_VERIFY_LINE.test(line))
       fail(`${where} instructs serving/verifying stale checkpoint runs/skills/latest.pt (use runs/skills_real/latest.pt): ${line.trim()}`);
     if (M4_REAL_FLAG.test(line) || (line.includes("runs/m4") && /serve/i.test(line) && !M4_WARNING.test(line)))
