@@ -111,7 +111,8 @@ ml/               # Workstream B — world model (Python / PyTorch)
 - Also: [colour theory](./docs/color-theory.md), [command-block optimization](./docs/command-block-optimization.md),
   [real world models](./docs/real-world-models.md), [movement types](./docs/movement-types.md),
   [driving world model](./docs/driving-world-model.md), [live control](./docs/live-control.md),
-  [load into Minecraft](./docs/load-into-minecraft.md), [fps budget](./docs/fps-budget.md)
+  [load into Minecraft](./docs/load-into-minecraft.md), [fps budget](./docs/fps-budget.md),
+  [vanilla command budgets](./docs/vanilla-command-budgets.md)
 
 ## Minecraft version support
 
