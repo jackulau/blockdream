@@ -10,8 +10,9 @@ blockdream preview <input> --out preview.png   (side-by-side source | block-art 
 Convert a GIF/video into Minecraft block-art.
 
 Options:
-  --target <t>       map | mcstructure | datapack | behaviorpack | mwframes | voxel3d
-                       (default: datapack; mwframes = Fabric map-wall mod pool)
+  --target <t>       map | mcstructure | mcstructure3d | datapack | behaviorpack | mwframes | voxel3d
+                       (default: datapack; mwframes = Fabric map-wall mod pool;
+                        mcstructure3d = TRUE 3D Bedrock structure from the voxel pipeline)
   --edition <e>      java | bedrock                                (map target only; default: java)
   --grid <WxH>       block grid size      (default: 128x128 for map, 64x64 otherwise)
   --fps <n>          sample frame rate    (default: source rate)
@@ -31,6 +32,7 @@ Options:
 const TARGETS = new Set<RenderTarget>([
   "map",
   "mcstructure",
+  "mcstructure3d",
   "datapack",
   "behaviorpack",
   "bedrock-script",

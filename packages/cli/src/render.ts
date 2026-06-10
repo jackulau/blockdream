@@ -19,7 +19,7 @@ import {
 } from "@blockdream/color-core";
 import { extractFrames } from "@blockdream/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
-import { buildMcStructure } from "@blockdream/emit-bedrock";
+import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack } from "@blockdream/emit-commands";
 import { framesToAnimated3d } from "@blockdream/voxel";
 import {
@@ -31,6 +31,7 @@ import {
 export type RenderTarget =
   | "map"
   | "mcstructure"
+  | "mcstructure3d"
   | "datapack"
   | "behaviorpack"
   | "bedrock-script"
@@ -187,6 +188,26 @@ export function render(opts: RenderOptions): RenderResult {
       filesWritten.push(path);
     });
     notes.push(`Bedrock .mcstructure (${frames.length} frame(s)); import with a structure block or world tool.`);
+    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
+
+  if (opts.target === "mcstructure3d") {
+    // image/video → temporally-stable 3D volumes (same pipeline as voxel3d) → a TRUE 3D Bedrock
+    // .mcstructure per frame (depth = volume depth, not the 1-thick wall of `mcstructure`)
+    const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
+    volumes.forEach((vol, fi) => {
+      const buf = buildVoxelMcStructure(vol, (id) => {
+        const b = blockByMapColorId.get(id);
+        return b ? { name: b.id, states: {} } : undefined;
+      }, { blockVersion: BEDROCK_BLOCK_VERSION });
+      const path = join(opts.out, volumes.length > 1 ? `frame_${fi}.mcstructure` : `model3d.mcstructure`);
+      writeFile(path, buf);
+      filesWritten.push(path);
+    });
+    const v0 = volumes[0]!;
+    notes.push(
+      `TRUE 3D Bedrock .mcstructure (${volumes.length} frame(s), ${v0.sx}×${v0.sy}×${v0.sz}); place with a structure block or import via a world tool.`,
+    );
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
