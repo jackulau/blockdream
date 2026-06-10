@@ -26,12 +26,10 @@ import { rgbFramesToAnimated3d } from "./video3d";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
-import { blockForBase, localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
+import { localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
+import { resolveBlock, safeBlockInfo } from "./resolve-block";
 import { downloadDatapack } from "./datapack-export";
 import { decodeGif } from "./gif";
-
-// map-colour id → Minecraft block id (baseId = id>>2); air for unmapped
-const resolveBlock = (mapColorId: number) => blockForBase(mapColorId >> 2)?.id ?? "minecraft:air";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const MC_URL = "ws://127.0.0.1:8765";
@@ -204,7 +202,7 @@ let grayId = 0;
     const mean = (r + g + b) / 3;
     const spread = Math.abs(r - mean) + Math.abs(g - mean) + Math.abs(b - mean);
     const score = spread + Math.abs(mean - 130);
-    if (score < best && blockForBase(mapColorId >> 2)) {
+    if (score < best && safeBlockInfo(mapColorId)) {
       best = score;
       grayId = mapColorId;
     }
@@ -261,12 +259,12 @@ async function setup3dViewer(): Promise<void> {
   const viewer = new Viewer3D({
     canvas,
     textureFor: (id) => {
-      const info = blockForBase(id >> 2); // mapColorId → baseId
+      const info = safeBlockInfo(id); // texture of the SAFE placeable block → preview == export
       return info ? localTextureUrl(info.id) : null;
     },
     // per-face textures: dir 2 = +Y (top), dir 3 = -Y (bottom), else side. null → falls back to textureFor.
     faceTextureFor: (id, dir) => {
-      const info = blockForBase(id >> 2);
+      const info = safeBlockInfo(id);
       if (!info) return null;
       const face = dir === 2 ? "top" : dir === 3 ? "bottom" : "side";
       return faceTextureUrl(info.id, face);
