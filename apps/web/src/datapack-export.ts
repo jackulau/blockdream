@@ -46,7 +46,8 @@ export function zipDatapack(files: Map<string, string>): Uint8Array {
 
 /** Trigger a browser download of bytes under `name`. */
 export function downloadBytes(name: string, bytes: Uint8Array): void {
-  const blob = new Blob([bytes], { type: "application/zip" });
+  // copy into a fresh ArrayBuffer-backed view — BlobPart rejects ArrayBufferLike-typed views
+  const blob = new Blob([new Uint8Array(bytes)], { type: "application/zip" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
