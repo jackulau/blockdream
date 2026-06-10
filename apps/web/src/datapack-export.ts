@@ -8,7 +8,7 @@ import { zipSync, strToU8 } from "fflate";
  *  the instructions travel with the download (the "how do I load this" answer ships with it). */
 export function loadInstructions(files: Map<string, string>): string {
   const setup = [...files.keys()].find((k) => /^data\/[^/]+\/function\/setup\.mcfunction$/.test(k));
-  const ns = setup ? setup.split("/")[1]! : "blockdream_art";
+  const ns = setup ? setup.split("/")[1]! : "blockdream";
   return [
     "HOW TO LOAD THIS INTO MINECRAFT (Java Edition — any 1.21.x: 1.21 through 1.21.10)",
     "================================================================================",

@@ -174,10 +174,10 @@ $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
   const q = ba.getFrame();
   if (!q) return;
   const pack = generateJavaDatapack([q], resolveBlock, {
-    namespace: "blockdream_art",
+    namespace: "blockdream",
     supportedFormats: JAVA_DATAPACK_SUPPORTED,
   });
-  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream_art:setup`;
+  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream:setup`;
   downloadDatapack("blockdream-blockart-datapack", pack.files);
 });
 
