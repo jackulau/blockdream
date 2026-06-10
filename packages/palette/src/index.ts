@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PALETTE_DATA } from "./versions";
+import { buildSolidBlockMapPalette } from "./solid";
 
 export * from "./versions";
 
@@ -225,30 +226,7 @@ export function getSolidBlockMapPalette(version = "1.21"): {
   palette: MapPalette;
   blockByMapColorId: Map<number, BlockEntry>;
 } {
-  const bp = getJavaBlockPalette(version);
-  const colors: MapColor[] = [];
-  const blockByMapColorId = new Map<number, BlockEntry>();
-  for (const base of bp.bases) {
-    const block =
-      base.representative && !base.representative.biomeDependent && !base.representative.supportRequired
-        ? base.representative
-        : base.blocks.find((b) => !b.biomeDependent && !b.supportRequired) ?? null;
-    if (!block) continue;
-    const mapColorId = base.baseId * 4 + 2; // full (×255) shade
-    colors.push({ mapColorId, baseId: base.baseId, shadeIndex: 2, mult: 255, ...base.rgb });
-    blockByMapColorId.set(mapColorId, block);
-  }
-  return {
-    palette: {
-      edition: "java",
-      version,
-      source: "cross-edition solid-block set (biome-independent, support-free)",
-      shadeMultipliers: [180, 220, 255, 135],
-      baseCount: colors.length,
-      usableColorCount: colors.length,
-      note: "flat solid-block build palette; pair with shade multipliers for staircased mapart",
-      colors,
-    },
-    blockByMapColorId,
-  };
+  // shared pure builder lives in ./solid (which also offers a browser-safe entry that
+  // imports the canonical data JSON directly instead of going through this node loader)
+  return buildSolidBlockMapPalette(getJavaBlockPalette(version), version);
 }

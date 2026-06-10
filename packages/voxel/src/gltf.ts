@@ -13,8 +13,12 @@ import type { VoxelVolume } from "./volume";
 
 export interface SequenceOptions {
   resolution?: number; // cube grid size (default 32)
-  mapColorId?: number; // block colour id (default 0)
+  mapColorId?: number; // block colour id (default 0; the fallback for colorless geometry)
   solid?: boolean; // flood-fill interiors (default true for models)
+  /** sRGB (0..255) → mapColorId (e.g. color-core OKLab nearest against the placeable palette).
+   *  When supplied, COLOR_0 vertex colors and material baseColorFactor drive per-triangle
+   *  block selection; colorless geometry keeps the mapColorId fallback. */
+  matchColor?: (r: number, g: number, b: number) => number;
 }
 
 export interface GltfImportOptions extends SequenceOptions {
@@ -22,24 +26,50 @@ export interface GltfImportOptions extends SequenceOptions {
   buffers?: ArrayBuffer[]; // external .bin buffers, indexed like gltf.buffers (when not embedded)
 }
 
-/** A frame's world-space geometry. */
+/** A frame's world-space geometry. `triColors` (sRGB 0..255, aligned to tris; null = colorless)
+ *  comes from COLOR_0 vertex colors × material baseColorFactor. */
 interface Mesh {
   verts: V3[];
   tris: Tri[];
+  triColors?: Array<V3 | null>;
 }
 
 function rasterizeSequence(meshes: Mesh[], opts: SequenceOptions): VoxelVolume[] {
   const bounds: Bounds = unionBounds(meshes.map((m) => meshBounds(m.verts)));
   const solid = opts.solid ?? true;
-  return meshes.map((m) =>
-    trisToVolume(m.verts, m.tris, { resolution: opts.resolution, mapColorId: opts.mapColorId, solid, bounds }),
-  );
+  const match = opts.matchColor;
+  const cache = new Map<number, number>();
+  return meshes.map((m) => {
+    let colorOf: ((t: number) => number) | undefined;
+    if (match && m.triColors) {
+      const tc = m.triColors;
+      colorOf = (t: number) => {
+        const c = tc[t];
+        if (!c) return opts.mapColorId ?? 0;
+        const key = (Math.round(c[0]) << 16) | (Math.round(c[1]) << 8) | Math.round(c[2]);
+        let id = cache.get(key);
+        if (id === undefined) cache.set(key, (id = match(c[0], c[1], c[2])));
+        return id;
+      };
+    }
+    return trisToVolume(m.verts, m.tris, { resolution: opts.resolution, mapColorId: opts.mapColorId, solid, bounds, colorOf });
+  });
 }
 
 /** Voxelize an .obj-per-frame sequence into temporally-coherent frames (shared world box). */
 export function objSequenceToFrames(objs: string[], opts: SequenceOptions = {}): VoxelVolume[] {
   if (objs.length === 0) throw new Error("empty .obj sequence");
-  const meshes: Mesh[] = objs.map((o) => parseObj(o));
+  const meshes: Mesh[] = objs.map((o) => {
+    const { verts, tris, colors } = parseObj(o);
+    const triColors = colors
+      ? tris.map(([ia, ib, ic]): V3 | null => [
+          ((colors[ia]![0]! + colors[ib]![0]! + colors[ic]![0]!) / 3) * 255,
+          ((colors[ia]![1]! + colors[ib]![1]! + colors[ic]![1]!) / 3) * 255,
+          ((colors[ia]![2]! + colors[ib]![2]! + colors[ic]![2]!) / 3) * 255,
+        ])
+      : undefined;
+    return { verts, tris, triColors };
+  });
   if (meshes.some((m) => m.verts.length === 0 || m.tris.length === 0)) throw new Error("a frame in the .obj sequence has no geometry");
   return rasterizeSequence(meshes, opts);
 }
@@ -50,7 +80,8 @@ interface GltfJson {
   buffers?: Array<{ uri?: string; byteLength: number }>;
   bufferViews?: Array<{ buffer: number; byteOffset?: number; byteLength: number; byteStride?: number }>;
   accessors?: Array<{ bufferView?: number; byteOffset?: number; componentType: number; count: number; type: string }>;
-  meshes?: Array<{ primitives: Array<{ attributes: Record<string, number>; indices?: number; mode?: number }> }>;
+  materials?: Array<{ pbrMetallicRoughness?: { baseColorFactor?: number[] } }>;
+  meshes?: Array<{ primitives: Array<{ attributes: Record<string, number>; indices?: number; mode?: number; material?: number }> }>;
   nodes?: Array<{ mesh?: number; children?: number[]; matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] }>;
   scenes?: Array<{ nodes: number[] }>;
   scene?: number;
@@ -209,7 +240,10 @@ export function gltfToFrames(gltf: GltfJson | string, opts: GltfImportOptions = 
 
   const roots = g.scenes?.[g.scene ?? 0]?.nodes ?? g.nodes.map((_, i) => i);
 
-  // cached per-primitive geometry (positions + indices), parsed once
+  // cached per-primitive geometry (positions + indices + per-tri sRGB color), parsed once.
+  // Color source: COLOR_0 vertex colors (float / normalized ubyte / normalized ushort, vec3 or
+  // vec4) modulated by the material's pbr baseColorFactor; a material-only primitive gets the
+  // flat factor color; neither → null (colorless, keeps the gray fallback).
   const meshGeo = g.meshes.map((m) =>
     m.primitives.map((p) => {
       const pos = readAccessor(g, bufs, p.attributes.POSITION!);
@@ -222,7 +256,39 @@ export function gltfToFrames(gltf: GltfJson | string, opts: GltfImportOptions = 
       } else {
         for (let i = 0; i + 2 < verts.length; i += 3) tris.push([i, i + 1, i + 2]);
       }
-      return { verts, tris };
+
+      const factor = p.material !== undefined
+        ? g.materials?.[p.material]?.pbrMetallicRoughness?.baseColorFactor ?? null
+        : null;
+      let vertColors: V3[] | null = null;
+      const colorAcc = p.attributes.COLOR_0;
+      if (colorAcc !== undefined) {
+        const acc = g.accessors![colorAcc]!;
+        const col = readAccessor(g, bufs, colorAcc);
+        const denom = acc.componentType === 5121 ? 255 : acc.componentType === 5123 ? 65535 : 1;
+        vertColors = [];
+        for (let i = 0; i < col.count; i++) {
+          vertColors.push([
+            col.data[i * col.comps]! / denom,
+            col.data[i * col.comps + 1]! / denom,
+            col.data[i * col.comps + 2]! / denom,
+          ]);
+        }
+      }
+      let triColors: Array<V3 | null> | undefined;
+      if (vertColors || factor) {
+        const f: V3 = factor ? [factor[0] ?? 1, factor[1] ?? 1, factor[2] ?? 1] : [1, 1, 1];
+        triColors = tris.map(([ia, ib, ic]): V3 => {
+          const at = (i: number): V3 => vertColors?.[i] ?? [1, 1, 1];
+          const a = at(ia), b = at(ib), c = at(ic);
+          return [
+            ((a[0]! + b[0]! + c[0]!) / 3) * f[0]! * 255,
+            ((a[1]! + b[1]! + c[1]!) / 3) * f[1]! * 255,
+            ((a[2]! + b[2]! + c[2]!) / 3) * f[2]! * 255,
+          ];
+        });
+      }
+      return { verts, tris, triColors };
     }),
   );
 
@@ -241,6 +307,7 @@ export function gltfToFrames(gltf: GltfJson | string, opts: GltfImportOptions = 
     const ts = animated ? tMin + ((tMax - tMin) * f) / Math.max(1, frameCount - 1) : 0;
     const verts: V3[] = [];
     const tris: Tri[] = [];
+    const triColors: Array<V3 | null> = [];
     const visit = (nodeIdx: number, parent: Mat4): void => {
       const node = g.nodes![nodeIdx]!;
       const world = mul(parent, localMatrix(nodeIdx, ts));
@@ -249,12 +316,14 @@ export function gltfToFrames(gltf: GltfJson | string, opts: GltfImportOptions = 
           const base = verts.length;
           for (const v of prim.verts) verts.push(transform(world, v));
           for (const t of prim.tris) tris.push([t[0] + base, t[1] + base, t[2] + base]);
+          if (prim.triColors) triColors.push(...prim.triColors);
+          else for (let i = 0; i < prim.tris.length; i++) triColors.push(null);
         }
       }
       for (const c of node.children ?? []) visit(c, world);
     };
     for (const r of roots) visit(r, identity());
-    frames.push({ verts, tris });
+    frames.push({ verts, tris, triColors: triColors.some((c) => c !== null) ? triColors : undefined });
   }
   return rasterizeSequence(frames, opts);
 }

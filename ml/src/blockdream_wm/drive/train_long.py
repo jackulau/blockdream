@@ -52,12 +52,13 @@ def _log(out: Path, row: dict) -> None:
         w.writerow(row)
 
 
-def build(dev):
+def build(dev, n_history: int = 0):
     tcfg = TokenizerConfig(image_size=IMAGE, base_channels=32, latent_channels=4, downsample=DOWNSAMPLE, vq_codebook_size=CODEBOOK)
     dcfg = DynamicsConfig(kind="ar", dim=128, depth=3, heads=4)
     n_tokens = (IMAGE // DOWNSAMPLE) ** 2
     tok = Tokenizer(tcfg).to(dev)
-    trans = DriveTransition(dcfg, n_tokens=n_tokens, codebook_size=CODEBOOK, n_lidar=N_LIDAR, n_telemetry=N_TEL).to(dev)
+    trans = DriveTransition(dcfg, n_tokens=n_tokens, codebook_size=CODEBOOK, n_lidar=N_LIDAR, n_telemetry=N_TEL,
+                            n_history=n_history).to(dev)
     return tcfg, dcfg, tok, trans
 
 
@@ -75,6 +76,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-minutes", type=float, default=0.0)  # 0 = until step targets
     ap.add_argument("--roll-k", type=int, default=12, help="multi-step recursive rollout horizon for the telemetry/LiDAR loss (0 disables → pure single-step teacher forcing)")
     ap.add_argument("--roll-weight", type=float, default=1.0, help="weight of the recursive rollout loss vs the single-step loss")
+    ap.add_argument("--n-history", type=int, default=0, help="temporal-context window: condition on the last N (control, telemetry) frames (0 = original single-step conditioning)")
+    ap.add_argument("--hist-dropout", type=float, default=0.15, help="probability of zeroing the history window per batch (trains the fresh-reset condition the server starts from)")
     ap.add_argument("--val-frac", type=float, default=0.05)
     ap.add_argument("--device", default="auto")
     ap.add_argument("--seed", type=int, default=0)
@@ -94,15 +97,23 @@ def main(argv: list[str] | None = None) -> int:
     ctl = torch.from_numpy(ctl_np).float().to(dev)
     N = rgb.shape[0]
 
+    # contiguous K-step windows for the recursive rollout loss (controllability + stability)
+    windows = load_windows(args.pool, args.roll_k) if args.roll_k > 0 else None
+    # contiguous (n_history+1)-step windows so the single-step loss can see REAL history rows
+    # (a window's last two frames are the (prev, next) pair; the frames before them are history)
+    hwindows = load_windows(args.pool, args.n_history + 1) if args.n_history > 0 else None
+
     rng = np.random.default_rng(args.seed)
     perm = rng.permutation(len(pairs))
     n_val = max(1, int(len(pairs) * args.val_frac))
     val_pairs, train_pairs = pairs[perm[:n_val]], pairs[perm[n_val:]]
+    val_hw = train_hw = None
+    if hwindows is not None:
+        hperm = rng.permutation(len(hwindows))
+        n_hval = max(1, int(len(hwindows) * args.val_frac))
+        val_hw, train_hw = hwindows[hperm[:n_hval]], hwindows[hperm[n_hval:]]
 
-    # contiguous K-step windows for the recursive rollout loss (controllability + stability)
-    windows = load_windows(args.pool, args.roll_k) if args.roll_k > 0 else None
-
-    tcfg, dcfg, tok, trans = build(dev)
+    tcfg, dcfg, tok, trans = build(dev, args.n_history)
     tok_opt = torch.optim.Adam(tok.parameters(), lr=args.lr)
     tr_opt = torch.optim.Adam(trans.parameters(), lr=args.lr)
 
@@ -136,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
             "phase": phase, "tok_step": tok_step, "ar_step": ar_step,
             "tokenizer_cfg": vars(tcfg), "dynamics_cfg": vars(dcfg),
             "n_lidar": N_LIDAR, "n_telemetry": N_TEL, "image": IMAGE, "downsample": DOWNSAMPLE, "codebook": CODEBOOK,
+            "n_history": args.n_history,
             "tokenizer": tok.state_dict(), "transition": trans.state_dict(),
             "tok_opt": tok_opt.state_dict(), "tr_opt": tr_opt.state_dict(),
             "init_tokens": init_tok.cpu(), "init_lidar": lidar[0].cpu(), "init_telemetry": tel[0].cpu(),
@@ -197,7 +209,16 @@ def main(argv: list[str] | None = None) -> int:
         b = parr[np.random.randint(0, len(parr), args.batch)]
         i0 = torch.from_numpy(b[:, 0]).to(dev)
         i1 = torch.from_numpy(b[:, 1]).to(dev)
-        return i0, i1
+        return i0, i1, None
+
+    def h_batch(warr, dropout: float):
+        """(prev, next, history) from an (n_history+2)-frame window: last two frames are the
+        pair, the frames before them are the REAL (control, telemetry) history rows."""
+        w = torch.from_numpy(warr[np.random.randint(0, len(warr), args.batch)]).to(dev)
+        hist = torch.cat([torch.cat([ctl[w[:, j]], tel[w[:, j]]], dim=-1) for j in range(args.n_history)], dim=-1)
+        if dropout > 0 and np.random.random() < dropout:
+            hist = torch.zeros_like(hist)  # fresh-reset condition (server starts with a zero window)
+        return w[:, -2], w[:, -1], hist
 
     # ---- PHASE 2: multimodal transition ----
     def roll_batch():
@@ -207,18 +228,18 @@ def main(argv: list[str] | None = None) -> int:
         return tel[w[:, 0]], lidar[w[:, 0]], ctrls, tel[w[:, 1:]], lidar[w[:, 1:]]
 
     while phase == "ar" and ar_step < args.ar_steps and not time_up():
-        i0, i1 = ar_batch(train_pairs)
-        loss, _ = trans.loss(tokens[i0], tokens[i1], lidar[i0], tel[i0], ctl[i0], lidar[i1], tel[i1])
+        i0, i1, hist = h_batch(train_hw, args.hist_dropout) if train_hw is not None else ar_batch(train_pairs)
+        loss, _ = trans.loss(tokens[i0], tokens[i1], lidar[i0], tel[i0], ctl[i0], lidar[i1], tel[i1], history=hist)
         if windows is not None:  # recursive multi-step loss on the telemetry/LiDAR feedback path
             t0_, l0_, cw, tt, lt = roll_batch()
-            rloss, _ = trans.rollout_loss(t0_, l0_, cw, tt, lt)
+            rloss, _ = trans.rollout_loss(t0_, l0_, cw, tt, lt)  # zero-init window; slides internally
             loss = loss + args.roll_weight * rloss
         tr_opt.zero_grad(); loss.backward(); tr_opt.step()
         ar_step += 1
         if ar_step % 50 == 0 or (time.time() - last_ckpt) / 60 >= args.ckpt_every_min:
             with torch.no_grad():
-                vi0, vi1 = ar_batch(val_pairs)
-                vloss, _ = trans.loss(tokens[vi0], tokens[vi1], lidar[vi0], tel[vi0], ctl[vi0], lidar[vi1], tel[vi1])
+                vi0, vi1, vhist = h_batch(val_hw, 0.0) if val_hw is not None else ar_batch(val_pairs)
+                vloss, _ = trans.loss(tokens[vi0], tokens[vi1], lidar[vi0], tel[vi0], ctl[vi0], lidar[vi1], tel[vi1], history=vhist)
             if vloss.item() < best_val[0]:  # track the peak at every val eval (avoid overfit tail)
                 best_val[0] = vloss.item()
                 _atomic_save(_state(), best_path)

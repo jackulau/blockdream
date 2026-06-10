@@ -63,7 +63,7 @@ export async function createBrowserRollout(opts: RolloutOpts): Promise<BrowserRo
   const transition = await ort.InferenceSession.create(transitionUrl, { executionProviders: ep });
   const decoder = await ort.InferenceSession.create(decoderUrl, { executionProviders: ep });
   const N = C * H * H;
-  let prev = new Float32Array(N);
+  let prev: Float32Array = new Float32Array(N);
 
   async function sampleNext(actionEmb: Float32Array): Promise<Float32Array> {
     let z = randn(N);

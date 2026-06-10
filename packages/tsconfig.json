@@ -23,6 +23,9 @@
       "path": "./video"
     },
     {
+      "path": "./voxel"
+    },
+    {
       "path": "./cli"
     }
   ]

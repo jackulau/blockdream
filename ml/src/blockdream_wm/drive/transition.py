@@ -84,14 +84,28 @@ class DriveTransition(nn.Module):
         — the fix for the flat, control-independent speed/yaw. RGB tokens stay single-step (AR decode
         is too expensive to roll in-loop and is not the unstable modality).
 
+        With n_history > 0 the (control, telemetry) window SLIDES with the model's own predicted
+        telemetry — the same feedback inference sees. `history` is the initial window (zeros =
+        fresh-reset condition; most steps of a K-window build real history as they go).
+
         Shapes: tel0 (B,n_tel), lidar0 (B,n_lidar), controls (B,K,n_control),
         tel_targets (B,K,n_tel), lidar_targets (B,K,n_lidar).
         """
         tel, lidar = tel0, lidar0
         k = controls.shape[1]
         tel_loss = lidar_loss = controls.new_zeros(())
+        rows: list[torch.Tensor] | None = None
+        if self.n_history > 0:
+            width = self.n_control + self.n_telemetry
+            if history is None:
+                rows = [controls.new_zeros((controls.shape[0], width)) for _ in range(self.n_history)]
+            else:
+                rows = list(history.view(controls.shape[0], self.n_history, width).unbind(1))
         for t in range(k):
-            c = self._fuse(controls[:, t], lidar, tel, history)
+            h = torch.cat(rows, dim=-1) if rows is not None else history
+            c = self._fuse(controls[:, t], lidar, tel, h)
+            if rows is not None:  # row_t = (control applied at t, telemetry observed at t)
+                rows = rows[1:] + [torch.cat([controls[:, t], tel], dim=-1)]
             tel = self.bound_tel(self.telemetry_head(c))
             lidar = torch.sigmoid(self.lidar_head(c))
             tel_loss = tel_loss + F.mse_loss(tel, tel_targets[:, t])

@@ -21,8 +21,10 @@ class DriveSession:
         self.tok = Tokenizer(TokenizerConfig(**ckpt["tokenizer_cfg"]))
         self.tok.load_state_dict(ckpt["tokenizer"])
         n_tokens = (ckpt["image"] // ckpt["downsample"]) ** 2
+        self.n_history = int(ckpt.get("n_history", 0))  # legacy checkpoints carry no key → 0
         self.trans = DriveTransition(DynamicsConfig(**ckpt["dynamics_cfg"]), n_tokens=n_tokens,
-                                     codebook_size=ckpt["codebook"], n_lidar=ckpt["n_lidar"], n_telemetry=ckpt["n_telemetry"])
+                                     codebook_size=ckpt["codebook"], n_lidar=ckpt["n_lidar"],
+                                     n_telemetry=ckpt["n_telemetry"], n_history=self.n_history)
         self.trans.load_state_dict(ckpt["transition"])
         self.tok = self.tok.to(self.device).eval()
         self.trans = self.trans.to(self.device).eval()
@@ -37,6 +39,12 @@ class DriveSession:
         self.tokens = t.view(1, -1).clone().to(self.device)
         self.lidar = l.view(1, -1).clone().to(self.device)
         self.tel = te.view(1, -1).clone().to(self.device)
+        # temporal-context window of the last n_history (control, telemetry) rows — zeros at
+        # reset (the model trains with zero-init windows, so this matches the data distribution)
+        self.hist_rows = [
+            torch.zeros((1, self.trans.n_control + self.trans.n_telemetry), device=self.device)
+            for _ in range(self.n_history)
+        ]
         self.step_idx = 0
         return self._decode()
 
@@ -48,7 +56,10 @@ class DriveSession:
     @torch.no_grad()
     def step(self, control):
         c = torch.tensor([control], dtype=torch.float32, device=self.device)
-        self.tokens, self.lidar, self.tel = self.trans.step(self.tokens, self.lidar, self.tel, c)
+        h = torch.cat(self.hist_rows, dim=-1) if self.n_history > 0 else None
+        if self.n_history > 0:  # row_t = (control applied at t, telemetry observed at t) — pre-step
+            self.hist_rows = self.hist_rows[1:] + [torch.cat([c, self.tel], dim=-1)]
+        self.tokens, self.lidar, self.tel = self.trans.step(self.tokens, self.lidar, self.tel, c, history=h)
         self.step_idx += 1
         return self._decode()
 
@@ -58,6 +69,7 @@ class DriveSession:
         not re-loaded; reset() clones the shared init tensors into fresh state."""
         s = object.__new__(DriveSession)
         s.device, s.tok, s.trans, s.grid, s._init = self.device, self.tok, self.trans, self.grid, self._init
+        s.n_history = self.n_history
         s.step_idx = 0
         s.reset()
         return s

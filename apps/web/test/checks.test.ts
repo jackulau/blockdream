@@ -42,4 +42,10 @@ describe("web invariant checks (wired into CI)", () => {
     expect(r.out).toContain("no pre-rebrand identifiers or stale serve paths");
     expect(r.code).toBe(0);
   });
+
+  it("every page credits the author and the landing page deep-links the repo (check-attribution)", () => {
+    const r = run("check-attribution.mjs");
+    expect(r.out).toContain("attribution ok");
+    expect(r.code).toBe(0);
+  });
 });

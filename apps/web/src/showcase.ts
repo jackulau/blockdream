@@ -6,9 +6,8 @@ import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt } from "./blockart-core";
-import { preparePalette, quantizeFrame, type RgbImage } from "@blockdream/color-core";
-import javaMapPalette from "@blockdream/palette/data/java-map-colors-1.21.9.json";
-import type { MapPalette } from "@blockdream/palette";
+import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage } from "@blockdream/color-core";
+import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 // Pure-data subpath (no node:fs/url) so the browser bundle never pulls in the fs-based palette loaders.
 import { JAVA_DATAPACK_SUPPORTED } from "@blockdream/palette/versions";
 import {
@@ -26,12 +25,11 @@ import { rgbFramesToAnimated3d } from "./video3d";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
-import { blockForBase, localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
+import { localTextureUrl, faceTextureUrl, loadTextureManifest, hasLocalTextures, swatchDataUrl } from "./blocks";
+import { resolveBlock, safeBlockInfo } from "./resolve-block";
+import { volumeBom } from "./bom3d";
 import { downloadDatapack } from "./datapack-export";
 import { decodeGif } from "./gif";
-
-// map-colour id → Minecraft block id (baseId = id>>2); air for unmapped
-const resolveBlock = (mapColorId: number) => blockForBase(mapColorId >> 2)?.id ?? "minecraft:air";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const MC_URL = "ws://127.0.0.1:8765";
@@ -188,7 +186,14 @@ mcViewer.connect();
 drViewer.connect();
 
 // --- 3D voxel builder + replay -------------------------------------------------
-const pal3d = preparePalette(javaMapPalette as unknown as MapPalette);
+// The 3D path quantizes against the PLACEABLE solid-block color space (same OKLab matcher
+// as the 2D pixel-art path) so what the viewer shows is exactly what the datapack places.
+// Stills get the 2D path's error-diffusion dither; animation frames stay nearest+gamut
+// (per-frame dither speckle would defeat the temporal stabilizer).
+const pal3d = preparePalette(getSolidBlockMapPalette().palette);
+const QUANT3D_STILL = { method: "floyd-steinberg", gamutMap: 0.8 } as const;
+// single-color OKLab match for 3D model imports (vertex colors / material colors → blocks)
+const match3d = (r: number, g: number, b: number) => nearestSrgbHue(r, g, b, pal3d, 0.8).color.mapColorId;
 const hexByMap = new Map<number, number>();
 for (const e of pal3d.entries) {
   const c = e.color;
@@ -204,7 +209,7 @@ let grayId = 0;
     const mean = (r + g + b) / 3;
     const spread = Math.abs(r - mean) + Math.abs(g - mean) + Math.abs(b - mean);
     const score = spread + Math.abs(mean - 130);
-    if (score < best && blockForBase(mapColorId >> 2)) {
+    if (score < best && safeBlockInfo(mapColorId)) {
       best = score;
       grayId = mapColorId;
     }
@@ -256,17 +261,68 @@ async function setup3dViewer(): Promise<void> {
   const scrub = $<HTMLInputElement>("v3-scrub");
   const animSel = $<HTMLSelectElement>("v3-anim");
   const hud = $<HTMLDivElement>("v3-hud");
+  const tooltip = $<HTMLDivElement>("v3-tooltip");
+  const bomEl = $<HTMLUListElement>("v3-bom");
   await loadTextureManifest();
+
+  // bill-of-materials for the built volume — same markup contract as blockart-core's renderBom,
+  // counted by the pure volumeBom helper and named by the SAFE block that is actually placed.
+  function renderBom3d(vol: VoxelVolume): void {
+    const useTex = hasLocalTextures();
+    bomEl.innerHTML = "";
+    for (const row of volumeBom(vol)) {
+      const info = safeBlockInfo(row.id);
+      if (!info) continue;
+      const li = document.createElement("li");
+      const ic = document.createElement("img");
+      ic.className = "ic";
+      ic.alt = info.name;
+      const swatch = swatchDataUrl(info);
+      const real = useTex ? localTextureUrl(info.id) : null;
+      if (real) {
+        ic.src = real;
+        ic.onerror = () => {
+          ic.onerror = null;
+          ic.src = swatch;
+        };
+      } else {
+        ic.src = swatch;
+      }
+      const nm = document.createElement("div");
+      nm.className = "nm";
+      nm.innerHTML = `${info.name}<br><small>${info.id}</small>`;
+      const ct = document.createElement("div");
+      ct.className = "ct";
+      ct.innerHTML = `${row.count}<small>${row.pct.toFixed(1)}%</small>`;
+      li.append(ic, nm, ct);
+      bomEl.appendChild(li);
+    }
+  }
 
   const viewer = new Viewer3D({
     canvas,
+    // hover picking: same tooltip contract as the 2D block-art canvas (name, id, rgb swatch)
+    onPick: (pick, ev) => {
+      const info = pick ? safeBlockInfo(pick.id) : undefined;
+      if (!pick || !info) {
+        tooltip.style.display = "none";
+        return;
+      }
+      tooltip.innerHTML =
+        `<span class="sw" style="background:rgb(${info.rgb.r},${info.rgb.g},${info.rgb.b})"></span>` +
+        `${info.name} <span class="id">${info.id}</span><br>` +
+        `voxel ${pick.x}, ${pick.y}, ${pick.z} · rgb(${info.rgb.r}, ${info.rgb.g}, ${info.rgb.b})`;
+      tooltip.style.display = "block";
+      tooltip.style.left = `${ev.clientX + 14}px`;
+      tooltip.style.top = `${ev.clientY + 14}px`;
+    },
     textureFor: (id) => {
-      const info = blockForBase(id >> 2); // mapColorId → baseId
+      const info = safeBlockInfo(id); // texture of the SAFE placeable block → preview == export
       return info ? localTextureUrl(info.id) : null;
     },
     // per-face textures: dir 2 = +Y (top), dir 3 = -Y (bottom), else side. null → falls back to textureFor.
     faceTextureFor: (id, dir) => {
-      const info = blockForBase(id >> 2);
+      const info = safeBlockInfo(id);
       if (!info) return null;
       const face = dir === 2 ? "top" : dir === 3 ? "bottom" : "side";
       return faceTextureUrl(info.id, face);
@@ -284,23 +340,6 @@ async function setup3dViewer(): Promise<void> {
   let lastSource: ReturnType<typeof quantizeFrame> | null = null;
   let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
   const isTransformAnim = (s: string) => (TRANSFORM_ANIMS as readonly string[]).includes(s);
-
-  // nearest-downscale a quantized frame so the voxel volume stays light (3D = W×H×depth × frames)
-  function downscale(q: ReturnType<typeof quantizeFrame>, maxW: number) {
-    if (q.width <= maxW) return q;
-    const s = q.width / maxW;
-    const w = maxW;
-    const h = Math.max(1, Math.round(q.height / s));
-    const mapColorId = new Uint8Array(w * h);
-    const paletteIndex = new Int32Array(w * h);
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const p = Math.min(q.height - 1, Math.floor(y * s)) * q.width + Math.min(q.width - 1, Math.floor(x * s));
-        mapColorId[y * w + x] = q.mapColorId[p]!;
-        paletteIndex[y * w + x] = q.paletteIndex[p]!;
-      }
-    return { width: w, height: h, mapColorId, paletteIndex };
-  }
 
   // Build a genuine 3D SOLID from the current source. imageToSolid isolates the subject from the
   // background, inflates thickness by silhouette shape (a rounded dome, not a brightness emboss),
@@ -320,6 +359,7 @@ async function setup3dViewer(): Promise<void> {
     log.debug("build3d", { dims: [vol.sx, vol.sy, vol.sz], depthMapped: !!depthOf });
     baseVolume = vol;
     current3d = [vol];
+    renderBom3d(vol);
     viewer.setFrames(current3d); // single solid → live transform animation (no baked frames)
     // re-apply the chosen live animation (setFrames defaults a single volume to "spin")
     if (isTransformAnim(animSel.value)) viewer.setAnim(animSel.value);
@@ -339,13 +379,14 @@ async function setup3dViewer(): Promise<void> {
 
   // initial source = the preloaded sample image (higher res than the old 28px for a sharper solid)
   const img = new Image();
-  img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, { method: "none" }));
+  img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
   img.src = "/test-assets/pixelart.png";
 
-  // "build 3D from image" voxelizes the CURRENT block-art image (downscaled) one-click
+  // "build 3D from image" re-quantizes the SOURCE colors in the 3D palette — not a nearest
+  // subsample of the already-dithered 2D map-palette frame (which compounds two quantizers)
   $<HTMLButtonElement>("v3-rebuild").addEventListener("click", () => {
-    const q = ba.getFrame();
-    setSource(q ? downscale(q, 40) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 40), pal3d, { method: "none" }));
+    const rgb = ba.getSourceRgb(40);
+    setSource(rgb ? quantizeFrame(rgb, pal3d, QUANT3D_STILL) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
   });
   depth.addEventListener("input", () => rebuildVolume());
 
@@ -365,6 +406,7 @@ async function setup3dViewer(): Promise<void> {
 
   function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>): void {
     current3d = frames;
+    if (frames[0]) renderBom3d(frames[0]);
     viewer.setFrames(frames, { durationsMs }); // multi-frame → live transform anim defaults off
     scrub.max = String(frames.length - 1);
     $<HTMLButtonElement>("v3-download").disabled = false;
@@ -387,14 +429,14 @@ async function setup3dViewer(): Promise<void> {
       const gltf = files.find((f) => /\.gltf$/i.test(f.name));
       const gif = files.find((f) => /\.gif$/i.test(f.name) || f.type === "image/gif");
       if (glb) {
-        showFrames(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId }), `glb ${glb.name}`);
+        showFrames(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glb ${glb.name}`);
       } else if (gltf) {
-        showFrames(gltfToFrames(await gltf.text(), { frames: 24, resolution: 40, mapColorId: grayId }), `glTF ${gltf.name}`);
+        showFrames(gltfToFrames(await gltf.text(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glTF ${gltf.name}`);
       } else if (objs.length > 1) {
         const texts = await Promise.all(objs.sort((a, b) => a.name.localeCompare(b.name)).map((f) => f.text()));
-        showFrames(objSequenceToFrames(texts, { resolution: 40, mapColorId: grayId }), `obj-seq ×${texts.length}`);
+        showFrames(objSequenceToFrames(texts, { resolution: 40, mapColorId: grayId, matchColor: match3d }), `obj-seq ×${texts.length}`);
       } else if (objs.length === 1) {
-        showFrames([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true })], `model ${objs[0]!.name}`);
+        showFrames([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true, matchColor: match3d })], `model ${objs[0]!.name}`);
       } else if (gif) {
         // animated GIF → temporally-stable 3D block animation (subject-isolated solids, not flat slabs)
         const { canvases, durationsMs } = await decodeGif(gif);

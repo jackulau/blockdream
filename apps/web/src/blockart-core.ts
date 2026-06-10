@@ -39,7 +39,14 @@ export interface BlockArtOpts {
 export function createBlockArt(
   els: BlockArtEls,
   opts: BlockArtOpts = {},
-): { loadUrl: (url: string) => void; loadFile: (file: File) => Promise<void>; getFrame: () => QuantizedFrame | null } {
+): {
+  loadUrl: (url: string) => void;
+  loadFile: (file: File) => Promise<void>;
+  getFrame: () => QuantizedFrame | null;
+  /** Current SOURCE image as RGB at ≤maxW — lets the 3D builder re-quantize the original
+   *  colors in its own palette instead of inheriting this path's dithered map-palette ids. */
+  getSourceRgb: (maxW: number) => RgbImage | null;
+} {
   const pal: PreparedPalette = preparePalette(javaMapPalette as unknown as MapPalette);
   let lastImage: Source | null = null;
   let lastQ: QuantizedFrame | null = null;
@@ -258,5 +265,13 @@ export function createBlockArt(
     img.onload = () => loadImage(img);
     img.src = url;
   }
-  return { loadUrl, loadFile, getFrame: () => lastQ };
+  return {
+    loadUrl,
+    loadFile,
+    getFrame: () => lastQ,
+    getSourceRgb: (maxW: number) => {
+      const src = currentSource();
+      return src ? toRgbImage(src, Math.min(maxW, Number(els.grid.value) || maxW)) : null;
+    },
+  };
 }

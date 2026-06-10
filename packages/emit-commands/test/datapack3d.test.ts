@@ -51,3 +51,15 @@ describe("generateVoxelDatapack (3D)", () => {
     expect(f0).toContain("setblock 2 64 0 minecraft:c2 replace"); // singleton stays /setblock
   });
 });
+
+describe("start/stop chunk lifecycle (3D)", () => {
+  it("stop releases the forceloaded chunks and start re-acquires them", () => {
+    const pack = generateVoxelDatapack([lineVolume()], resolve, { origin: { x: 0, y: 64, z: 0 } });
+    const start = pack.files.get("data/blockdream/function/start.mcfunction")!;
+    const stop = pack.files.get("data/blockdream/function/stop.mcfunction")!;
+    expect(start).toContain("forceload add 0 0 2 0");
+    expect(start).toContain("scoreboard players set #play ma 1");
+    expect(stop).toContain("forceload remove 0 0 2 0");
+    expect(stop).toContain("scoreboard players set #play ma 0");
+  });
+});
