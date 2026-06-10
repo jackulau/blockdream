@@ -19,7 +19,8 @@
 import { createBot } from "mineflayer";
 import { Rcon } from "rcon-client";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtempSync, copyFileSync, existsSync, rmSync, createWriteStream } from "node:fs";
+import { mkdtempSync, copyFileSync, existsSync, rmSync, readFileSync, writeFileSync, createWriteStream } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +39,28 @@ const SAMPLES = [[0, 0], [16, 12], [32, 24], [48, 36], [63, 48], [31, 63], [63, 
 
 const log = (m) => console.log(`[bridge-e2e] ${m}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ephemeral free port — concurrent e2e runs (parallel audits / two verify-alls) must
+// not race a hardcoded 25565/25575; the bind loser's clients would silently drive the
+// winner's server
+function freePort() {
+  return new Promise((res, rej) => {
+    const srv = createServer();
+    srv.once("error", rej);
+    srv.listen(0, "127.0.0.1", () => {
+      const p = srv.address().port;
+      srv.close(() => res(p));
+    });
+  });
+}
+
+// replace-or-APPEND a server.properties key: the bootstrap properties are minimal
+// (vanilla appends missing defaults on first boot), so a bare .replace() on an absent
+// key is a silent no-op and the server binds the default port instead
+function setProp(text, key, val) {
+  const re = new RegExp(`^${key.replace(/\./g, "\\.")}=.*$`, "m");
+  return re.test(text) ? text.replace(re, `${key}=${val}`) : `${text.replace(/\n?$/, "\n")}${key}=${val}\n`;
+}
 
 // stream child output line-by-line: echo with a prefix and remember lines for diagnostics
 function tee(stream, prefix, sink) {
@@ -84,29 +107,49 @@ try {
   log(`bootstrapping vanilla ${MC_VERSION} in ${dir}`);
   execFileSync("bash", [join(ROOT, "scripts/vanilla-server.sh"), "--dir", dir, "--rcon-pass", RCON_PASS, "--no-start"], { stdio: "inherit" });
 
+  // unique ports per run so concurrent instances can't cross-talk. freePort() has a
+  // tiny check-then-use race (another process can bind the port between close and
+  // java's bind), so a bind-failure boot is retried with fresh ports.
   const javaHome = execFileSync("/usr/libexec/java_home", ["-v", "21"]).toString().trim();
-  log(`starting server (java 21 @ ${javaHome}) — waiting for RCON (≤180 s)`);
-  server = spawn(join(javaHome, "bin", "java"), ["-Xmx2G", "-jar", "server.jar", "nogui"], {
-    cwd: dir, env: { ...process.env, JAVA_HOME: javaHome }, stdio: ["ignore", "pipe", "pipe"],
-  });
-  const bootLog = createWriteStream(join(dir, "boot-stdout.log"));
-  server.stdout.pipe(bootLog); server.stderr.pipe(bootLog);
-  await new Promise((res, rej) => {
-    const timer = setTimeout(() => rej(new Error(`server not ready after 180 s — see ${dir}/boot-stdout.log`)), 180_000);
-    let buf = "";
-    const onData = (d) => {
-      buf += d.toString();
-      if (/RCON running on/.test(buf)) {
-        server.stdout.off("data", onData); clearTimeout(timer);
-        log("server ready (RCON listening)"); res();
+  const propsPath = join(dir, "server.properties");
+  let SERVER_PORT, RCON_PORT;
+  for (let attempt = 1; ; attempt++) {
+    SERVER_PORT = await freePort();
+    RCON_PORT = await freePort();
+    writeFileSync(propsPath,
+      setProp(setProp(readFileSync(propsPath, "utf8"), "server-port", SERVER_PORT), "rcon.port", RCON_PORT));
+    log(`starting server (java 21, ports: server ${SERVER_PORT}, rcon ${RCON_PORT}) — waiting for RCON (≤180 s)`);
+    server = spawn(join(javaHome, "bin", "java"), ["-Xmx2G", "-jar", "server.jar", "nogui"], {
+      cwd: dir, env: { ...process.env, JAVA_HOME: javaHome }, stdio: ["ignore", "pipe", "pipe"],
+    });
+    const bootLog = createWriteStream(join(dir, "boot-stdout.log"));
+    server.stdout.pipe(bootLog); server.stderr.pipe(bootLog);
+    let bootBuf = "";
+    try {
+      await new Promise((res, rej) => {
+        const timer = setTimeout(() => rej(new Error(`server not ready after 180 s — see ${dir}/boot-stdout.log`)), 180_000);
+        const onData = (d) => {
+          bootBuf += d.toString();
+          if (/RCON running on/.test(bootBuf)) {
+            server.stdout.off("data", onData); clearTimeout(timer);
+            log("server ready (RCON listening)"); res();
+          }
+        };
+        server.stdout.on("data", onData);
+        server.once("exit", (code) => { clearTimeout(timer); rej(new Error(`server exited early (code ${code}) — see ${dir}/boot-stdout.log`)); });
+      });
+      break; // booted
+    } catch (bootErr) {
+      if (attempt < 3 && /Address already in use/.test(bootBuf)) {
+        log(`port collision on boot (attempt ${attempt}) — retrying with fresh ports`);
+        continue;
       }
-    };
-    server.stdout.on("data", onData);
-    server.once("exit", (code) => { clearTimeout(timer); rej(new Error(`server exited early (code ${code}) — see ${dir}/boot-stdout.log`)); });
-  });
+      throw bootErr;
+    }
+  }
 
   // ---- 2. RCON-prepare: keep the wall + walking area loaded, flatten the slate to air
-  rconClient = await Rcon.connect({ host: "127.0.0.1", port: 25575, password: RCON_PASS });
+  rconClient = await Rcon.connect({ host: "127.0.0.1", port: RCON_PORT, password: RCON_PASS });
   const rcon = (cmd) => rconClient.send(cmd);
   await rcon("difficulty peaceful");
   await rcon("defaultgamemode creative");
@@ -117,7 +160,7 @@ try {
 
   // ---- 3. join the bot (offline-mode server — no Microsoft account needed)
   log(`joining bot ${BOT_NAME} (mineflayer, version ${MC_VERSION}, auth offline)`);
-  bot = createBot({ host: "127.0.0.1", port: 25565, username: BOT_NAME, auth: "offline", version: MC_VERSION });
+  bot = createBot({ host: "127.0.0.1", port: SERVER_PORT, username: BOT_NAME, auth: "offline", version: MC_VERSION });
   await new Promise((res, rej) => {
     const timer = setTimeout(() => rej(new Error("bot did not spawn within 60 s")), 60_000);
     bot.once("spawn", () => { clearTimeout(timer); res(); });
@@ -131,8 +174,8 @@ try {
 
   // ---- 4. launch the sidecar (mock WM: no checkpoint/WS) and DRIVE the bot during its frames
   const tsx = join(ROOT, "node_modules/.bin/tsx");
-  const args = ["packages/cli/src/rcon-bridge-cli.ts", "--rcon-pass", RCON_PASS, "--player", BOT_NAME,
-    "--mock-wm", "--frames", String(FRAMES), "--fps", "4", "--max-commands", "4096",
+  const args = ["packages/cli/src/rcon-bridge-cli.ts", "--rcon-pass", RCON_PASS, "--rcon-port", String(RCON_PORT),
+    "--player", BOT_NAME, "--mock-wm", "--frames", String(FRAMES), "--fps", "4", "--max-commands", "4096",
     "--origin", `${ORIGIN.x},${ORIGIN.y},${ORIGIN.z}`];
   log(`launching sidecar: tsx ${args.join(" ")}`);
   sidecar = spawn(existsSync(tsx) ? tsx : "npx", existsSync(tsx) ? args : ["tsx", ...args],

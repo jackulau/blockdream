@@ -26,7 +26,8 @@
 
 import { Rcon } from "rcon-client";
 import { spawn, execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, copyFileSync, existsSync, rmSync, readFileSync, readdirSync, createWriteStream } from "node:fs";
+import { mkdtempSync, copyFileSync, existsSync, rmSync, readFileSync, writeFileSync, readdirSync, createWriteStream } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +35,28 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const MC_VERSION = "1.21.1";
 const RCON_PASS = "blockdream-dp-e2e";
+
+// ephemeral free port — concurrent e2e runs (e.g. parallel audit skeptics) must not
+// race a hardcoded 25565/25575: both RCON clients would reach whichever server won
+// the bind, and the loser's setup (#play=0) silently freezes the winner's playback
+function freePort() {
+  return new Promise((res, rej) => {
+    const srv = createServer();
+    srv.once("error", rej);
+    srv.listen(0, "127.0.0.1", () => {
+      const p = srv.address().port;
+      srv.close(() => res(p));
+    });
+  });
+}
+
+// replace-or-APPEND a server.properties key: the bootstrap properties are minimal
+// (vanilla appends missing defaults on first boot), so a bare .replace() on an absent
+// key is a silent no-op and the server binds the default port instead
+function setProp(text, key, val) {
+  const re = new RegExp(`^${key.replace(/\./g, "\\.")}=.*$`, "m");
+  return re.test(text) ? text.replace(re, `${key}=${val}`) : `${text.replace(/\n?$/, "\n")}${key}=${val}\n`;
+}
 const NS = "blockdream";
 const GRID = { w: 32, h: 24 }; // wall size; emitter default origin {x:0,y:64,z:0}, +Z facing
 const ORIGIN = { x: 0, y: 64, z: 0 };
@@ -144,28 +167,48 @@ try {
   execFileSync("bash", [join(ROOT, "scripts/vanilla-server.sh"), "--dir", dir, "--rcon-pass", RCON_PASS,
     "--datapack", zip, "--no-start"], { stdio: "inherit" });
 
+  // unique ports per run so concurrent instances can't cross-talk. freePort() has a
+  // tiny check-then-use race (another process can bind the port between close and
+  // java's bind), so a bind-failure boot is retried with fresh ports.
   const javaHome = execFileSync("/usr/libexec/java_home", ["-v", "21"]).toString().trim();
-  log(`starting server (java 21 @ ${javaHome}) — waiting for RCON (≤180 s)`);
-  server = spawn(join(javaHome, "bin", "java"), ["-Xmx2G", "-jar", "server.jar", "nogui"], {
-    cwd: dir, env: { ...process.env, JAVA_HOME: javaHome }, stdio: ["ignore", "pipe", "pipe"],
-  });
-  const bootLog = createWriteStream(join(dir, "boot-stdout.log"));
-  server.stdout.pipe(bootLog); server.stderr.pipe(bootLog);
-  await new Promise((res, rej) => {
-    const timer = setTimeout(() => rej(new Error(`server not ready after 180 s — see ${dir}/boot-stdout.log`)), 180_000);
-    let buf = "";
-    const onData = (d) => {
-      buf += d.toString();
-      if (/RCON running on/.test(buf)) {
-        server.stdout.off("data", onData); clearTimeout(timer);
-        log("server ready (RCON listening)"); res();
+  const propsPath = join(dir, "server.properties");
+  let RCON_PORT;
+  for (let attempt = 1; ; attempt++) {
+    const SERVER_PORT = await freePort();
+    RCON_PORT = await freePort();
+    writeFileSync(propsPath,
+      setProp(setProp(readFileSync(propsPath, "utf8"), "server-port", SERVER_PORT), "rcon.port", RCON_PORT));
+    log(`starting server (java 21, ports: server ${SERVER_PORT}, rcon ${RCON_PORT}) — waiting for RCON (≤180 s)`);
+    server = spawn(join(javaHome, "bin", "java"), ["-Xmx2G", "-jar", "server.jar", "nogui"], {
+      cwd: dir, env: { ...process.env, JAVA_HOME: javaHome }, stdio: ["ignore", "pipe", "pipe"],
+    });
+    const bootLog = createWriteStream(join(dir, "boot-stdout.log"));
+    server.stdout.pipe(bootLog); server.stderr.pipe(bootLog);
+    let bootBuf = "";
+    try {
+      await new Promise((res, rej) => {
+        const timer = setTimeout(() => rej(new Error(`server not ready after 180 s — see ${dir}/boot-stdout.log`)), 180_000);
+        const onData = (d) => {
+          bootBuf += d.toString();
+          if (/RCON running on/.test(bootBuf)) {
+            server.stdout.off("data", onData); clearTimeout(timer);
+            log("server ready (RCON listening)"); res();
+          }
+        };
+        server.stdout.on("data", onData);
+        server.once("exit", (code) => { clearTimeout(timer); rej(new Error(`server exited early (code ${code}) — see ${dir}/boot-stdout.log`)); });
+      });
+      break; // booted
+    } catch (bootErr) {
+      if (attempt < 3 && /Address already in use/.test(bootBuf)) {
+        log(`port collision on boot (attempt ${attempt}) — retrying with fresh ports`);
+        continue;
       }
-    };
-    server.stdout.on("data", onData);
-    server.once("exit", (code) => { clearTimeout(timer); rej(new Error(`server exited early (code ${code}) — see ${dir}/boot-stdout.log`)); });
-  });
+      throw bootErr;
+    }
+  }
 
-  rconClient = await Rcon.connect({ host: "127.0.0.1", port: 25575, password: RCON_PASS });
+  rconClient = await Rcon.connect({ host: "127.0.0.1", port: RCON_PORT, password: RCON_PASS });
   const rcon = (cmd) => rconClient.send(cmd);
 
   // ---- 5. pack is enabled at boot AND survives /reload (the documented user flow)
@@ -208,16 +251,23 @@ try {
 
   // ---- 7. start → the tick driver + vanilla MACRO dispatch must really animate
   await rcon(`function ${NS}:start`);
-  let fLine = "";
+  // POLL CADENCE MATTERS: the animation cycle is FRAMES×speedTicks×50 ms = 400 ms, and a
+  // 400 ms poll phase-locks onto it — it can land on the wrap-to-zero tick every single
+  // time and read #f==0 forever while the wall visibly animates (the goal-028 audit
+  // caught exactly that, ~25% false-fail). 90 ms is deliberately co-prime with the
+  // cycle (gcd(90,400)=10 ≠ 0 phase drift per poll), so consecutive reads sweep all
+  // phases; #f>0 for 75% of the cycle ⇒ a live driver is detected within a few polls.
+  const seen = new Set();
   const tPoll = Date.now();
-  let advanced = false;
   while (Date.now() - tPoll < 15_000) {
-    await sleep(400);
-    fLine = await rcon("scoreboard players get #f ma");
-    const m = /has (\d+)/.exec(fLine);
-    if (m && Number(m[1]) > 0) { advanced = true; break; }
+    const m = /has (\d+)/.exec(await rcon("scoreboard players get #f ma"));
+    if (m) seen.add(Number(m[1]));
+    if ([...seen].some((v) => v > 0)) break;
+    await sleep(90);
   }
-  if (!advanced) throw new Error(`frame counter never advanced after :start — macro driver not ticking (last: ${fLine})`);
+  if (![...seen].some((v) => v > 0)) {
+    throw new Error(`frame counter never advanced after :start — macro driver not ticking (saw #f ∈ {${[...seen].join(",") || "∅"}})`);
+  }
   await rcon(`function ${NS}:stop`);
   const readF = async () => {
     const m = /has (\d+)/.exec(await rcon("scoreboard players get #f ma"));
