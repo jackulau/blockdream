@@ -25,8 +25,9 @@ import { rgbFramesToAnimated3d } from "./video3d";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
-import { localTextureUrl, faceTextureUrl, loadTextureManifest } from "./blocks";
+import { localTextureUrl, faceTextureUrl, loadTextureManifest, hasLocalTextures, swatchDataUrl } from "./blocks";
 import { resolveBlock, safeBlockInfo } from "./resolve-block";
+import { volumeBom } from "./bom3d";
 import { downloadDatapack } from "./datapack-export";
 import { decodeGif } from "./gif";
 
@@ -258,10 +259,61 @@ async function setup3dViewer(): Promise<void> {
   const scrub = $<HTMLInputElement>("v3-scrub");
   const animSel = $<HTMLSelectElement>("v3-anim");
   const hud = $<HTMLDivElement>("v3-hud");
+  const tooltip = $<HTMLDivElement>("v3-tooltip");
+  const bomEl = $<HTMLUListElement>("v3-bom");
   await loadTextureManifest();
+
+  // bill-of-materials for the built volume — same markup contract as blockart-core's renderBom,
+  // counted by the pure volumeBom helper and named by the SAFE block that is actually placed.
+  function renderBom3d(vol: VoxelVolume): void {
+    const useTex = hasLocalTextures();
+    bomEl.innerHTML = "";
+    for (const row of volumeBom(vol)) {
+      const info = safeBlockInfo(row.id);
+      if (!info) continue;
+      const li = document.createElement("li");
+      const ic = document.createElement("img");
+      ic.className = "ic";
+      ic.alt = info.name;
+      const swatch = swatchDataUrl(info);
+      const real = useTex ? localTextureUrl(info.id) : null;
+      if (real) {
+        ic.src = real;
+        ic.onerror = () => {
+          ic.onerror = null;
+          ic.src = swatch;
+        };
+      } else {
+        ic.src = swatch;
+      }
+      const nm = document.createElement("div");
+      nm.className = "nm";
+      nm.innerHTML = `${info.name}<br><small>${info.id}</small>`;
+      const ct = document.createElement("div");
+      ct.className = "ct";
+      ct.innerHTML = `${row.count}<small>${row.pct.toFixed(1)}%</small>`;
+      li.append(ic, nm, ct);
+      bomEl.appendChild(li);
+    }
+  }
 
   const viewer = new Viewer3D({
     canvas,
+    // hover picking: same tooltip contract as the 2D block-art canvas (name, id, rgb swatch)
+    onPick: (pick, ev) => {
+      const info = pick ? safeBlockInfo(pick.id) : undefined;
+      if (!pick || !info) {
+        tooltip.style.display = "none";
+        return;
+      }
+      tooltip.innerHTML =
+        `<span class="sw" style="background:rgb(${info.rgb.r},${info.rgb.g},${info.rgb.b})"></span>` +
+        `${info.name} <span class="id">${info.id}</span><br>` +
+        `voxel ${pick.x}, ${pick.y}, ${pick.z} · rgb(${info.rgb.r}, ${info.rgb.g}, ${info.rgb.b})`;
+      tooltip.style.display = "block";
+      tooltip.style.left = `${ev.clientX + 14}px`;
+      tooltip.style.top = `${ev.clientY + 14}px`;
+    },
     textureFor: (id) => {
       const info = safeBlockInfo(id); // texture of the SAFE placeable block → preview == export
       return info ? localTextureUrl(info.id) : null;
@@ -305,6 +357,7 @@ async function setup3dViewer(): Promise<void> {
     log.debug("build3d", { dims: [vol.sx, vol.sy, vol.sz], depthMapped: !!depthOf });
     baseVolume = vol;
     current3d = [vol];
+    renderBom3d(vol);
     viewer.setFrames(current3d); // single solid → live transform animation (no baked frames)
     // re-apply the chosen live animation (setFrames defaults a single volume to "spin")
     if (isTransformAnim(animSel.value)) viewer.setAnim(animSel.value);
@@ -351,6 +404,7 @@ async function setup3dViewer(): Promise<void> {
 
   function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>): void {
     current3d = frames;
+    if (frames[0]) renderBom3d(frames[0]);
     viewer.setFrames(frames, { durationsMs }); // multi-frame → live transform anim defaults off
     scrub.max = String(frames.length - 1);
     $<HTMLButtonElement>("v3-download").disabled = false;

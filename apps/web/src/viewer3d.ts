@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { poseAt, type VoxelVolume } from "@blockdream/voxel";
+import { EMPTY, getVoxel, poseAt, type VoxelVolume } from "@blockdream/voxel";
 import { meshByMaterial, type FaceDir } from "./mesh3d";
 import { buildSchedule, uniformSchedule, frameAtElapsed, startOfFrame, type FrameSchedule } from "./anim";
 
@@ -17,6 +17,16 @@ export interface Viewer3DConfig {
   colorFor: (mapColorId: number) => number; // 0xRRGGBB fallback when no texture
   fps?: number; // fallback playback fps when frames carry no per-frame durations (default 8)
   onFrame?: (index: number, count: number) => void;
+  /** Hover picking: fired on mousemove with the voxel under the cursor (null = none). */
+  onPick?: (pick: VoxelPick | null, ev: MouseEvent) => void;
+}
+
+export interface VoxelPick {
+  /** mapColorId of the hovered voxel. */
+  id: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 export class Viewer3D {
@@ -54,7 +64,44 @@ export class Viewer3D {
     this.controls.enableDamping = true;
     this.resize();
     window.addEventListener("resize", this.resize);
+    if (cfg.onPick) {
+      cfg.canvas.addEventListener("mousemove", this.onMouseMove);
+      cfg.canvas.addEventListener("mouseleave", this.onMouseLeave);
+    }
     this.loop(0);
+  }
+
+  // --- hover picking: ray → merged greedy-quad mesh → voxel cell → id from the volume ---
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly pointer = new THREE.Vector2();
+
+  private onMouseMove = (ev: MouseEvent): void => {
+    this.cfg.onPick?.(this.pick(ev), ev);
+  };
+  private onMouseLeave = (ev: MouseEvent): void => {
+    this.cfg.onPick?.(null, ev);
+  };
+
+  /** The voxel under a mouse event, or null. Robust to the live transform animation because
+   *  the intersected mesh's world matrix carries the root pose. */
+  pick(ev: MouseEvent): VoxelPick | null {
+    const v = this.frames[this.index];
+    const g = this.groups[this.index];
+    if (!v || !g) return null;
+    const r = this.cfg.canvas.getBoundingClientRect();
+    this.pointer.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const hit = this.raycaster.intersectObjects(g.children, false)[0];
+    if (!hit?.face) return null;
+    // local-space hit point sits ON a face plane; step half a cell INTO the solid along the
+    // (local) face normal, then un-center to volume coordinates.
+    const local = (hit.object as THREE.Mesh).worldToLocal(hit.point.clone());
+    const n = hit.face.normal;
+    const x = Math.floor(local.x - n.x * 0.5 + v.sx / 2);
+    const y = Math.floor(local.y - n.y * 0.5 + v.sy / 2);
+    const z = Math.floor(local.z - n.z * 0.5 + v.sz / 2);
+    const id = getVoxel(v, x, y, z);
+    return id === EMPTY ? null : { id, x, y, z };
   }
 
   private resize = () => {
@@ -118,7 +165,7 @@ export class Viewer3D {
    * volume defaults spin ON (turntable showcase).
    */
   setFrames(frames: VoxelVolume[], opts: { durationsMs?: Array<number | undefined | null> } = {}): void {
-    this.root.clear();
+    this.disposeGroups(); // free the previous frames' geometries (materials/textures stay cached)
     this.groups = new Array(frames.length).fill(null);
     this.frames = frames;
     this.index = 0;
@@ -204,9 +251,25 @@ export class Viewer3D {
     this.renderer.render(this.scene, this.camera);
   };
 
+  /** Dispose every mesh geometry under the root (the leak: BufferGeometries held GPU buffers
+   *  across setFrames calls — re-importing animations grew GPU memory unboundedly). */
+  private disposeGroups(): void {
+    this.root.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose();
+    });
+    this.root.clear();
+  }
+
   dispose(): void {
     cancelAnimationFrame(this.raf);
     window.removeEventListener("resize", this.resize);
+    this.cfg.canvas.removeEventListener("mousemove", this.onMouseMove);
+    this.cfg.canvas.removeEventListener("mouseleave", this.onMouseLeave);
+    this.disposeGroups();
+    for (const m of this.matCache.values()) m.dispose();
+    for (const t of this.texCache.values()) t.dispose();
+    this.matCache.clear();
+    this.texCache.clear();
     this.renderer.dispose();
   }
 }
