@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "node scripts/check-emit-browser-safe.mjs && node scripts/check-render-loop.mjs && node scripts/check-texture-coverage.mjs",
+    "check": "node scripts/check-emit-browser-safe.mjs && node scripts/check-render-loop.mjs && node scripts/check-texture-coverage.mjs && node scripts/check-attribution.mjs",
     "prebuild": "node scripts/check-emit-browser-safe.mjs && node scripts/check-render-loop.mjs"
   },
   "dependencies": {
