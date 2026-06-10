@@ -135,8 +135,16 @@ export function generateVoxelDatapack(
     ].join("\n"),
   );
 
-  files.set(`${fnDir}/start.mcfunction`, `scoreboard players set #play ma 1\n`);
-  files.set(`${fnDir}/stop.mcfunction`, `scoreboard players set #play ma 0\n`);
+  // start re-acquires the forceload that stop releases — stop fully frees the chunks
+  // (server-friendly: a paused animation keeps nothing loaded), start gets them back.
+  files.set(
+    `${fnDir}/start.mcfunction`,
+    [`forceload add ${x0} ${z0} ${x1} ${z1}`, `scoreboard players set #play ma 1`, ""].join("\n"),
+  );
+  files.set(
+    `${fnDir}/stop.mcfunction`,
+    [`scoreboard players set #play ma 0`, `forceload remove ${x0} ${z0} ${x1} ${z1}`, ""].join("\n"),
+  );
   files.set(
     `${fnDir}/driver.mcfunction`,
     [
