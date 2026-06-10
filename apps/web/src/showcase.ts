@@ -6,7 +6,7 @@ import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt } from "./blockart-core";
-import { preparePalette, quantizeFrame, type RgbImage } from "@blockdream/color-core";
+import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage } from "@blockdream/color-core";
 import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 // Pure-data subpath (no node:fs/url) so the browser bundle never pulls in the fs-based palette loaders.
 import { JAVA_DATAPACK_SUPPORTED } from "@blockdream/palette/versions";
@@ -192,6 +192,8 @@ drViewer.connect();
 // (per-frame dither speckle would defeat the temporal stabilizer).
 const pal3d = preparePalette(getSolidBlockMapPalette().palette);
 const QUANT3D_STILL = { method: "floyd-steinberg", gamutMap: 0.8 } as const;
+// single-color OKLab match for 3D model imports (vertex colors / material colors → blocks)
+const match3d = (r: number, g: number, b: number) => nearestSrgbHue(r, g, b, pal3d, 0.8).color.mapColorId;
 const hexByMap = new Map<number, number>();
 for (const e of pal3d.entries) {
   const c = e.color;
@@ -427,14 +429,14 @@ async function setup3dViewer(): Promise<void> {
       const gltf = files.find((f) => /\.gltf$/i.test(f.name));
       const gif = files.find((f) => /\.gif$/i.test(f.name) || f.type === "image/gif");
       if (glb) {
-        showFrames(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId }), `glb ${glb.name}`);
+        showFrames(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glb ${glb.name}`);
       } else if (gltf) {
-        showFrames(gltfToFrames(await gltf.text(), { frames: 24, resolution: 40, mapColorId: grayId }), `glTF ${gltf.name}`);
+        showFrames(gltfToFrames(await gltf.text(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glTF ${gltf.name}`);
       } else if (objs.length > 1) {
         const texts = await Promise.all(objs.sort((a, b) => a.name.localeCompare(b.name)).map((f) => f.text()));
-        showFrames(objSequenceToFrames(texts, { resolution: 40, mapColorId: grayId }), `obj-seq ×${texts.length}`);
+        showFrames(objSequenceToFrames(texts, { resolution: 40, mapColorId: grayId, matchColor: match3d }), `obj-seq ×${texts.length}`);
       } else if (objs.length === 1) {
-        showFrames([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true })], `model ${objs[0]!.name}`);
+        showFrames([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true, matchColor: match3d })], `model ${objs[0]!.name}`);
       } else if (gif) {
         // animated GIF → temporally-stable 3D block animation (subject-isolated solids, not flat slabs)
         const { canvases, durationsMs } = await decodeGif(gif);

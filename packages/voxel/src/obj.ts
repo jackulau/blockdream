@@ -10,6 +10,10 @@ export interface ObjVoxelizeOptions {
   resolution?: number; // cube grid size (default 32)
   mapColorId?: number; // block colour id to fill the shell with (default 0)
   solid?: boolean; // fill the interior too (flood-fill from outside), not just the surface shell
+  /** sRGB (0..255) → mapColorId, e.g. a color-core OKLab nearest-match against the placeable
+   *  palette. When supplied AND the source carries vertex colors, each triangle gets its own
+   *  matched block instead of the single mapColorId. */
+  matchColor?: (r: number, g: number, b: number) => number;
 }
 
 export type V3 = [number, number, number];
@@ -19,9 +23,11 @@ export interface Bounds {
   max: V3;
 }
 
-export function parseObj(obj: string): { verts: V3[]; tris: Tri[] } {
+export function parseObj(obj: string): { verts: V3[]; tris: Tri[]; colors?: V3[] } {
   const verts: V3[] = [];
   const tris: Tri[] = [];
+  const colors: V3[] = [];
+  let anyColor = false;
   for (const line of obj.split(/\r?\n/)) {
     const t = line.trim().split(/\s+/);
     if (t[0] === "v" && t.length >= 4) {
@@ -30,6 +36,14 @@ export function parseObj(obj: string): { verts: V3[]; tris: Tri[] } {
         throw new Error(`malformed vertex in .obj (non-numeric coordinate): "${line.trim()}"`);
       }
       verts.push([x, y, z]);
+      // the common .obj vertex-color extension: "v x y z r g b" with r/g/b in 0..1
+      if (t.length >= 7) {
+        const r = Number(t[4]), g = Number(t[5]), b = Number(t[6]);
+        if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+          colors.push([r, g, b]);
+          anyColor = true;
+        } else colors.push([1, 1, 1]);
+      } else colors.push([1, 1, 1]);
     } else if (t[0] === "f" && t.length >= 4) {
       const idx = t.slice(1).map((s) => {
         const n = parseInt(s.split("/")[0]!, 10);
@@ -38,7 +52,7 @@ export function parseObj(obj: string): { verts: V3[]; tris: Tri[] } {
       for (let i = 1; i + 1 < idx.length; i++) tris.push([idx[0]!, idx[i]!, idx[i + 1]!]); // fan-triangulate
     }
   }
-  return { verts, tris };
+  return anyColor ? { verts, tris, colors } : { verts, tris };
 }
 
 /** Axis-aligned bounds of a vertex set. */
@@ -67,13 +81,15 @@ export function unionBounds(all: Bounds[]): Bounds {
 
 export interface RasterOptions extends ObjVoxelizeOptions {
   bounds?: Bounds; // shared normalization box (for an animation); defaults to this mesh's own bounds
+  /** Per-triangle block id (overrides mapColorId for that triangle's surface voxels). */
+  colorOf?: (triIndex: number) => number;
 }
 
 /** Rasterize a triangle mesh into a res³ volume. With `bounds` supplied, the mesh is normalized into
  *  that shared box (uniform scale, preserving aspect) so a sequence of meshes lands in one world frame. */
 export function trisToVolume(verts: V3[], tris: Tri[], opts: RasterOptions = {}): VoxelVolume {
   const res = Math.max(2, Math.floor(opts.resolution ?? 32));
-  const color = opts.mapColorId ?? 0;
+  const fallback = opts.mapColorId ?? 0;
   if (verts.length === 0 || tris.length === 0) throw new Error("empty mesh (need vertices + triangles)");
 
   const b = opts.bounds ?? meshBounds(verts);
@@ -82,8 +98,10 @@ export function trisToVolume(verts: V3[], tris: Tri[], opts: RasterOptions = {})
   const grid = (v: V3): V3 => [(v[0]! - b.min[0]!) * scale, (v[1]! - b.min[1]!) * scale, (v[2]! - b.min[2]!) * scale];
 
   const vol = createVolume(res, res, res);
-  for (const [ia, ib, ic] of tris) {
+  for (let t = 0; t < tris.length; t++) {
+    const [ia, ib, ic] = tris[t]!;
     if (ia < 0 || ib < 0 || ic < 0 || ia >= verts.length || ib >= verts.length || ic >= verts.length) continue;
+    const color = opts.colorOf?.(t) ?? fallback;
     const a = grid(verts[ia]!);
     const bb = grid(verts[ib]!);
     const c = grid(verts[ic]!);
@@ -104,14 +122,29 @@ export function trisToVolume(verts: V3[], tris: Tri[], opts: RasterOptions = {})
       }
     }
   }
-  if (opts.solid) solidify(vol, color);
+  if (opts.solid) solidify(vol, fallback);
   return vol;
 }
 
 export function objToVolume(obj: string, opts: ObjVoxelizeOptions = {}): VoxelVolume {
-  const { verts, tris } = parseObj(obj);
+  const { verts, tris, colors } = parseObj(obj);
   if (verts.length === 0 || tris.length === 0) throw new Error("empty or invalid .obj (need v + f)");
-  return trisToVolume(verts, tris, opts);
+  let colorOf: ((t: number) => number) | undefined;
+  if (colors && opts.matchColor) {
+    const match = opts.matchColor;
+    const cache = new Map<number, number>();
+    colorOf = (t: number) => {
+      const [ia, ib, ic] = tris[t]!;
+      const r = ((colors[ia]![0]! + colors[ib]![0]! + colors[ic]![0]!) / 3) * 255;
+      const g = ((colors[ia]![1]! + colors[ib]![1]! + colors[ic]![1]!) / 3) * 255;
+      const bch = ((colors[ia]![2]! + colors[ib]![2]! + colors[ic]![2]!) / 3) * 255;
+      const key = (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(bch);
+      let id = cache.get(key);
+      if (id === undefined) cache.set(key, (id = match(r, g, bch)));
+      return id;
+    };
+  }
+  return trisToVolume(verts, tris, { ...opts, colorOf });
 }
 
 /**
