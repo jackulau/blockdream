@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 # Goal 020 / D6 — per-movement-type training.
+#
+# ⚠️  DEPRECATED — PROOF-ONLY, NOT SERVED. ⚠️
+# This trains the SUPERSEDED runs/skills checkpoint on SYNTHETIC per-skill pools (gen_movement_data.py
+# procedural tints). The served Minecraft world model is now runs/skills_real, trained on 100% REAL
+# footage for all 9 movement types via scripts/train_skills_hi.sh (OUT=runs/skills_real). Do NOT use
+# this for anything shipped; the no_synthetic_guard.py gate fails if pool_synth_* reaches a live path.
+# Kept only to reproduce the original conditioning proof.
+#
 # Generates synthetic per-skill pools (distinct, learnable dynamics) in the real
 # on-disk format, then trains ONE skill-conditioned model on all 9 types so the
 # tester's movement selector produces DISTINCT rollouts. Bounded to finish in-session.

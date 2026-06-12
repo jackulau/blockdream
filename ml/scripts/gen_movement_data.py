@@ -1,11 +1,19 @@
 """Synthetic per-movement-type data generator.
 
+⚠️  DEPRECATED — PROOF-ONLY, NOT USED BY ANY SERVED MODEL. ⚠️
+The served Minecraft world model (runs/skills_real) is now trained on 100% REAL footage for all 9
+movement types — real human VPT (walk/general/sprint/jump) + real mineflayer gameplay
+(swim/boat/elytra/pig/minecart). This generator exists ONLY as the historical conditioning proof
+that produced the superseded runs/skills checkpoint. It MUST NOT feed any served/live checkpoint;
+the no_synthetic_guard.py gate enforces that pool_synth_* never appears in a live training path.
+Kept for reproducibility of the original proof only.
+
 The VPT contractor data is walking/general only, so the boat/swim/elytra/pig/minecart skill
 embeddings never get a gradient — selecting "boat" in the tester does nothing. This generates
 per-skill pools with DISTINCT, learnable dynamics (different scroll speed + colour cast +
 bob), in the exact on-disk pool format the real trainer consumes (frames (N,H,W,3) uint8,
-actions (N,11) float32, skill.txt). It is a stand-in so conditioning is trainable + provable
-WITHOUT scarce real footage; real per-skill footage drops into the same layout to scale up.
+actions (N,11) float32, skill.txt). It was a stand-in so conditioning was trainable + provable
+WITHOUT scarce real footage; the real per-skill footage now lives in the same layout (pool_real_*).
 
 Usage:
   python scripts/gen_movement_data.py --skills walk,boat,elytra --segments 6 --len 64 --size 64 --out data
