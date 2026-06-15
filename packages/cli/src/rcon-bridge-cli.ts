@@ -1,6 +1,6 @@
 // Runnable NO-MOD live sidecar around the pure core in rcon-bridge.ts: connects a STOCK
 // vanilla Minecraft server (RCON) to the local world-model WS server (ml serve.py) and
-// paints each generated frame as a vertical solid-block wall near --origin — live, while
+// paints each generated frame as a vertical solid-block wall near --origin - live, while
 // the player walks around. No mod, no datapack, no client plugin: RCON is the transport.
 //
 //   RCON poll (`data get entity <p> Pos` / `Rotation`) → parsePosRotation → poseToAction
@@ -10,7 +10,7 @@
 // All data transforms (pose parsing, action derivation, frame→commands with the
 // {commands, remainder} carry contract) live in rcon-bridge.ts and are tested there;
 // this file owns ONLY sockets, retry ladders, and the ONE-IN-FLIGHT pump (CPU generation
-// is ~450 ms/frame — an action is sent only after the previous frame arrived, never queued).
+// is ~450 ms/frame - an action is sent only after the previous frame arrived, never queued).
 //
 // Resilience mirrors mods/java-fabric WorldModelClient.java: exponential backoff
 // 1 s → 30 s cap for both sockets, reset to 1 s on success. A dead RCON client is dropped
@@ -39,24 +39,24 @@ import {
 } from "./rcon-bridge";
 import { mockWorldModel } from "./control-sim";
 
-const USAGE = `rcon-bridge — no-mod LIVE sidecar: vanilla server (RCON) ⇄ world-model (WS) ⇄ block wall
+const USAGE = `rcon-bridge - no-mod LIVE sidecar: vanilla server (RCON) ⇄ world-model (WS) ⇄ block wall
 
 Usage: npx tsx packages/cli/src/rcon-bridge-cli.ts [options]
 
 Polls the player's Pos/Rotation over RCON, derives a VPT-style action, steps the
 world model (ml/src/blockdream_wm/serve.py), and paints each generated frame as a
-vertical solid-block wall near --origin via setblock/fill — live, while the player
+vertical solid-block wall near --origin via setblock/fill - live, while the player
 walks around a stock vanilla server.
 
 Options:
   --rcon-host <h>     RCON host                          (default 127.0.0.1)
   --rcon-port <p>     RCON port                          (default 25575)
-  --rcon-pass <pw>    RCON password — REQUIRED unless --dry-run
+  --rcon-pass <pw>    RCON password - REQUIRED unless --dry-run
   --player <name>     player to follow (default: auto-detect via \`list\` when
                       exactly one player is online)
   --ws <url>          world-model WS server              (default ws://127.0.0.1:8765)
   --skill <s>         movement type sent to the WM       (default walk)
-  --origin <x,y,z>    wall's bottom-left block           (default 10,-60,10 — on a 1.21
+  --origin <x,y,z>    wall's bottom-left block           (default 10,-60,10 - on a 1.21
                       superflat the top grass block is y=-61 and players stand at
                       y=-60, so the wall base sits at ground level near spawn)
   --size <WxH>        wall size in blocks; WM frames are scaled to it (default 64x64,
@@ -80,7 +80,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 
 // ---------------------------------------------------------------------------
 // RCON: lazy connect with retry/backoff; error/end handlers DROP the dead client
-// (collect.mjs's lazy client lacks these — a dead socket there hangs every send)
+// (collect.mjs's lazy client lacks these - a dead socket there hangs every send)
 // ---------------------------------------------------------------------------
 
 class RconManager {
@@ -118,20 +118,20 @@ class RconManager {
         const drop = (why: string): void => {
           if (this.client === client) {
             this.client = null;
-            if (!this.stopped) log(`rcon connection lost (${why}) — reconnecting on next send`);
+            if (!this.stopped) log(`rcon connection lost (${why}) - reconnecting on next send`);
           }
         };
         client.on("error", (err) => drop(err instanceof Error ? err.message : String(err)));
         client.on("end", () => drop("closed"));
         this.client = client;
-        this.backoffMs = BACKOFF_INITIAL_MS; // healthy again — next outage starts the ladder over
+        this.backoffMs = BACKOFF_INITIAL_MS; // healthy again - next outage starts the ladder over
         log(`rcon connected: ${this.host}:${this.port}`);
         return client;
       } catch (e) {
         this.connecting = null;
         const delay = this.backoffMs;
         this.backoffMs = Math.min(this.backoffMs * 2, BACKOFF_MAX_MS);
-        log(`rcon connect failed (${e instanceof Error ? e.message : String(e)}) — retrying in ${delay} ms (cap ${BACKOFF_MAX_MS} ms)`);
+        log(`rcon connect failed (${e instanceof Error ? e.message : String(e)}) - retrying in ${delay} ms (cap ${BACKOFF_MAX_MS} ms)`);
         await sleep(delay);
       }
     }
@@ -167,7 +167,7 @@ class WmClient {
   }
 
   /**
-   * ONE-IN-FLIGHT pump primitive: send one JSON message (reset or action — serve.py
+   * ONE-IN-FLIGHT pump primitive: send one JSON message (reset or action - serve.py
    * replies to both with {"type":"frame"}), resolve with the frame's PNG bytes.
    * Rejects on server {"type":"error"}, socket loss, or timeout (which recycles the
    * socket through the backoff ladder so a wedged server can never hang the pump).
@@ -178,7 +178,7 @@ class WmClient {
     if (!ws || ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error("world-model not connected"));
     return new Promise<Buffer>((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.failPending(new Error(`no frame after ${FRAME_TIMEOUT_MS} ms — recycling the socket`));
+        this.failPending(new Error(`no frame after ${FRAME_TIMEOUT_MS} ms - recycling the socket`));
         ws.terminate(); // close event follows → scheduleReconnect
       }, FRAME_TIMEOUT_MS);
       this.pending = { resolve, reject, timer };
@@ -203,7 +203,7 @@ class WmClient {
     const ws = new WebSocket(this.url);
     this.ws = ws;
     ws.on("open", () => {
-      this.backoffMs = BACKOFF_INITIAL_MS; // healthy again — next outage starts the ladder over
+      this.backoffMs = BACKOFF_INITIAL_MS; // healthy again - next outage starts the ladder over
       this.needsReset = true;
       log("world-model connected");
     });
@@ -220,7 +220,7 @@ class WmClient {
     if (this.stopped || this.reconnectTimer) return;
     const delay = this.backoffMs;
     this.backoffMs = Math.min(this.backoffMs * 2, BACKOFF_MAX_MS);
-    log(`world-model down — reconnecting in ${delay} ms (cap ${BACKOFF_MAX_MS} ms)`);
+    log(`world-model down - reconnecting in ${delay} ms (cap ${BACKOFF_MAX_MS} ms)`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
@@ -250,14 +250,14 @@ class WmClient {
     }
     if (msg.type === "frame" && typeof msg.png_b64 === "string") {
       const p = this.pending;
-      if (!p) return; // unsolicited frame — drop
+      if (!p) return; // unsolicited frame - drop
       this.pending = null;
       clearTimeout(p.timer);
       p.resolve(Buffer.from(msg.png_b64, "base64"));
     } else if (msg.type === "error") {
       this.failPending(new Error(`world-model error: ${msg.error ?? msg.message ?? "unknown"}`));
     }
-    // {"type":"ok"} (skill ack) — nothing pending on it; ignore
+    // {"type":"ok"} (skill ack) - nothing pending on it; ignore
   }
 }
 
@@ -291,7 +291,7 @@ async function detectPlayer(rcon: RconManager): Promise<string> {
     try {
       reply = await rcon.send("list");
     } catch (e) {
-      log(`\`list\` failed (${e instanceof Error ? e.message : String(e)}) — retrying in 2 s`);
+      log(`\`list\` failed (${e instanceof Error ? e.message : String(e)}) - retrying in 2 s`);
       await sleep(2_000);
       continue;
     }
@@ -301,9 +301,9 @@ async function detectPlayer(rcon: RconManager): Promise<string> {
       .filter(Boolean);
     if (names.length === 1) return names[0]!;
     if (names.length > 1) {
-      throw new Error(`multiple players online (${names.join(", ")}) — pass --player <name>`);
+      throw new Error(`multiple players online (${names.join(", ")}) - pass --player <name>`);
     }
-    log("no players online — waiting 2 s (join the server, or pass --player)");
+    log("no players online - waiting 2 s (join the server, or pass --player)");
     await sleep(2_000);
   }
 }
@@ -374,7 +374,7 @@ export async function main(argv: string[]): Promise<number> {
   const sizeW = parseInt(sm[1]!, 10);
   const sizeH = parseInt(sm[2]!, 10);
   if (sizeW < 1 || sizeH < 1) return fail(`--size must be ≥ 1x1`);
-  if (mockWm && sizeW !== sizeH) return fail(`--mock-wm frames are square — use --size NxN`);
+  if (mockWm && sizeW !== sizeH) return fail(`--mock-wm frames are square - use --size NxN`);
 
   log(
     `wall ${sizeW}×${sizeH} at (${origin.x},${origin.y},${origin.z}) skill=${skill} fps≤${fps} budget=${maxCommands} cmds/frame` +
@@ -386,7 +386,7 @@ export async function main(argv: string[]): Promise<number> {
   const wm = mockWm ? null : new WmClient(wsUrl);
 
   process.once("SIGINT", () => {
-    log("SIGINT — closing rcon + ws");
+    log("SIGINT - closing rcon + ws");
     stopped = true;
     wm?.close();
     if (rcon) void rcon.stop().finally(() => process.exit(130));
@@ -409,7 +409,7 @@ export async function main(argv: string[]): Promise<number> {
       for (const cmd of wall.commands) await rcon!.send(cmd);
     }
     const now = Date.now();
-    const fpsStr = lastPaintAt ? (1000 / (now - lastPaintAt)).toFixed(2) : "—";
+    const fpsStr = lastPaintAt ? (1000 / (now - lastPaintAt)).toFixed(2) : "-";
     lastPaintAt = now;
     prevWall = frame;
     carry = wall.remainder;
@@ -448,7 +448,7 @@ export async function main(argv: string[]): Promise<number> {
     const t0 = Date.now();
     try {
       if (wm && !wm.isOpen()) {
-        // the backoff ladder is reconnecting in the background — idle this cycle
+        // the backoff ladder is reconnecting in the background - idle this cycle
       } else if (wm?.needsReset) {
         const png = await wm.request(JSON.stringify({ type: "reset", skill }));
         wm.needsReset = false;
@@ -468,7 +468,7 @@ export async function main(argv: string[]): Promise<number> {
             `${await rcon!.send(`data get entity ${player} Pos`)}\n` +
               `${await rcon!.send(`data get entity ${player} Rotation`)}`,
           );
-          if (isParseError(parsed)) log(`pose parse failed — skipping cycle: ${parsed.error}`);
+          if (isParseError(parsed)) log(`pose parse failed - skipping cycle: ${parsed.error}`);
           else pose = parsed;
         }
         if (pose) {

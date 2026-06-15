@@ -1,7 +1,7 @@
 """Unified trainer: tokenizer + transition (AR or diffusion) on synthetic rollouts.
 
 Toy/CPU scale. The real run swaps `make_rollouts` for VPT/MineRL data, scales the
-configs, and runs on multi-GPU — the loop is the same.
+configs, and runs on multi-GPU - the loop is the same.
 
     python -m blockdream_wm.train --config configs/toy.yaml --max-steps 50
 """

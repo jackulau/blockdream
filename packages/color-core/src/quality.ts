@@ -19,7 +19,7 @@ export function oklabDeltaE(
 
 /**
  * Mean OKLab ΔE between each source pixel and its NEAREST palette color.
- * Pure measure of palette coverage (no dithering) — lower = the palette can
+ * Pure measure of palette coverage (no dithering) - lower = the palette can
  * represent this content well.
  */
 export function meanMatchError(img: RgbImage, pal: PreparedPalette): number {
@@ -50,7 +50,7 @@ function reconstructLinear(frame: QuantizedFrame, pal: PreparedPalette): Float64
  * Tone-fidelity error: average a `block`×`block` neighborhood of both the source
  * and the rendered result in LINEAR light, then measure the mean error between
  * those averages. Dithering trades per-pixel exactness for correct LOCAL AVERAGE
- * tone, so a good dither has LOWER block-average error than nearest — this is the
+ * tone, so a good dither has LOWER block-average error than nearest - this is the
  * quantitative proof that dithering reduces banding.
  */
 export function blockAverageError(

@@ -1,17 +1,17 @@
-"""no_synthetic_guard.py — mechanically prove ZERO synthetic data in the live/served world-model path.
+"""no_synthetic_guard.py - mechanically prove ZERO synthetic data in the live/served world-model path.
 
 The served world models MUST be trained on 100% REAL data:
-  • Minecraft WM (runs/skills_real) — real OpenAI VPT footage (walk/general/sprint/jump) + real
+  • Minecraft WM (runs/skills_real) - real OpenAI VPT footage (walk/general/sprint/jump) + real
     mineflayer gameplay footage (swim/boat/elytra/pig/minecart).
-  • Driving WM (runs/drive)         — real comma.ai commaVQ dashcam footage (camera tokens + pose).
+  • Driving WM (runs/drive)         - real comma.ai commaVQ dashcam footage (camera tokens + pose).
 
 This guard fails (exit 1) if ANY of these hold:
   1. A served checkpoint is missing its PROVENANCE.json sidecar, or that sidecar marks synthetic:true
      or declares a non-real data_source. (Sidecars are written at promotion time by the trainers /
-     promote step — they are the single source of truth a model cannot fabricate.)
+     promote step - they are the single source of truth a model cannot fabricate.)
   2. A canonical SERVED/LIVE trainer references a synthetic pool (pool_synth_*) or the synthetic
      generator (gen_movement_data.py). Deprecated proof-only scripts are exempt (they must carry a
-     DEPRECATED banner — checked separately).
+     DEPRECATED banner - checked separately).
   3. A synthetic data pool (data/pool_synth_*) still contains data on disk.
   4. A script that generates synthetic data is missing its DEPRECATED banner (so nobody mistakes it
      for a live path).
@@ -34,8 +34,8 @@ SERVED = [
     ("runs/drive", "Driving world model"),
 ]
 
-# Canonical trainers/collectors that feed a SERVED checkpoint — none may touch synthetic data.
-# (The driving SIM trainer/collector — train_long.py, collect.py — is NO LONGER here: it is the
+# Canonical trainers/collectors that feed a SERVED checkpoint - none may touch synthetic data.
+# (The driving SIM trainer/collector - train_long.py, collect.py - is NO LONGER here: it is the
 # deprecated synthetic path, moved to SYNTH_GENERATORS. The served driving model trains on real
 # commaVQ via train_real.py + collect_real_drive.py + train_drive_real.sh.)
 LIVE_TRAINERS = [
@@ -47,7 +47,7 @@ LIVE_TRAINERS = [
     "src/blockdream_wm/drive/commavq.py",
 ]
 
-# Scripts that GENERATE synthetic data — proof-only / research, must be clearly DEPRECATED so nobody
+# Scripts that GENERATE synthetic data - proof-only / research, must be clearly DEPRECATED so nobody
 # mistakes them for a served path. Includes the driving physics SIM (sim/collect/train_long).
 SYNTH_GENERATORS = [
     "scripts/gen_movement_data.py",
@@ -89,10 +89,10 @@ def check(strict_provenance: bool = True) -> list[str]:
             fails.append(f"{rel}/PROVENANCE.json: invalid JSON ({e})")
             continue
         if meta.get("synthetic", None) is not False:
-            fails.append(f"{rel}: PROVENANCE.json synthetic={meta.get('synthetic')!r} (must be false) — {label}")
+            fails.append(f"{rel}: PROVENANCE.json synthetic={meta.get('synthetic')!r} (must be false) - {label}")
         src = str(meta.get("data_source", "")).lower()
         if src not in REAL_SOURCES:
-            fails.append(f"{rel}: PROVENANCE.json data_source={src!r} not a recognized REAL source — {label}")
+            fails.append(f"{rel}: PROVENANCE.json data_source={src!r} not a recognized REAL source - {label}")
         pools = meta.get("pools", [])
         synth_pools = [p for p in pools if "pool_synth" in str(p)]
         if synth_pools:
@@ -147,16 +147,16 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"clean": not fails, "failures": fails}, indent=2))
     else:
         if fails:
-            print("[no-synthetic-guard] FAIL — synthetic data found in the live path:")
+            print("[no-synthetic-guard] FAIL - synthetic data found in the live path:")
             for f in fails:
                 print(f"  ✗ {f}")
         else:
-            print("[no-synthetic-guard] PASS — zero synthetic data in any served/live world-model path.")
+            print("[no-synthetic-guard] PASS - zero synthetic data in any served/live world-model path.")
             for rel, label in SERVED:
                 prov = ML / rel / "PROVENANCE.json"
                 if prov.exists():
                     m = json.loads(_read(prov))
-                    print(f"  ✓ {rel}: data_source={m.get('data_source')!r} synthetic={m.get('synthetic')} — {label}")
+                    print(f"  ✓ {rel}: data_source={m.get('data_source')!r} synthetic={m.get('synthetic')} - {label}")
     return 1 if fails else 0
 
 

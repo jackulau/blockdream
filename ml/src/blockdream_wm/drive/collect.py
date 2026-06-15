@@ -1,4 +1,4 @@
-"""DEPRECATED — SYNTHETIC, NOT SERVED. Collects driving rollouts from the physics SIM
+"""DEPRECATED - SYNTHETIC, NOT SERVED. Collects driving rollouts from the physics SIM
 (`drive.sim.DriveSim` + a pursuit autopilot) = SYNTHETIC data. The served driving world model is now
 trained on 100% REAL comma.ai commaVQ footage (`drive.commavq` + `scripts/collect_real_drive.py` +
 `scripts/train_drive_real.sh`). Kept for research/repro only; `no_synthetic_guard.py` asserts the

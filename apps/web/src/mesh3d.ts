@@ -1,10 +1,10 @@
 // Greedy voxel mesher. The old viewer drew one full cube per voxel (a BoxGeometry instance
-// each), so a solid N³ build spawned N³ cubes — including the fully-buried interior ones that
-// can never be seen — and every one of the 6 faces of every cube, most of them hidden behind a
+// each), so a solid N³ build spawned N³ cubes - including the fully-buried interior ones that
+// can never be seen - and every one of the 6 faces of every cube, most of them hidden behind a
 // neighbour. This mesher does what real voxel engines do:
-//   1. FACE CULLING — emit a face only where a solid voxel borders air (or the volume edge), so
+//   1. FACE CULLING - emit a face only where a solid voxel borders air (or the volume edge), so
 //      interior/occluded faces vanish. An N³ solid drops from 6·N³ faces to ~6·N² shell faces.
-//   2. GREEDY MERGING — within each face plane, merge coplanar same-block faces into the largest
+//   2. GREEDY MERGING - within each face plane, merge coplanar same-block faces into the largest
 //      possible rectangle (one quad covering W×H cells, UV-tiled so each cell still shows a tile).
 // The output is plain typed-array geometry grouped by a caller-chosen material key, so a block can
 // carry DIFFERENT textures per face (grass top/side/bottom, log end-grain) by keying on the face.
@@ -37,7 +37,7 @@ export interface Quad {
 
 /**
  * Greedy-mesh a volume into culled, merged quads. One quad may span many cells.
- * Algorithm: the classic per-axis sweep — for each axis and each slice boundary, build a 2D mask
+ * Algorithm: the classic per-axis sweep - for each axis and each slice boundary, build a 2D mask
  * of visible faces (signed by block id + orientation), then merge equal-value rectangles.
  */
 export function greedyQuads(v: VoxelVolume): Quad[] {
@@ -180,7 +180,7 @@ export function meshByMaterial(
   return out;
 }
 
-/** Total quad count — handy for tests / perf logging. */
+/** Total quad count - handy for tests / perf logging. */
 export function quadCount(v: VoxelVolume): number {
   return greedyQuads(v).length;
 }

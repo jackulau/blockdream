@@ -14,7 +14,7 @@ export interface VideoQuantizeOptions extends QuantizeOptions {
   /**
    * Temporal hysteresis threshold (OKLab squared-distance units). When set > 0,
    * a pixel keeps its color from the previous frame as long as that color is
-   * within `bestDist2 + temporalThreshold` of the ideal — this kills the
+   * within `bestDist2 + temporalThreshold` of the ideal - this kills the
    * single-color flicker that makes naive per-frame quantization shimmer.
    * Applied to the "none"/"bayer" methods (error-diffusion has its own dynamics).
    * Typical values: 0.0005–0.003.

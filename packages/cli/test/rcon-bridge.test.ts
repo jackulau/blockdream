@@ -1,7 +1,7 @@
 // Proves the no-mod live-bridge core end-to-end (headless): RCON `data get` reply text →
 // pose → serve.py action (via control-sim's deriveAction, so the schema is the contract),
 // and world-model frame → quantize → delta → greedy-boxed setblock/fill wall commands that
-// REPLAY through the shared Grid interpreter to a pixel-perfect wall — keyframe, delta,
+// REPLAY through the shared Grid interpreter to a pixel-perfect wall - keyframe, delta,
 // and the capped/carry degradation path.
 
 import { describe, it, expect } from "vitest";
@@ -183,7 +183,7 @@ describe("frameToWallCommands: keyframe", () => {
   it("two solid halves fill-batch to exactly 2 commands, nothing deferred", () => {
     expect(res.commands).toHaveLength(2);
     expect(res.remainder).toEqual([]);
-    // the solid palette covers the whole frame — no pixel degraded to the air fallback
+    // the solid palette covers the whole frame - no pixel degraded to the air fallback
     for (const id of res.quantized.mapColorId) expect(resolve(id)).not.toBe(FALLBACK_BLOCK);
   });
 

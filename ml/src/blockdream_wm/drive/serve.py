@@ -52,7 +52,7 @@ class DriveSession:
         self.tokens = t.view(1, -1).clone().to(self.device)
         self.lidar = l.view(1, -1).clone().to(self.device)
         self.tel = self._physical_tel(te.view(1, -1).clone().to(self.device))
-        # temporal-context window of the last n_history (control, telemetry) rows — zeros at
+        # temporal-context window of the last n_history (control, telemetry) rows - zeros at
         # reset (the model trains with zero-init windows, so this matches the data distribution)
         self.hist_rows = [
             torch.zeros((1, self.trans.n_control + self.trans.n_telemetry), device=self.device)
@@ -72,7 +72,7 @@ class DriveSession:
     @torch.no_grad()
     def _token_field_rgb(self, out_h: int = 64, out_w: int = 128):
         """Render the REAL model's predicted commaVQ token field as an image. Photoreal pixels need
-        comma's VQ decoder (not bundled — operator-gated); this shows the real, control-responsive
+        comma's VQ decoder (not bundled - operator-gated); this shows the real, control-responsive
         token dynamics directly (the field shifts as the world model rolls under control)."""
         import torch.nn.functional as F
         h, w = self.token_grid
@@ -86,7 +86,7 @@ class DriveSession:
     def step(self, control):
         c = torch.tensor([control], dtype=torch.float32, device=self.device)
         h = torch.cat(self.hist_rows, dim=-1) if self.n_history > 0 else None
-        if self.n_history > 0:  # row_t = (control applied at t, telemetry observed at t) — pre-step
+        if self.n_history > 0:  # row_t = (control applied at t, telemetry observed at t) - pre-step
             self.hist_rows = self.hist_rows[1:] + [torch.cat([c, self.tel], dim=-1)]
         self.tokens, self.lidar, self.tel = self.trans.step(self.tokens, self.lidar, self.tel, c, history=h)
         self.tel = self._physical_tel(self.tel)
@@ -94,7 +94,7 @@ class DriveSession:
         return self._decode()
 
     def _physical_tel(self, tel):
-        """REAL commaVQ is forward dashcam video — the car never reverses, so the forward-speed
+        """REAL commaVQ is forward dashcam video - the car never reverses, so the forward-speed
         telemetry channels ([0]=vx/30, [3]=speed/30) are physically NON-NEGATIVE. The shared telemetry
         bound uses a symmetric tanh (right for the sim's signed channels) which can dip a hair below 0
         at a standstill; floor the speed channels at 0 for the camera-only real model so the recursively
@@ -107,7 +107,7 @@ class DriveSession:
 
     def fork(self) -> "DriveSession":
         """Independent recursive state (tokens/LiDAR/telemetry) over the SAME model
-        weights — one per WebSocket connection. Skips __init__ so the checkpoint is
+        weights - one per WebSocket connection. Skips __init__ so the checkpoint is
         not re-loaded; reset() clones the shared init tensors into fresh state."""
         s = object.__new__(DriveSession)
         s.device, s.tok, s.trans, s.grid, s._init = self.device, self.tok, self.trans, self.grid, self._init
@@ -132,7 +132,7 @@ class DriveServer:
         self.session = session
 
     def fork(self) -> "DriveServer":
-        """A server over an independent session (shared weights) — one per connection."""
+        """A server over an independent session (shared weights) - one per connection."""
         return DriveServer(self.session.fork())
 
     def handle(self, msg: dict) -> dict:

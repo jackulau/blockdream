@@ -1,7 +1,7 @@
 """Recursive driving rollout must NEVER diverge. The telemetry head is fed back as prev_tel every
 step; before the physical soft-clamp (DriveTransition.bound_tel) an unbounded Linear in that loop
 blew up to NaN over a long rollout (reproduced: speed -4558 m/s by step 50, NaN by step 500, peak
-6e36 — the browser HUD's "speed -3.5e18 m/s · yaw-rate -1.1e16"). These tests pin the fix: telemetry
+6e36 - the browser HUD's "speed -3.5e18 m/s · yaw-rate -1.1e16"). These tests pin the fix: telemetry
 stays finite and physically bounded for thousands of steps under any control, regardless of weights.
 """
 
@@ -13,7 +13,7 @@ from blockdream_wm.config import DynamicsConfig
 from blockdream_wm.drive.transition import DriveTransition
 
 # adversarial control schedule: idle, full throttle+hard steer, alternating steer, hard brake, and a
-# cheap deterministic pseudo-random mix — the exact regimes that diverged in the unbounded repro.
+# cheap deterministic pseudo-random mix - the exact regimes that diverged in the unbounded repro.
 def _control(i: int) -> list[float]:
     phase = (i // 400) % 5
     if phase == 0:
@@ -41,7 +41,7 @@ def _model(seed: int = 0, amplify: float = 1.0) -> DriveTransition:
 
 def test_telemetry_recursion_cannot_diverge_over_long_rollout():
     """5000 self-fed steps under every control regime, with a deliberately amplified (×5) telemetry
-    head — the bound must keep speed/yaw-rate finite + physical the whole way."""
+    head - the bound must keep speed/yaw-rate finite + physical the whole way."""
     m = _model(amplify=5.0)
     tel = torch.zeros(1, 6)
     tel[0, 0] = tel[0, 3] = 0.4  # plausible start: ~12 m/s
@@ -62,7 +62,7 @@ def test_telemetry_recursion_cannot_diverge_over_long_rollout():
 
 
 def test_bound_tel_tames_divergent_feedback():
-    """Guard against silently removing the bound. An explicit expansive feedback (gain 1.5 > 1 — what
+    """Guard against silently removing the bound. An explicit expansive feedback (gain 1.5 > 1 - what
     a poorly-conditioned trained head + off-distribution rollout effectively becomes) diverges when
     unbounded but is provably tamed by bound_tel. This tests the fix's math directly, independent of
     any particular random weights."""
@@ -81,7 +81,7 @@ def test_bound_tel_tames_divergent_feedback():
 
 def test_full_step_rollout_stays_finite():
     """Exercise the real integrated step() path (AR token gen + lidar + telemetry) for a stretch and
-    confirm every modality stays finite + bounded — the actual serve code path."""
+    confirm every modality stays finite + bounded - the actual serve code path."""
     m = _model()
     tokens = torch.randint(0, 64, (1, 64))
     lid = torch.rand(1, 32)

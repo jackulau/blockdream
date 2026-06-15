@@ -1,7 +1,7 @@
-# Movement types — covering all Minecraft locomotion
+# Movement types - covering all Minecraft locomotion
 
 The world model is **conditioned on a movement type** (skill) so one model covers
-every locomotion regime, selectable live in the tester. Walking is not enough —
+every locomotion regime, selectable live in the tester. Walking is not enough -
 elytra glide, boat steering, pig mount, and swimming have distinct dynamics.
 
 Types (`movement.py`): `general, walk, sprint, jump, swim, boat, elytra, pig, minecart`.
@@ -30,10 +30,10 @@ sprint 19%, attack 45%, **no elytra/boat/pig**). So each type needs its own foot
 
 **Pipeline to add a type:**
 1. Get clips of that movement (download to mp4 + actions, or YouTube + the VPT
-   **IDM** to label actions — `docs/real-world-models.md`).
+   **IDM** to label actions - `docs/real-world-models.md`).
 2. Build a tagged pool: `python -m blockdream_wm.data_pool --segments N --skill elytra --out ml/data/pool_elytra`
    (today this pulls from the VPT index; point it at your own clips for real elytra data).
-3. Train/extend: `train_long --pools ml/data/pool_m4,ml/data/pool_elytra …` — the
+3. Train/extend: `train_long --pools ml/data/pool_m4,ml/data/pool_elytra …` - the
    conditioned model learns each type; resume keeps prior types.
 
 ## Synthetic per-skill data (so conditioning is trainable + provable NOW)
@@ -42,7 +42,7 @@ Real boat/elytra footage is scarce, which previously left those skill embeddings
 **untrained** (selecting "boat" did nothing). To make conditioning trainable and provable
 without that footage, `scripts/gen_movement_data.py` generates per-skill pools with DISTINCT,
 learnable dynamics (different scroll speed + colour cast + bob), in the exact on-disk format
-the real trainer consumes — so real footage drops into the same layout to scale up.
+the real trainer consumes - so real footage drops into the same layout to scale up.
 
 ```bash
 # 1. generate per-skill synthetic pools (trainer-compatible: frames + actions + skill.txt)
@@ -55,12 +55,12 @@ python scripts/prove_skill_conditioning.py        # → "verdict: DISTINCT", exi
 
 `prove_skill_conditioning.py` trains the **real** `SkillRealEncoder + ARTransition` on a tiny
 task and shows skill=boat vs skill=walk roll out differently and each matches its own
-dynamics — the mechanism the multi-day trainer relies on, verified in seconds (also
+dynamics - the mechanism the multi-day trainer relies on, verified in seconds (also
 `tests/test_skill_conditioning.py`).
 
 ## Honest status
-- The conditioning + per-type pipeline is **built, tested, and proven** — selecting boat vs
+- The conditioning + per-type pipeline is **built, tested, and proven** - selecting boat vs
   walk measurably changes the rollout (`prove_skill_conditioning.py` → DISTINCT).
 - For **photoreal** boat/elytra/etc., add real footage (table above) into the same pool
   layout; the synthetic generator unblocks training + the demo today, real footage raises
-  fidelity. The infra ingests either — the blocker was data, and the synthetic path removes it.
+  fidelity. The infra ingests either - the blocker was data, and the synthetic path removes it.

@@ -1,4 +1,4 @@
-"""DEPRECATED — SYNTHETIC, NOT SERVED. Trains the driving WM on the physics-SIM pool (data/drive_pool
+"""DEPRECATED - SYNTHETIC, NOT SERVED. Trains the driving WM on the physics-SIM pool (data/drive_pool
 from `drive.collect` + `drive.sim`) = SYNTHETIC data. The served driving model is now trained on 100%
 REAL comma.ai commaVQ footage via `drive.train_real` + `scripts/train_drive_real.sh`. Kept for
 research/repro only; `no_synthetic_guard.py` asserts the served checkpoint is the real one, not this.
@@ -44,7 +44,7 @@ N_TEL = 6
 def _atomic_save(obj, path: Path) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     torch.save(obj, tmp)
-    os.replace(tmp, path)  # atomic — a crash mid-write can't corrupt latest.pt
+    os.replace(tmp, path)  # atomic - a crash mid-write can't corrupt latest.pt
 
 
 def _log(out: Path, row: dict) -> None:
@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     if not list(Path(args.pool).glob("roll_*.npz")):
         prepare_pool(args.rollouts, args.steps, args.pool)
     rgb_np, lidar_np, tel_np, ctl_np, pairs = load_pool(args.pool)
-    rgb = torch.from_numpy(rgb_np).to(torch.uint8)              # CPU (N,3,S,S) — moved per-batch
+    rgb = torch.from_numpy(rgb_np).to(torch.uint8)              # CPU (N,3,S,S) - moved per-batch
     lidar = torch.from_numpy(lidar_np).float().to(dev)
     tel = torch.from_numpy(tel_np).float().to(dev)
     ctl = torch.from_numpy(ctl_np).float().to(dev)
@@ -194,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if time_up():
         save(0.0, 0.0)
-        print("[drive.train_long] time budget reached — checkpoint saved, resume to continue")
+        print("[drive.train_long] time budget reached - checkpoint saved, resume to continue")
         return 0
 
     # precompute pool tokens with the (now frozen) tokenizer; cached across resumes

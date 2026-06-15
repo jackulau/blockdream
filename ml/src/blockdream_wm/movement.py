@@ -1,7 +1,7 @@
 """Minecraft movement types (skills) + a skill-conditioned action encoder.
 
 The world model is conditioned on a movement-type id so one model covers all
-locomotion regimes — walking is not enough (elytra glide, boat steering, pig
+locomotion regimes - walking is not enough (elytra glide, boat steering, pig
 mount, swimming all have distinct dynamics). Each training pool is tagged with a
 type; the tester selects it live.
 """
@@ -15,14 +15,14 @@ from .config import ActionConfig
 from .actions import ActionEncoder
 
 MOVEMENT_TYPES = [
-    "general",   # 0 — mixed gameplay (VPT contractor default)
+    "general",   # 0 - mixed gameplay (VPT contractor default)
     "walk",      # 1
     "sprint",    # 2
     "jump",      # 3
     "swim",      # 4
     "boat",      # 5
     "elytra",    # 6
-    "pig",       # 7 — riding a saddled pig/horse (mount)
+    "pig",       # 7 - riding a saddled pig/horse (mount)
     "minecart",  # 8
 ]
 SKILL_ID = {name: i for i, name in enumerate(MOVEMENT_TYPES)}

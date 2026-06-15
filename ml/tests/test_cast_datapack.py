@@ -5,7 +5,7 @@ Two layers, mirroring the JS suite's `hasFfmpeg` describe.skip pattern
 
 1. fast, always-on unit tests of the preflight logic (shutil.which monkeypatched);
 2. an environment-gated end-to-end smoke that only runs when ffmpeg, npx, AND the
-   trained checkpoint are all present — it rolls a tiny 2-step dream and asserts a
+   trained checkpoint are all present - it rolls a tiny 2-step dream and asserts a
    droppable .zip lands. Checkpoint load + rollout can take ~1-2 min on CPU.
 """
 

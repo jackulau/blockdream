@@ -1,5 +1,5 @@
 """train_real.py + serve.load_real_checkpoint on a tiny synthetic dataset
-(no network) — covers the real-data training + serving code paths fast."""
+(no network) - covers the real-data training + serving code paths fast."""
 
 from __future__ import annotations
 

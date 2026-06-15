@@ -37,7 +37,7 @@ echo "[multiday] resumable: re-run this command any time to continue from $OUT/l
 
 if [ "$DRY" = "1" ]; then echo "[multiday] --dry-run: nothing launched."; exit 0; fi
 
-# 1) build/extend the pool (resumable — skips already-cached segments).
+# 1) build/extend the pool (resumable - skips already-cached segments).
 # Tagged "general" (VPT contractor = walking/mining). Add elytra/boat/pig by building
 # more tagged pools and passing --pools (see docs/movement-types.md).
 "$PY" -m blockdream_wm.data_pool --segments "$SEGMENTS" --seconds "$SECONDS_" --size "$SIZE" --fps "$FPS" --out "$POOL" --skill general
@@ -45,13 +45,13 @@ if [ "$DRY" = "1" ]; then echo "[multiday] --dry-run: nothing launched."; exit 0
 # 2) train, auto-restarting on crash (resume is automatic), until STOP or step targets
 mkdir -p "$OUT"
 while true; do
-  if [ -f "$OUT/STOP" ]; then echo "[multiday] STOP file present — exiting."; break; fi
+  if [ -f "$OUT/STOP" ]; then echo "[multiday] STOP file present - exiting."; break; fi
   if "$PY" -m blockdream_wm.train_long --pool "$POOL" --out "$OUT" --preset m4 --device mps \
         --tok-steps "$TOK_STEPS" --ar-steps "$AR_STEPS" --ckpt-every-min "$CKPT_MIN" --batch 16; then
-    echo "[multiday] trainer returned 0 (step targets reached) — done."
+    echo "[multiday] trainer returned 0 (step targets reached) - done."
     break
   else
-    echo "[multiday] trainer crashed (rc=$?) — resuming from last checkpoint in 15s..."
+    echo "[multiday] trainer crashed (rc=$?) - resuming from last checkpoint in 15s..."
     sleep 15
   fi
 done

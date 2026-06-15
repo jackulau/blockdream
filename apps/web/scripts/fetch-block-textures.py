@@ -2,9 +2,9 @@
 """Fetch REAL Minecraft block textures for the block-art tester.
 
 Downloads the OFFICIAL Minecraft 1.21 client jar from Mojang's public distribution
-(the same artifact the launcher fetches — you are licensed to it by owning Minecraft),
+(the same artifact the launcher fetches - you are licensed to it by owning Minecraft),
 verifies its sha1, and extracts assets/minecraft/textures/block/*.png into
-apps/web/public/blocks/ (GITIGNORED — Mojang's copyrighted assets, used locally, never
+apps/web/public/blocks/ (GITIGNORED - Mojang's copyrighted assets, used locally, never
 committed or redistributed). Then emits manifest.json mapping every palette block id to
 its best texture file (map-relevant top face first, documented fallbacks).
 
@@ -34,12 +34,12 @@ MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
 
 def _get(url: str) -> bytes:
-    with urllib.request.urlopen(url, timeout=60) as r:  # noqa: S310 — official Mojang hosts
+    with urllib.request.urlopen(url, timeout=60) as r:  # noqa: S310 - official Mojang hosts
         return r.read()
 
 
 def _sha1(b: bytes) -> str:
-    return hashlib.sha1(b).hexdigest()  # noqa: S324 — Mojang publishes sha1, integrity check only
+    return hashlib.sha1(b).hexdigest()  # noqa: S324 - Mojang publishes sha1, integrity check only
 
 
 def resolve_client(version: str) -> tuple[str, str, str]:
@@ -66,7 +66,7 @@ def fetch_jar(version: str) -> tuple[Path, str]:
     data = _get(url)
     got = _sha1(data)
     if got != sha1:
-        sys.exit(f"[textures] sha1 mismatch! expected {sha1} got {got} — refusing")
+        sys.exit(f"[textures] sha1 mismatch! expected {sha1} got {got} - refusing")
     jar.write_bytes(data)
     print(f"[textures] verified sha1 {sha1[:12]} ({len(data) / 1e6:.1f} MB)")
     return jar, version

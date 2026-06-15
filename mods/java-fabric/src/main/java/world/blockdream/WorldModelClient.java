@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * Each received frame is PNG-decoded, scaled to the wall (cols×rows maps of 128px), matched to
  * map colours, and handed to {@link MapWallRenderer#pushLiveFrame} for the next tick to display.
- * This is the live counterpart of the static frames.bin path — same MapState.colors sink.
+ * This is the live counterpart of the static frames.bin path - same MapState.colors sink.
  *
  * The exact transform (decode → nearest map colour → 128×128 tiles) is proven headless in
  * packages/cli/src/control-sim.ts (frameToMapTiles) + control-sim.test.ts.
@@ -87,7 +87,7 @@ public final class WorldModelClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake h) {
-        backoffMs = INITIAL_BACKOFF_MS; // healthy again — next outage starts the ladder over
+        backoffMs = INITIAL_BACKOFF_MS; // healthy again - next outage starts the ladder over
         state.set("connected");
         BlockdreamMod.LOGGER.info("[blockdream] world-model connected: {}", getURI());
         send("{\"type\":\"reset\"}");
@@ -162,7 +162,7 @@ public final class WorldModelClient extends WebSocketClient {
         final long delay = backoffMs;
         backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
         state.set("reconnecting in " + Math.max(1, delay / 1000) + "s");
-        BlockdreamMod.LOGGER.info("[blockdream] world-model bridge down — reconnecting in {} ms (cap {} ms)", delay, MAX_BACKOFF_MS);
+        BlockdreamMod.LOGGER.info("[blockdream] world-model bridge down - reconnecting in {} ms (cap {} ms)", delay, MAX_BACKOFF_MS);
         try {
             reconnector.schedule(this::attemptReconnect, delay, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException e) {

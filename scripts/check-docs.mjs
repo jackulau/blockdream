@@ -1,12 +1,12 @@
 // Docs gate: keeps the writeups honest and catches doc staleness so it can't silently return.
 //  1. every REQUIRED doc exists with its key sections and isn't an empty stub
-//  2. scope: only git-TRACKED .md files (git ls-files '*.md') — untracked scratch notes can't fail the gate
+//  2. scope: only git-TRACKED .md files (git ls-files '*.md') - untracked scratch notes can't fail the gate
 //  3. no markdown file links to a missing relative .md target
 //  4. no pre-rebrand identifiers (mineworld_wm / MINEWORLD_LOG / @mineworld) outside an explicit
 //     allowlist (docs/results.md keeps the historical rebrand-verification table)
 //  5. no instructions to serve stale checkpoints:
 //     - `runs/skills/latest.pt` (pre-skills_real path) on any serve/verify-style line
-//     - advice to serve `runs/m4` (real-VPT walking-only — dead skill embeddings)
+//     - advice to serve `runs/m4` (real-VPT walking-only - dead skill embeddings)
 //  6. every `python -m blockdream_wm.<module>` snippet maps to a real module under ml/src/
 import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -34,7 +34,7 @@ const REQUIRED = {
   "docs/results.md": ["## System", "## Measured results", "## Reproduce"],
 };
 
-// required literal strings — the real artifact/function names users must be told.
+// required literal strings - the real artifact/function names users must be told.
 // If an emitter namespace ever changes, datapack-e2e fails live; if a doc drifts away
 // from the real names (the goal-028 `blockdream_art:` bug), THIS fails.
 const REQUIRED_LITERALS = {
@@ -57,7 +57,7 @@ for (const [rel, literals] of Object.entries(REQUIRED_LITERALS)) {
   for (const s of literals) if (!text.includes(s)) fail(`${rel} no longer documents the real name "${s}"`);
 }
 
-// only git-tracked markdown — scratch/untracked .md files must never fail (or be able to game) the gate
+// only git-tracked markdown - scratch/untracked .md files must never fail (or be able to game) the gate
 const tracked = execFileSync("git", ["ls-files", "*.md"], { cwd: ROOT, encoding: "utf8" })
   .split("\n")
   .filter(Boolean)
@@ -119,7 +119,7 @@ for (const rel of tracked) {
     if (line.includes("runs/skills/latest.pt") && SERVE_VERIFY_LINE.test(line))
       fail(`${where} instructs serving/verifying stale checkpoint runs/skills/latest.pt (use runs/skills_real/latest.pt): ${line.trim()}`);
     if (M4_REAL_FLAG.test(line) || (line.includes("runs/m4") && /serve/i.test(line) && !M4_WARNING.test(line)))
-      fail(`${where} advises serving runs/m4 (dead skill embeddings — serve runs/skills_real instead): ${line.trim()}`);
+      fail(`${where} advises serving runs/m4 (dead skill embeddings - serve runs/skills_real instead): ${line.trim()}`);
   }
 }
 

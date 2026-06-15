@@ -59,7 +59,7 @@ function loadJson<T>(fileKey: string): T {
  * Load the Java map-color palette for a pinned version (default 1.21.9).
  *
  * These are the colors written directly into a filled map's `colors` byte array.
- * Because we author that array ourselves, the game does NOT biome-tint them — all
+ * Because we author that array ourselves, the game does NOT biome-tint them - all
  * 244 ids (61 bases × 4 shades) are usable verbatim on both Java and Bedrock.
  */
 export function getJavaMapPalette(version: string = PALETTE_DATA.javaMap): MapPalette {
@@ -79,7 +79,7 @@ export function indexByMapColorId(p: MapPalette): Map<number, MapColor> {
 /**
  * Load the Bedrock map-color palette. Filled-map color indices are shared across
  * editions, and direct-written maps are not biome-tinted on either edition, so
- * this is the same RGB table as Java — verified equal by test.
+ * this is the same RGB table as Java - verified equal by test.
  */
 export function getBedrockMapPalette(version: string = PALETTE_DATA.bedrockMap): MapPalette {
   const fileKey = resolveFileKey("bedrock-map-colors", version, PALETTE_DATA.bedrockMap);
@@ -176,7 +176,7 @@ export function getFullBlockColorPalette(version: string = PALETTE_DATA.block): 
 /**
  * The full solid-block set shaped as a MapPalette for the color-core matcher.
  * `mapColorId` carries the block's index so the caller recovers which block to
- * place (it is NOT a map-item color id — this is the block-build path).
+ * place (it is NOT a map-item color id - this is the block-build path).
  */
 export function getFullBlockMapPalette(version = "1.21"): {
   palette: MapPalette;
@@ -220,7 +220,7 @@ export function getJavaBlockPalette(version: string = PALETTE_DATA.block): Block
  * using the block's full (×255) base color. `mapColorId` carries the base's
  * full-shade map color id so the caller can recover which block to place.
  *
- * (Flat builds only — staircased 4-shade block mapart is a later refinement.)
+ * (Flat builds only - staircased 4-shade block mapart is a later refinement.)
  */
 export function getSolidBlockMapPalette(version = "1.21"): {
   palette: MapPalette;

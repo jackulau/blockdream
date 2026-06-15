@@ -5,7 +5,7 @@ needed); `run_ws()` exposes the same handler over a real WebSocket when the
 optional `websockets` package is installed.
 
 Rollout cache: the current state (prev tokens / latent) is kept on the session and
-reused as the context for the next step — so stepping the world never re-tokenizes
+reused as the context for the next step - so stepping the world never re-tokenizes
 the previous frame. Per-token KV-caching inside AR generation (MineWorld's
 Diagonal Decoding) is a further speedup that needs a custom attention; noted.
 """
@@ -106,7 +106,7 @@ class WorldModelSession:
         """Independent rollout state over the SAME model weights.
 
         Used to give each WebSocket connection its own session: `.to()` on a module is
-        in-place, so the constructor shares tok/enc/trans rather than copying them —
+        in-place, so the constructor shares tok/enc/trans rather than copying them -
         only the rollout cache (`_prev`), step counter and skill are per-fork.
         """
         s = WorldModelSession(self.cfg, self.tok, self.enc, self.trans, device=self.device)
@@ -116,13 +116,13 @@ class WorldModelSession:
 
 
 class RolloutServer:
-    """JSON message handler — same logic over in-process calls or a WebSocket."""
+    """JSON message handler - same logic over in-process calls or a WebSocket."""
 
     def __init__(self, session: WorldModelSession):
         self.session = session
 
     def fork(self) -> "RolloutServer":
-        """A server over an independent rollout session (shared weights) — one per connection."""
+        """A server over an independent rollout session (shared weights) - one per connection."""
         return RolloutServer(self.session.fork())
 
     def _set_skill(self, msg: dict) -> None:
@@ -259,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     ap.add_argument("--kind", default="ar", choices=["ar", "diffusion"])
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
-    # CPU beats MPS for this sequential token-by-token decode — 256 tiny per-step kernel
+    # CPU beats MPS for this sequential token-by-token decode - 256 tiny per-step kernel
     # launches make GPU dispatch overhead dominate (measured 450ms CPU vs 1066ms MPS/frame).
     ap.add_argument("--device", default="cpu")
     args = ap.parse_args(argv)

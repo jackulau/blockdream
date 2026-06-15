@@ -1,6 +1,6 @@
 """Eval metrics: reconstruction, action-conditioning, and an FVD stub.
 
-The FVD stub is a Fréchet-style distance over flattened pixel features — a real
+The FVD stub is a Fréchet-style distance over flattened pixel features - a real
 pipeline swaps in I3D/VideoMAE features. It is labeled a stub so it is never
 mistaken for true FVD.
 """
@@ -18,7 +18,7 @@ def reconstruction_mse(tokenizer, frames: torch.Tensor) -> float:
 
 @torch.no_grad()
 def ar_action_accuracy(ar, prev_tokens, next_tokens, action_emb) -> float:
-    """Teacher-forced next-token accuracy — how well the AR model predicts."""
+    """Teacher-forced next-token accuracy - how well the AR model predicts."""
     pred = ar(prev_tokens, next_tokens, action_emb).argmax(-1)
     return (pred == next_tokens).float().mean().item()
 
@@ -40,7 +40,7 @@ def action_conditioning_score(transition, prev, next_latent, action_emb, steps: 
 
 @torch.no_grad()
 def fvd_stub(real: torch.Tensor, fake: torch.Tensor) -> float:
-    """Fréchet-style distance over flattened features (STUB — not true FVD)."""
+    """Fréchet-style distance over flattened features (STUB - not true FVD)."""
     r = real.reshape(real.shape[0], -1)
     f = fake.reshape(fake.shape[0], -1)
     mu_r, mu_f = r.mean(0), f.mean(0)

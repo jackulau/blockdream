@@ -63,7 +63,7 @@ def test_reimport_appends_new_segment(tmp_path, monkeypatch):
     src = tmp_path / "collector_out"
     src.mkdir()
     (src / "walk.json").write_text(json.dumps({"skill": "walk", "size": 8, "seconds": 1.0, "ticks": [_tick(0.0, forward=True)]}))
-    (src / "walk.mp4").write_bytes(b"")  # existence check only — decode_mp4 is stubbed below
+    (src / "walk.mp4").write_bytes(b"")  # existence check only - decode_mp4 is stubbed below
 
     fills = iter([7, 9])  # distinct frame content per import so a clobber is detectable
     monkeypatch.setattr(import_mineflayer, "decode_mp4", lambda path, size: np.full((4, size, size, 3), next(fills), dtype=np.uint8))

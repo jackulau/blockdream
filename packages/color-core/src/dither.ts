@@ -12,7 +12,7 @@ export interface QuantizeOptions {
   method?: DitherMethod;
   /** Bayer ordered-dither amplitude in linear light (default 0.06). */
   bayerAmplitude?: number;
-  /** Optional prebuilt LUT (buildRgbLut) for O(1)/pixel matching — the fast path. */
+  /** Optional prebuilt LUT (buildRgbLut) for O(1)/pixel matching - the fast path. */
   lut?: RgbLut;
   /**
    * Gamut-map by hue: when set (the hue-penalty λ, e.g. 0.8), out-of-gamut
@@ -22,7 +22,7 @@ export interface QuantizeOptions {
   gamutMap?: number;
 }
 
-/** Nearest palette index for a linear-RGB triple — gamut-mapped, LUT (fast), or exact OKLab. */
+/** Nearest palette index for a linear-RGB triple - gamut-mapped, LUT (fast), or exact OKLab. */
 function matchLinear(lr: number, lg: number, lb: number, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): number {
   if (gamutMap !== undefined) {
     return nearestByLabHue(linearRgbToOklab(lr, lg, lb), pal, gamutMap).index;
@@ -58,7 +58,7 @@ function writePixel(frame: QuantizedFrame, p: number, entryIndex: number, mapCol
 
 /**
  * Match each pixel to the nearest palette color in OKLab. No dithering.
- * Pass a prebuilt `lut` (buildRgbLut) for O(1)/pixel matching — the fast path
+ * Pass a prebuilt `lut` (buildRgbLut) for O(1)/pixel matching - the fast path
  * for real-time/video; without it, exact brute-force OKLab match.
  */
 export function quantizeNearest(img: RgbImage, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): QuantizedFrame {
@@ -151,7 +151,7 @@ const BAYER8 = (() => {
 })();
 
 /**
- * Ordered (Bayer) dithering — fully deterministic per pixel position, which
+ * Ordered (Bayer) dithering - fully deterministic per pixel position, which
  * makes it the most TEMPORALLY STABLE dither for video: a static region maps to
  * the same colors every frame, so there is no dither "crawl"/flicker.
  */

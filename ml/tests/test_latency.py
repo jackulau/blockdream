@@ -1,6 +1,6 @@
 """Inference latency: the few-step diffusion path must be cheap (the browser
-lineage targets ~30fps). These are CPU/toy timings — real deployment uses WebGPU
-(browser) or a server GPU — but they prove the few-step path is far cheaper than
+lineage targets ~30fps). These are CPU/toy timings - real deployment uses WebGPU
+(browser) or a server GPU - but they prove the few-step path is far cheaper than
 the autoregressive path and comfortably real-time at this scale."""
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def test_diffusion_step_is_realtime_and_faster_than_ar():
     diff_ms = _bench(_session("diffusion"))
     ar_ms = _bench(_session("ar"))
     print(f"\n[latency] diffusion {diff_ms:.2f} ms/step ({1000/diff_ms:.0f} fps)  "
-          f"AR {ar_ms:.2f} ms/step ({1000/ar_ms:.0f} fps)  [CPU/toy — browser uses WebGPU]")
+          f"AR {ar_ms:.2f} ms/step ({1000/ar_ms:.0f} fps)  [CPU/toy - browser uses WebGPU]")
     # few-step diffusion path is comfortably under a real-time frame budget even on CPU
     assert diff_ms < 50.0, f"diffusion step too slow: {diff_ms:.2f} ms"
     # the few-step diffusion path is the browser lineage precisely because it beats AR

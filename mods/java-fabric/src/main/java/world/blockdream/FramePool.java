@@ -16,7 +16,7 @@ import java.nio.file.Path;
  *   frames  : int      (frame count)
  *   speed   : int      (ticks per frame)
  *   data    : frames × cols × rows × 16384 bytes (per-tile map color arrays,
- *             tile order row-major, each frame fully materialized — keyframes,
+ *             tile order row-major, each frame fully materialized - keyframes,
  *             not deltas, so seeking/looping is O(1))
  */
 public final class FramePool {

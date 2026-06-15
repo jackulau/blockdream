@@ -3,7 +3,7 @@ package world.blockdream;
 import net.minecraft.server.network.ServerPlayerEntity;
 
 /**
- * Derives a VPT-style world-model action from a player's server-observed pose delta — so a
+ * Derives a VPT-style world-model action from a player's server-observed pose delta - so a
  * player joins with a STOCK vanilla client and just walks/looks to drive the model (no client
  * mixin, no keyboard hook). One instance tracks one controlling player across ticks.
  *
@@ -11,7 +11,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
  * unit-tested; keep the two in sync (button order, thresholds, camera scale).
  */
 public final class InputCapture {
-    // button order — matches control-sim.ts BTN + apps/web action.ts
+    // button order - matches control-sim.ts BTN + apps/web action.ts
     private static final int FORWARD = 0, BACK = 1, LEFT = 2, RIGHT = 3, JUMP = 4, SNEAK = 5, SPRINT = 6;
     private static final int N_BUTTONS = 9;
     private static final double MOVE_EPS = 0.02;   // m/tick below which the player is "still"

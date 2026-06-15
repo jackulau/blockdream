@@ -15,7 +15,7 @@ function resolveSpec(fromFile, spec) {
   }
   const m = /^@blockdream\/([^/]+)$/.exec(spec);
   if (m) return join(repo, "packages", m[1], "src", "index.ts"); // follow workspace deps too
-  return null; // external (e.g. fflate) — assumed browser-safe
+  return null; // external (e.g. fflate) - assumed browser-safe
 }
 
 const seen = new Set();
@@ -26,7 +26,7 @@ while (stack.length) {
   if (seen.has(f) || !existsSync(f)) continue;
   seen.add(f);
   const src = readFileSync(f, "utf8");
-  // `import/export ... from "spec"` — skip TYPE-ONLY imports (erased by the bundler, never reach the browser)
+  // `import/export ... from "spec"` - skip TYPE-ONLY imports (erased by the bundler, never reach the browser)
   for (const mm of src.matchAll(/\b(?:import|export)\b([^;]*?)\bfrom\s+["']([^"']+)["']/g)) {
     if (/^\s*type\b/.test(mm[1])) continue; // `import type { ... } from`
     const spec = mm[2];

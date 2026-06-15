@@ -1,6 +1,6 @@
 """Structured, leveled logging for the world-model server + trainers. Level via the BLOCKDREAM_LOG
 env var (DEBUG | INFO | WARNING | ERROR), default INFO. Replaces scattered print() calls with one
-consistent, timestamped, name-tagged stream — and DEBUG turns on per-step latency timing without
+consistent, timestamped, name-tagged stream - and DEBUG turns on per-step latency timing without
 touching the hot path when it's off (logger.debug short-circuits on level)."""
 
 from __future__ import annotations

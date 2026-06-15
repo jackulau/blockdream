@@ -1,4 +1,4 @@
-// render-probe — proves prismarine-viewer actually meshes + renders textured TERRAIN (not just sky).
+// render-probe - proves prismarine-viewer actually meshes + renders textured TERRAIN (not just sky).
 // Root cause of the earlier blank frames: prismarine-viewer 1.33's worldrenderer.addColumn only marks
 // sections y=0..255 dirty, so a 1.18+ world (superflat ground at y≈-60, negative-Y section) is never
 // meshed. A pre-1.18 world (1.16.5: ground at y≈4, positive Y) IS meshed. This probe renders one frame
@@ -39,7 +39,7 @@ bot.once('spawn', async () => {
   for (let i = 0; i < 200; i++) {
     const p = bot.entity.position
     // set camera DIRECTLY (setFirstPersonCamera tweens over 50ms; re-calling it every frame restarts
-    // the tween so it never reaches the bot — camera stuck at origin). Eye = pos.y + playerHeight.
+    // the tween so it never reaches the bot - camera stuck at origin). Eye = pos.y + playerHeight.
     viewer.camera.position.set(p.x, p.y + 1.6, p.z)
     viewer.camera.rotation.set(0.2, bot.entity.yaw, 0, 'ZYX') // pitch slightly down at the ground
     viewer.update()

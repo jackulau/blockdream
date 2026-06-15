@@ -4,8 +4,8 @@ to ONNX (blockdream_wm.export_onnx --checkpoint) for the server-free in-browser 
 independent), unlike the AR path's sequential per-token decode.
 
 Two phases, resumable, bounded by --max-minutes:
-  1. tokenizer (continuous AE, vq_codebook_size=0) — reconstruct frames into a latent grid.
-  2. rectified-flow transition — predict next-frame latent from (prev latent, action).
+  1. tokenizer (continuous AE, vq_codebook_size=0) - reconstruct frames into a latent grid.
+  2. rectified-flow transition - predict next-frame latent from (prev latent, action).
 
     ml/.venv/bin/python scripts/train_diffusion.py --pool data/pool_m4 --out runs/diffusion \
         --size 64 --max-frames 8000 --tok-steps 4000 --trans-steps 16000 --max-minutes 40
@@ -127,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     if tok_step >= args.tok_steps and phase == "tok":
         phase = "trans"; save(0.0, 0.0); last_ckpt[0] = time.time()
     if time_up():
-        save(0.0, 0.0); print("[diffusion] time budget reached — resume to continue"); return 0
+        save(0.0, 0.0); print("[diffusion] time budget reached - resume to continue"); return 0
 
     # cache latents for the transition phase
     lat_path = out / "latents.pt"

@@ -1,4 +1,4 @@
-"""Device selection — Apple Silicon (MPS) > CUDA > CPU."""
+"""Device selection - Apple Silicon (MPS) > CUDA > CPU."""
 
 from __future__ import annotations
 

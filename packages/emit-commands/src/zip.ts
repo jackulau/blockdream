@@ -1,6 +1,6 @@
 // Minimal, dependency-free ZIP (store-only) writer + reader. Store (no compression) is a
 // valid container for Minecraft Java datapacks (.zip) and Bedrock packs (.mcpack). Pure
-// Uint8Array + DataView, so it is browser-safe (lives in the "." entry — no node builtins).
+// Uint8Array + DataView, so it is browser-safe (lives in the "." entry - no node builtins).
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);

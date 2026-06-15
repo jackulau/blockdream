@@ -14,7 +14,7 @@ export interface FramePoolResult {
   cols: number;
   rows: number;
   frameCount: number;
-  /** placeholder maps.txt content — one map id per tile, operator fills real ids */
+  /** placeholder maps.txt content - one map id per tile, operator fills real ids */
   mapsTxtTemplate: string;
 }
 

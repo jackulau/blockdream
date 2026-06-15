@@ -1,6 +1,6 @@
 // One SAFE resolver for every web path that places or names a block. blocks.ts's
 // blockForBase() returns each base's raw `representative`, which can be flowing water,
-// slime_block, or a biome-dependent block — fine as a colour swatch, wrong to PLACE in a
+// slime_block, or a biome-dependent block - fine as a colour swatch, wrong to PLACE in a
 // user's world or to list as "the block you need". This wraps the canonical browser-safe
 // solid-block resolver from @blockdream/emit-commands (the exact mapping the datapack /
 // behaviorpack emitters place), plus display info (name + rgb) for that SAFE block.
@@ -46,7 +46,7 @@ export function safeBlockInfo(mapColorId: number): SafeBlockInfo | undefined {
 /**
  * mapColorId → placeable block id (cross-edition-safe solid set; air for unmapped ids).
  * Unlike the strict emitter resolver (solidBlockByMapColorId keys full shades only,
- * baseId*4+2), this accepts ANY shade of a base — the web 3D path quantizes against the
+ * baseId*4+2), this accepts ANY shade of a base - the web 3D path quantizes against the
  * full map palette, so its volumes carry all four shade ids of each base.
  */
 export function resolveBlock(mapColorId: number): string {

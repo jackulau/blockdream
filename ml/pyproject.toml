@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "blockdream-wm"
 version = "0.0.0"
-description = "blockdream — neural Minecraft world model (server AR + browser latent-diffusion)"
+description = "blockdream - neural Minecraft world model (server AR + browser latent-diffusion)"
 requires-python = ">=3.10"
 dependencies = [
   "torch>=2.4",

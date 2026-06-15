@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Overnight: train BOTH world models sequentially on an Apple Silicon Mac (MPS).
-#   Phase A — Minecraft world model (primary): gets the bulk of the night.
-#   Phase B — Driving world model (fallback): a fixed cap at the end.
+#   Phase A - Minecraft world model (primary): gets the bulk of the night.
+#   Phase B - Driving world model (fallback): a fixed cap at the end.
 # Both phases are resumable with periodic checkpoints and survive sleep/crash
 # (auto-restart loop). A single STOP file halts everything cleanly.
 #
@@ -12,7 +12,7 @@
 #   Stop everything:   touch ml/runs/overnight/STOP
 #   Watch:             tail -f ml/runs/overnight/overnight.log
 #                      ml/runs/m4/log.csv   ml/runs/drive/log.csv
-#   Serve the demo:    bash ml/scripts/serve_demo.sh   (serves ml/runs/skills_real — do NOT serve
+#   Serve the demo:    bash ml/scripts/serve_demo.sh   (serves ml/runs/skills_real - do NOT serve
 #                      ml/runs/m4 directly: its skill embeddings are dead, 0/36 distinct)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -51,22 +51,22 @@ if [ -z "$(ls "$MC_POOL"/*.npz 2>/dev/null || true)" ]; then
 fi
 END_A=$(( $(date +%s) + MC_MIN * 60 ))
 while :; do
-  propagate_stop && { log "STOP requested — exiting during Phase A"; exit 0; }
+  propagate_stop && { log "STOP requested - exiting during Phase A"; exit 0; }
   REM=$(( (END_A - $(date +%s)) / 60 ))
   [ "$REM" -le 0 ] && { log "Phase A budget exhausted"; break; }
   log "Phase A: train_long, ${REM}m remaining"
   if "$PY" -m blockdream_wm.train_long --pool "$MC_POOL" --out "$MC_OUT" \
         --preset m4 --device mps --tok-steps 40000 --ar-steps 5000000 \
         --ckpt-every-min 30 --batch 16 --max-minutes "$REM"; then
-    log "Phase A: trainer returned 0 (time budget or step targets) — advancing"
+    log "Phase A: trainer returned 0 (time budget or step targets) - advancing"
     break
   else
-    rc=$?; log "Phase A: crashed rc=$rc — resuming from $MC_OUT/latest.pt in 15s"; sleep 15
+    rc=$?; log "Phase A: crashed rc=$rc - resuming from $MC_OUT/latest.pt in 15s"; sleep 15
   fi
 done
 
 # ---------- Phase B: Driving world model ----------
-propagate_stop && { log "STOP requested before Phase B — exiting"; exit 0; }
+propagate_stop && { log "STOP requested before Phase B - exiting"; exit 0; }
 log "Phase B: Driving WM (pool=$DR_POOL)"
 NPZ=$(ls "$DR_POOL"/*.npz 2>/dev/null | wc -l | tr -d ' ')
 if [ "$NPZ" -lt 120 ]; then
@@ -75,21 +75,21 @@ if [ "$NPZ" -lt 120 ]; then
 fi
 END_B=$(( $(date +%s) + DRIVE_MIN * 60 ))
 while :; do
-  propagate_stop && { log "STOP requested — exiting during Phase B"; exit 0; }
+  propagate_stop && { log "STOP requested - exiting during Phase B"; exit 0; }
   REM=$(( (END_B - $(date +%s)) / 60 ))
   [ "$REM" -le 0 ] && { log "Phase B budget exhausted"; break; }
   log "Phase B: drive.train_long, ${REM}m remaining"
   if "$PY" -m blockdream_wm.drive.train_long --pool "$DR_POOL" --out "$DR_OUT" \
         --device mps --tok-steps 4000 --ar-steps 200000 \
         --ckpt-every-min 20 --batch 16 --max-minutes "$REM"; then
-    log "Phase B: trainer returned 0 (time budget or step targets) — done"
+    log "Phase B: trainer returned 0 (time budget or step targets) - done"
     break
   else
-    rc=$?; log "Phase B: crashed rc=$rc — resuming from $DR_OUT/latest.pt in 15s"; sleep 15
+    rc=$?; log "Phase B: crashed rc=$rc - resuming from $DR_OUT/latest.pt in 15s"; sleep 15
   fi
 done
 
 log "overnight done."
-log "  Minecraft: $MC_OUT/latest.pt   (training artifact only — do NOT serve it: dead skill embeddings, 0/36 distinct)"
+log "  Minecraft: $MC_OUT/latest.pt   (training artifact only - do NOT serve it: dead skill embeddings, 0/36 distinct)"
 log "  Driving:   $DR_OUT/latest.pt"
 log "  Serve the demo: bash ml/scripts/serve_demo.sh   (MC ← ml/runs/skills_real, driving ← $DR_OUT)"

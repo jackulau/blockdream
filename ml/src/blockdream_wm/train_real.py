@@ -25,7 +25,7 @@ from .transition_ar import ARTransition
 from .device import pick_device, device_name
 
 
-# presets balance resolution vs token count (attention is O((2·tokens)²) — the
+# presets balance resolution vs token count (attention is O((2·tokens)²) - the
 # 24GB M4 Pro caps tokens ~256, so the m4 preset uses downsample 8 at 128px).
 PRESETS = {
     # name:      (downsample, base, latent, codebook, dim, depth, heads)
@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     n_tokens = cfg.latent_size**2
     ar = ARTransition(cfg.dynamics, n_tokens=n_tokens, codebook_size=cfg.tokenizer.vq_codebook_size, action_dim=cfg.action.embed_dim).to(dev)
 
-    # 1) tokenizer (minibatched — frames can be many)
+    # 1) tokenizer (minibatched - frames can be many)
     topt = torch.optim.Adam(tok.parameters(), lr=2e-3)
     for step in range(args.tok_steps):
         idx = torch.randint(0, T, (min(args.batch, T),), device=dev)

@@ -4,7 +4,7 @@ Predicts the next frame's visual tokens from [action, prev-frame tokens], with t
 next-frame tokens generated autoregressively (teacher-forced, causal mask). This
 is the simplified single-step form: real MineWorld interleaves action+frame tokens
 across a context window and uses Diagonal Decoding to lift the ~6fps interactive
-ceiling — both are extensions of this core.
+ceiling - both are extensions of this core.
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ class ARTransition(nn.Module):
 
     @torch.no_grad()
     def _generate_uncached(self, prev: torch.Tensor, action_emb: torch.Tensor) -> torch.Tensor:
-        """Reference greedy rollout — O(N^2), recomputes the whole sequence each step.
+        """Reference greedy rollout - O(N^2), recomputes the whole sequence each step.
         Kept as the ground truth the KV-cached `generate` is tested against."""
         b = prev.shape[0]
         device = prev.device

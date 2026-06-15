@@ -1,9 +1,9 @@
 // Browser-safe solid-block palette entry. index.ts's getSolidBlockMapPalette resolves the
-// data file through the node-only loader (node:fs) — fine for the CLI, fatal in a browser
+// data file through the node-only loader (node:fs) - fine for the CLI, fatal in a browser
 // bundle. This module builds the SAME shape from the canonical data JSON imported directly
 // (the block-resolver pattern in @blockdream/emit-commands), so web code can quantize
 // against the placeable solid-block color space without dragging node builtins in.
-// Type-only imports from "./index" are erased at compile time — no runtime node:fs reach.
+// Type-only imports from "./index" are erased at compile time - no runtime node:fs reach.
 
 import type { BlockEntry, BlockPalette, MapColor, MapPalette } from "./index";
 import blockPaletteData from "@blockdream/palette/data/java-block-palette-1.21.json";

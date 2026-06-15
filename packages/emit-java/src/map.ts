@@ -66,7 +66,7 @@ export function buildMapDat(frame: QuantizedFrame, opts: MapDatOptions = {}): Bu
   return opts.gzip === false ? raw : gzipSync(raw);
 }
 
-/** Read back the colors array from a (possibly gzipped) map_<n>.dat — used by tests/tools. */
+/** Read back the colors array from a (possibly gzipped) map_<n>.dat - used by tests/tools. */
 export function readMapColors(datBytes: Buffer): Uint8Array {
   const isGzip = datBytes[0] === 0x1f && datBytes[1] === 0x8b;
   const raw = isGzip ? gunzipSync(datBytes) : datBytes;

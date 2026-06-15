@@ -1,4 +1,4 @@
-"""Real evaluation for the driving world model — replacing 'one summed loss + a directional
+"""Real evaluation for the driving world model - replacing 'one summed loss + a directional
 unit test' with per-modality validation error AND closed-loop rollout drift, and comparing
 single-step conditioning vs the new temporal-context conditioning.
 

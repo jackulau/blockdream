@@ -1,4 +1,4 @@
-// /fill run-batching — the core command-count optimizer. Vanilla `/fill` writes a whole
+// /fill run-batching - the core command-count optimizer. Vanilla `/fill` writes a whole
 // cuboid in one command, so collapsing runs of consecutive same-block cells into `/fill`
 // instead of one `/setblock` each massively cuts the per-tick command count (a solid 64-
 // wide row → 1 command instead of 64). Works for 2D walls (z constant) and 3D volumes.
@@ -34,7 +34,7 @@ export function fillBatchCount(cells: PlacedCell[], resolve: (mapColorId: number
 const key3 = (x: number, y: number, z: number) => `${x}|${y}|${z}`;
 
 /**
- * Greedy maximal-box merging — the strong optimizer. Where `fillBatch` only
+ * Greedy maximal-box merging - the strong optimizer. Where `fillBatch` only
  * collapses runs along X (a 64×64 solid → 64 `/fill`s), this grows each `/fill`
  * into the largest axis-aligned box of identical, present, not-yet-emitted cells
  * (a 64×64 solid → 1 `/fill`; a 64³ solid → 1). Lossless and deterministic:

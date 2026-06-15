@@ -1,4 +1,4 @@
-// Standalone block-art tester — thin wrapper over the shared block-art core.
+// Standalone block-art tester - thin wrapper over the shared block-art core.
 import { createBlockArt } from "./blockart-core";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

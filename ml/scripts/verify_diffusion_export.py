@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"[verify-diffusion] frame {tuple(img.shape)} ok · pixel spread {spread:.3f} · {fps:.1f} gen-fps")
     ok = fps >= args.min_fps
-    print(f"[verify-diffusion] verdict: {'PASS — exported engine runs few-step + decodes a real frame' if ok else f'SLOW (<{args.min_fps} fps)'}")
+    print(f"[verify-diffusion] verdict: {'PASS - exported engine runs few-step + decodes a real frame' if ok else f'SLOW (<{args.min_fps} fps)'}")
     return 0 if ok else 1
 
 

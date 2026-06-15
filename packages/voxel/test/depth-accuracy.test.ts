@@ -4,7 +4,7 @@ import { imageToSolid } from "../src/depth";
 import { getVoxel, EMPTY, type VoxelVolume } from "../src/volume";
 
 // Accuracy spec for image→3D: whatever depth we infer, the reconstruction must be FAITHFUL to the
-// source image — the front view reproduces the subject exactly (colour + silhouette), and the
+// source image - the front view reproduces the subject exactly (colour + silhouette), and the
 // background is fully isolated. These are the guarantees that make the build "accurate", separate
 // from how pleasing the inferred depth looks (validated visually in the browser).
 
@@ -36,7 +36,7 @@ describe("image→3D accuracy", () => {
   it("silhouette fidelity: every subject pixel occupies its column, every background pixel is empty", () => {
     const size = 20;
     const { frame } = scene(size, (set) => {
-      // an irregular subject (not just a square) — a plus / cross shape, ids 5 and 7
+      // an irregular subject (not just a square) - a plus / cross shape, ids 5 and 7
       for (let i = 4; i < 16; i++) set(i, 10, 5);
       for (let j = 4; j < 16; j++) set(10, j, 7);
       set(6, 6, 9); // an isolated subject pixel near the arm

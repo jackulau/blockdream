@@ -56,7 +56,7 @@ describe("gltfToFrames", () => {
     frames.forEach((f) => expect(countSolid(f)).toBeGreaterThan(0));
     // shared world box → the object slides in +X across the sequence
     expect(centroidX(frames[5]!)).toBeGreaterThan(centroidX(frames[0]!) + 2);
-    // all frames share the same grid (temporal coherence — not re-fit per frame)
+    // all frames share the same grid (temporal coherence - not re-fit per frame)
     expect(frames.every((f) => f.sx === frames[0]!.sx && f.sz === frames[0]!.sz)).toBe(true);
   });
 

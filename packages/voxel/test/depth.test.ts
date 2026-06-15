@@ -46,7 +46,7 @@ describe("silhouetteDistance", () => {
 });
 
 describe("imageToSolid", () => {
-  it("isolates the subject — background pixels become air", () => {
+  it("isolates the subject - background pixels become air", () => {
     const f = squareOnBg(8, 4);
     const v = imageToSolid(f, { maxDepth: 8 });
     expect([v.sx, v.sy, v.sz]).toEqual([8, 8, 8]);
@@ -56,7 +56,7 @@ describe("imageToSolid", () => {
     expect(countSolid(v)).toBeGreaterThan(0);
   });
 
-  it("is centered + double-sided — the deepest part straddles BOTH halves of the depth axis", () => {
+  it("is centered + double-sided - the deepest part straddles BOTH halves of the depth axis", () => {
     const f = squareOnBg(16, 10);
     const maxDepth = 12;
     const v = imageToSolid(f, { maxDepth });
@@ -75,7 +75,7 @@ describe("imageToSolid", () => {
     expect(ratio).toBeLessThan(2);
   });
 
-  it("reads as a real object from the side — the side silhouette is more than a 1-voxel sliver", () => {
+  it("reads as a real object from the side - the side silhouette is more than a 1-voxel sliver", () => {
     const f = squareOnBg(16, 12);
     const v = imageToSolid(f, { maxDepth: 12 });
     // project onto the X-Z plane (look from above): count distinct depths used in the center column

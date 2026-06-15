@@ -86,7 +86,7 @@ export function nearestSrgb(r: number, g: number, b: number, pal: PreparedPalett
 /**
  * Gamut-mapped nearest match: OKLab distance plus a HUE penalty weighted by the
  * target's chroma. For saturated (out-of-gamut) inputs this keeps the source
- * HUE — picking a duller same-hue block instead of a closer-but-wrong-hue or
+ * HUE - picking a duller same-hue block instead of a closer-but-wrong-hue or
  * muddy-gray one. Neutral inputs (chroma→0) fall back to plain nearest, since
  * hue is meaningless there. `lambda` controls hue rigidity.
  */
@@ -119,7 +119,7 @@ export function nearestSrgbHue(r: number, g: number, b: number, pal: PreparedPal
 
 /**
  * Precomputed 3D RGB → palette-index lookup table for O(1) matching (the brute
- * force is O(palette) per pixel — the lag source for video). Each cell stores the
+ * force is O(palette) per pixel - the lag source for video). Each cell stores the
  * perceptually-nearest entry index, computed once via the OKLab matcher. `res`
  * cells per axis (33 → 8-bit-ish grid, ~36k cells); higher = more accurate.
  */

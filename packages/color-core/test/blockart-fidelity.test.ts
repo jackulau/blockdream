@@ -1,5 +1,5 @@
 // Block-art fidelity: mapping real Minecraft-style pixel art to the 244-color map
-// palette must be COLOR-FAITHFUL — every cell's chosen block color should be close to
+// palette must be COLOR-FAITHFUL - every cell's chosen block color should be close to
 // the source pixel (small ΔE2000), and the chosen-block count should be sane.
 
 import { describe, it, expect } from "vitest";
@@ -58,7 +58,7 @@ describe("block-art fidelity vs real pixel art", () => {
     // eslint-disable-next-line no-console
     console.log(`\n[block-art ΔE2000] nearest: mean ${f.mean.toFixed(2)} p95 ${f.p95.toFixed(2)} max ${f.max.toFixed(2)} · ${f.distinctBlocks} blocks`);
     // The matcher is near-CIEDE2000-optimal (see ciede2000.test); ~9 mean is the honest
-    // ceiling of a 244-colour palette on saturated content — same colour family, no wild misses.
+    // ceiling of a 244-colour palette on saturated content - same colour family, no wild misses.
     expect(f.mean).toBeLessThan(12);
     expect(f.p95).toBeLessThan(20);
     expect(f.max).toBeLessThan(25); // even the single worst cell isn't a different colour

@@ -1,10 +1,10 @@
 // Server-free, in-browser diffusion world-model engine. Loads the ONNX exported by
 // `python -m blockdream_wm.export_onnx --checkpoint ...` (transition.onnx + decoder.onnx) and runs
-// the few-step Euler loop in JS — the >=30fps route (the whole frame's latent is denoised in
+// the few-step Euler loop in JS - the >=30fps route (the whole frame's latent is denoised in
 // parallel, unlike the AR server's token-by-token decode).
 //
 // onnxruntime-web is loaded from a CDN at runtime (a heavy WASM dep we don't want in the main
-// bundle) — so this stays a zero-cost optional feature: if the ONNX or the runtime is unavailable,
+// bundle) - so this stays a zero-cost optional feature: if the ONNX or the runtime is unavailable,
 // createBrowserRollout() returns null and the demo falls back to the WebSocket server engine.
 
 export interface RolloutOpts {
@@ -57,7 +57,7 @@ export async function createBrowserRollout(opts: RolloutOpts): Promise<BrowserRo
   try {
     ort = await import(/* @vite-ignore */ opts.ortUrl ?? DEFAULT_ORT);
   } catch {
-    return null; // runtime unavailable (offline) — fall back to the server engine
+    return null; // runtime unavailable (offline) - fall back to the server engine
   }
   const ep = "gpu" in navigator ? ["webgpu", "wasm"] : ["wasm"];
   const transition = await ort.InferenceSession.create(transitionUrl, { executionProviders: ep });

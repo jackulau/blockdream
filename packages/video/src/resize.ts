@@ -4,7 +4,7 @@ import { srgbChannelToLinear, linearToSrgbChannel, type RgbImage } from "@blockd
  * Box-average downscale in LINEAR light (the correct space for averaging colors).
  * ffmpeg's `scale=...:flags=area` averages in gamma space; for best fidelity,
  * decode at a larger size and downsample with this. Pure box filter (no overlap
- * weighting) — adequate for integer-ish ratios and the small target grids here.
+ * weighting) - adequate for integer-ish ratios and the small target grids here.
  */
 export function resizeAreaLinear(src: RgbImage, dstW: number, dstH: number): RgbImage {
   if (dstW <= 0 || dstH <= 0) throw new Error("target size must be > 0");

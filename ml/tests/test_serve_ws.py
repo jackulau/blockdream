@@ -76,7 +76,7 @@ def test_ws_concurrent_clients_are_independent():
     assert a_steps == [1, 2, 3]
     assert b_steps == [1, 2, 3]
     # the deterministic (greedy) rollout is identical with or without B's interleaved
-    # traffic — B's resets/steps do not perturb A's state
+    # traffic - B's resets/steps do not perturb A's state
     assert a_frames == solo_frames
 
 

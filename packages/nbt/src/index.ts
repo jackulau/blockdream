@@ -5,7 +5,7 @@
  * - Bedrock edition: LITTLE-endian (.mcstructure, and a header-prefixed level.dat).
  *
  * Both editions share the same tag ids and tree model; only integer/float byte
- * order and the string length prefix differ — so one implementation serves both.
+ * order and the string length prefix differ - so one implementation serves both.
  */
 
 export type Endianness = "big" | "little";

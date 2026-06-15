@@ -1,4 +1,4 @@
-# blockdream Block-Art Player — Bedrock addon (Script API)
+# blockdream Block-Art Player - Bedrock addon (Script API)
 
 Bedrock's **best-available "native" real-time** path. The Bedrock Script API
 cannot paint map items, so true video-on-maps is not reachable in vanilla
@@ -19,11 +19,11 @@ and batching than raw command blocks (the `behaviorpack` target).
 3. Build the block wall area, then in chat: `!mw start` (`!mw stop`, `!mw reset`).
 
 ## Files
-- `behavior_pack/manifest.json` — script module + `@minecraft/server` dependency.
-- `behavior_pack/scripts/main.js` — `system.runInterval` loop applying per-frame
+- `behavior_pack/manifest.json` - script module + `@minecraft/server` dependency.
+- `behavior_pack/scripts/main.js` - `system.runInterval` loop applying per-frame
   delta cells via `block.setPermutation`. Mirrors
   `@blockdream/emit-commands` `BEDROCK_PLAYER_JS` (the generator's source of truth).
-- `behavior_pack/scripts/frames.js` — **example** `POOL` data; regenerate per clip.
+- `behavior_pack/scripts/frames.js` - **example** `POOL` data; regenerate per clip.
 
 > The static files here are a runnable example. The canonical generator is
 > `generateBedrockScriptAddon` in `@blockdream/emit-commands`.

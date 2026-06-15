@@ -1,6 +1,6 @@
-"""CAST the world model's dream INTO Minecraft — record a WM rollout and emit a vanilla Java datapack
+"""CAST the world model's dream INTO Minecraft - record a WM rollout and emit a vanilla Java datapack
 ANIMATION that plays the dream as a block-wall in-world. This is the offline counterpart to the live
-Fabric bridge (mods/java-fabric): no mod, no server — just drop the datapack and run /function.
+Fabric bridge (mods/java-fabric): no mod, no server - just drop the datapack and run /function.
 
 Pipeline: roll the skill-conditioned WM N steps (held-forward by default) → save each generated frame →
 ffmpeg into an mp4 → the `blockdream` CLI quantizes every frame to Minecraft map-colors and emits a
@@ -32,18 +32,18 @@ def preflight_errors(checkpoint: str | Path) -> list[str]:
     errors: list[str] = []
     if shutil.which("ffmpeg") is None:
         errors.append(
-            "ffmpeg not found on PATH — install it (macOS: `brew install ffmpeg`; "
+            "ffmpeg not found on PATH - install it (macOS: `brew install ffmpeg`; "
             "Debian/Ubuntu: `apt install ffmpeg`) so frames can be encoded to mp4"
         )
     if shutil.which("npx") is None:
         errors.append(
-            "npx not found on PATH — install Node.js >= 18 (https://nodejs.org or `brew install node`); "
+            "npx not found on PATH - install Node.js >= 18 (https://nodejs.org or `brew install node`); "
             "the datapack emitter runs via `npx tsx packages/cli/src/index.ts`"
         )
     ckpt = Path(checkpoint)
     if not ckpt.is_file():
         errors.append(
-            f"checkpoint not found: {ckpt} — run from ml/ so the default "
+            f"checkpoint not found: {ckpt} - run from ml/ so the default "
             "`runs/skills_real/latest.pt` resolves, or pass --checkpoint <path> "
             "(train one with scripts/train_real.sh if you have none)"
         )
@@ -102,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         print("[cast] datapack emit FAILED")
         return 1
     zips = list(out.glob("*.zip"))
-    print(f"[cast] WM dream cast → {zips[0] if zips else '(no zip — check --out)'}")
+    print(f"[cast] WM dream cast → {zips[0] if zips else '(no zip - check --out)'}")
     return 0 if zips else 1
 
 

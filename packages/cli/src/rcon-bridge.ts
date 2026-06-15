@@ -1,5 +1,5 @@
 // PURE CORE of the no-mod live Minecraft bridge. A sidecar polls a STOCK vanilla server
-// over RCON — `data get entity <name> Pos` / `Rotation` — derives a world-model action
+// over RCON - `data get entity <name> Pos` / `Rotation` - derives a world-model action
 // from the pose delta, sends it to ml serve.py over WS, and paints the returned frame as
 // a vertical solid-block wall via literal `setblock`/`fill` RCON commands. No mod, no
 // datapack, no client plugin: RCON is the entire transport.
@@ -30,7 +30,7 @@ import {
 } from "@blockdream/color-core";
 import { deriveAction, type Action, type Pose } from "./control-sim";
 
-// the action message/encoding is control-sim's — re-export so a sidecar imports one module
+// the action message/encoding is control-sim's - re-export so a sidecar imports one module
 export { actionMessage, BTN, N_BUTTONS, type Action } from "./control-sim";
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ function parseNumList(group: string): number[] | null {
  * CONCATENATED for a full pose: the 3-number list is Pos (x,y,z), the 2-number list is
  * Rotation (yaw,pitch). A missing list leaves its fields 0 (so a Pos-only poll still
  * yields a position). Handles d/f suffixes, negatives, scientific notation, and the
- * "No entity was found" reply. Never throws — junk input becomes `{error}`.
+ * "No entity was found" reply. Never throws - junk input becomes `{error}`.
  */
 export function parsePosRotation(rconText: string): PosRotationResult {
   try {
@@ -102,7 +102,7 @@ export function parsePosRotation(rconText: string): PosRotationResult {
 // 2. pose delta → world-model action
 // ---------------------------------------------------------------------------
 
-const TICK_MS = 50; // 20 tps — control-sim's thresholds are per-tick metres/degrees
+const TICK_MS = 50; // 20 tps - control-sim's thresholds are per-tick metres/degrees
 const SPRINT_SPEED = 0.25; // m/tick: sprint ≈ 0.28, walk ≈ 0.216 → clean separation
 const RISE_SPEED = 0.1; // m/tick upward = jump launch (initial jump velocity ≈ 0.42)
 
@@ -150,7 +150,7 @@ export function poseToAction(prev: RconPose, cur: RconPose, dtMs: number, skill?
     pitch: cur.pitch,
     onGround: !rising, // just left the ground → deriveAction sets the jump button
     sprinting,
-    sneaking: false, // indistinguishable from slow walking over RCON — never inferred
+    sneaking: false, // indistinguishable from slow walking over RCON - never inferred
   };
   return deriveAction(simPrev, simCur, skill);
 }
@@ -168,26 +168,26 @@ export interface WallFrame {
 
 export interface WallCommandOptions {
   /**
-   * Per-frame command budget (docs/vanilla-command-budgets.md — the same 8000-command
+   * Per-frame command budget (docs/vanilla-command-budgets.md - the same 8000-command
    * function budget the datapack generators split at). RCON sidecars pay a round-trip
    * per command, so they typically set this far lower (e.g. 100-500) and let the
    * remainder carry. Default {@link DEFAULT_MAX_COMMANDS}.
    */
   maxCommands?: number;
-  /** Cells a previous capped call deferred — pass that call's `remainder` back here. */
+  /** Cells a previous capped call deferred - pass that call's `remainder` back here. */
   carry?: PlacedCell[];
   /** Palette/version line (validated; 1.21.x all alias to the canonical data). */
   paletteVersion?: string;
-  /** Dither method. Default "bayer" — temporally stable, so deltas stay small. */
+  /** Dither method. Default "bayer" - temporally stable, so deltas stay small. */
   dither?: DitherMethod;
 }
 
 export interface WallCommands {
   /** Literal vanilla commands (no leading slash; RCON accepts them as-is). */
   commands: string[];
-  /** Cells deferred past the budget — feed back via `opts.carry` on the next call. */
+  /** Cells deferred past the budget - feed back via `opts.carry` on the next call. */
   remainder: PlacedCell[];
-  /** The quantized frame (solid-block palette) the commands realize — for tests/debug. */
+  /** The quantized frame (solid-block palette) the commands realize - for tests/debug. */
   quantized: QuantizedFrame;
 }
 
@@ -235,7 +235,7 @@ function commandBox(line: string): { x0: number; y0: number; z0: number; x1: num
  *
  * With `prevFrame` present only the cells whose quantized block changed are repainted
  * (delta); without it the full frame is a keyframe. The command count is capped at
- * `opts.maxCommands` per call — over budget, the LARGEST boxes (most pixels per command)
+ * `opts.maxCommands` per call - over budget, the LARGEST boxes (most pixels per command)
  * are sent this frame and the uncovered cells come back as `remainder`, which the caller
  * feeds into the next call's `opts.carry` (fresh delta cells overwrite stale carried ones
  * at the same coordinate). Carried cells stay correct because an unchanged pixel's target

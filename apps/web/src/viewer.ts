@@ -1,11 +1,11 @@
 // Decoupled world-model viewer: the DISPLAY (a requestAnimationFrame render loop that
 // redraws the latest frame every screen refresh) is fully separate from GENERATION (a
 // "pump" that requests the next frame only once the previous one arrives). So the canvas
-// is buttery-smooth regardless of how fast the model generates — a slow 256-token
+// is buttery-smooth regardless of how fast the model generates - a slow 256-token
 // Minecraft frame can't freeze it; a fast driving model just shows fresher content.
 
 export interface Stats {
-  displayFps: number; // canvas redraws/sec (locked to refresh — always smooth)
+  displayFps: number; // canvas redraws/sec (locked to refresh - always smooth)
   genFps: number; // model frames/sec (content freshness)
   latencyMs: number; // last action→frame round-trip
 }
@@ -106,7 +106,7 @@ export class Viewer {
       img.src = `data:image/png;base64,${b64}`;
     }
     this.cfg.onFrame?.(msg);
-    this.pump(); // request the next frame immediately — generation runs flat-out
+    this.pump(); // request the next frame immediately - generation runs flat-out
   }
 
   // GENERATION: one request in flight at a time, as fast as the server produces frames

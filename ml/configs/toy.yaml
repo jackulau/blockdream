@@ -1,4 +1,4 @@
-# Tiny CPU preset — every stage runs in seconds. Not a real training config.
+# Tiny CPU preset - every stage runs in seconds. Not a real training config.
 tokenizer:
   image_size: 32
   base_channels: 16

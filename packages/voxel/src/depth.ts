@@ -1,17 +1,17 @@
 // Real shape-from-image voxelization. The old `relief` mode (see voxelize.ts) faked depth
-// from pixel BRIGHTNESS extruded backward from a single front face — so a bright background
+// from pixel BRIGHTNESS extruded backward from a single front face - so a bright background
 // became a thick slab, the subject was never isolated, and the result was one-sided (it
 // vanished/﻿read as a flat card when spun edge-on).
 //
 // imageToSolid fixes all three:
-//   1. Subject isolation — the background (border-connected dominant colour) is removed, so the
+//   1. Subject isolation - the background (border-connected dominant colour) is removed, so the
 //      object floats in air and reads as an OBJECT, not a wall.
-//   2. Depth follows SHAPE, not brightness — with no external depth map we "inflate" the
+//   2. Depth follows SHAPE, not brightness - with no external depth map we "inflate" the
 //      silhouette: a 2D distance transform makes pixels deep inside the subject bulge out and
 //      pixels near the outline taper thin, giving a rounded, dome-like solid (the classic
 //      puff/inflate reconstruction). With a real per-pixel depth map (an in-browser monocular
 //      depth model, or a Blender depth pass) the thickness follows true depth instead.
-//   3. Centered + double-sided — thickness is distributed SYMMETRICALLY about the mid-plane, so
+//   3. Centered + double-sided - thickness is distributed SYMMETRICALLY about the mid-plane, so
 //      both the front and back carry the image and the side silhouette shows the depth profile.
 //      The object stays coherent from every viewing angle.
 
@@ -24,7 +24,7 @@ export interface SolidifyImageOptions {
   /** Background handling. "auto" removes the border-connected dominant colour; "none" keeps all
    *  pixels as subject. Default "auto". */
   background?: "auto" | "none";
-  /** Explicit background test (overrides auto detection) — e.g. a palette's air id. */
+  /** Explicit background test (overrides auto detection) - e.g. a palette's air id. */
   isBackground?: (mapColorId: number) => boolean;
   /** Real per-pixel depth in [0,1] (1 = thickest). Overrides the silhouette-inflation heuristic.
    *  This is the hook a depth MODEL or a Blender depth pass feeds. (x,y) are image coords. */

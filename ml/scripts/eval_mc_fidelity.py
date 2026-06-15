@@ -1,14 +1,14 @@
-"""Fidelity gate for the served Minecraft world model — does the rolled-out frame actually LOOK like
+"""Fidelity gate for the served Minecraft world model - does the rolled-out frame actually LOOK like
 Minecraft, or is it blurry/gray mush?
 
 The distinctness gate (verify_movement_types.py) proves the movement types DIVERGE, but a model can be
 divergent AND blurry. This measures VISUAL FIDELITY of the recursive rollout:
 
-  detail  = mean gradient magnitude (high-frequency energy) of decoded frames — blur/gray mush has LOW
+  detail  = mean gradient magnitude (high-frequency energy) of decoded frames - blur/gray mush has LOW
             detail; real Minecraft (block edges, texture) has HIGH detail. The headline number is
             `detail_ratio` = rollout detail / real-holdout detail (1.0 = as sharp as real footage).
-  sat     = mean per-pixel color saturation (channel spread) — a sanity channel.
-  std     = mean spatial std — catches a literal gray collapse.
+  sat     = mean per-pixel color saturation (channel spread) - a sanity channel.
+  std     = mean spatial std - catches a literal gray collapse.
 
 Floor gate (exit 1) fires ONLY on a catastrophic collapse (std below the gray floor, or detail_ratio
 near zero). Otherwise exit 0 and print FIDELITY <detail_ratio>. Use --min-detail-ratio to gate harder
@@ -47,7 +47,7 @@ def _sat(f: torch.Tensor) -> float:
 
 
 def _real_baseline(n_per_pool: int = 12) -> tuple[float, float]:
-    """Mean (detail, sat) over a real-footage holdout — the fidelity target."""
+    """Mean (detail, sat) over a real-footage holdout - the fidelity target."""
     det, sat = [], []
     for p in sorted(glob.glob("data/pool_real_*")):
         segs = sorted(glob.glob(p + "/seg_*.npz"))
@@ -95,10 +95,10 @@ def main(argv: list[str] | None = None) -> int:
     collapsed = std < GRAY_STD_FLOOR or ratio < DETAIL_FLOOR
     low = args.min_detail_ratio > 0 and ratio < args.min_detail_ratio
     if collapsed:
-        print(f"FIDELITY_LOW — collapsed (std {std:.3f} < {GRAY_STD_FLOOR} or ratio {ratio:.3f} < {DETAIL_FLOOR})")
+        print(f"FIDELITY_LOW - collapsed (std {std:.3f} < {GRAY_STD_FLOOR} or ratio {ratio:.3f} < {DETAIL_FLOOR})")
         return 1
     if low:
-        print(f"FIDELITY_LOW — detail_ratio {ratio:.3f} < required {args.min_detail_ratio}")
+        print(f"FIDELITY_LOW - detail_ratio {ratio:.3f} < required {args.min_detail_ratio}")
         return 1
     print("FIDELITY_OK")
     return 0

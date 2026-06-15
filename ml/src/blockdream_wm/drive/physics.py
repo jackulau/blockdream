@@ -1,4 +1,4 @@
-"""Vehicle dynamics — dynamic bicycle model with a Pacejka 'magic formula' tire,
+"""Vehicle dynamics - dynamic bicycle model with a Pacejka 'magic formula' tire,
 drift-capable, with a kinematic-blend guard at low speed (the dynamic model is
 singular as v→0). This is the standard good-physics vehicle model (same family as
 highway-env / nuPlan / CARLA's underlying dynamics).

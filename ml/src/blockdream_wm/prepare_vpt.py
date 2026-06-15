@@ -35,7 +35,7 @@ def fetch_jsonl(url: str) -> list[dict]:
 
 
 def stream_frames(mp4_url: str, seconds: float, fps: int, size: int) -> np.ndarray:
-    """Download the mp4 (these are non-fragmented — moov atom at end, so the whole
+    """Download the mp4 (these are non-fragmented - moov atom at end, so the whole
     file is needed) then extract the first `seconds` → (T, size, size, 3) uint8."""
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as tmp:
         with urllib.request.urlopen(mp4_url, timeout=300) as r:

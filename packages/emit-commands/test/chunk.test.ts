@@ -22,7 +22,7 @@ describe("chunk()", () => {
 });
 
 // These tests isolate the per-function SPLIT machinery (writeSplitFunction), so they
-// disable the fill optimizer — otherwise greedy box-merging collapses the deliberately-
+// disable the fill optimizer - otherwise greedy box-merging collapses the deliberately-
 // oversized frames under the budget and there is nothing to split. The optimizer ×
 // splitter composition is covered separately in greedy.test.ts / roundtrip tests.
 describe("command-budget splitting", () => {
@@ -60,7 +60,7 @@ describe("command-budget splitting", () => {
   });
 
   it("optimizer × splitter compose: a truly unmergeable frame still splits with optimization ON", () => {
-    // genuine 2D checkerboard (x+y)%2 — no two neighbours share a block, so greedy
+    // genuine 2D checkerboard (x+y)%2 - no two neighbours share a block, so greedy
     // emits one /setblock per cell and the budget split still triggers.
     const flat = new Uint8Array(10 * 10);
     for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) flat[y * 10 + x] = (x + y) % 2;

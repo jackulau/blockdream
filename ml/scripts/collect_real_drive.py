@@ -1,13 +1,13 @@
-"""Build a REAL driving token pool from commaVQ — the driving analogue of import_mineflayer.py.
+"""Build a REAL driving token pool from commaVQ - the driving analogue of import_mineflayer.py.
 
 commaVQ (`commaai/commavq`, MIT) is ~100k segments of REAL comma.ai dashcam video, pre-tokenized
 with comma's VQ-VAE (128 tokens/frame, codebook 1024) + comma's logged ego MOTION pose
 (`<seg>.pose.npy`, (1200,6) = [v_fwd, v_lat, v_up, ω_roll, ω_pitch, ω_yaw]). This either streams a
-tiny real sample straight from HuggingFace (no multi-GB download — early-abort after N segments) or
+tiny real sample straight from HuggingFace (no multi-GB download - early-abort after N segments) or
 reads an already-downloaded commaVQ directory, then writes a real driving pool (roll_*.npz +
 source.txt 'commavq-real'). ZERO synthetic data: control/telemetry are derived from comma's real log.
 
-Stream a tiny real sample (recommended — pulls only a few MB):
+Stream a tiny real sample (recommended - pulls only a few MB):
     ml/.venv/bin/python scripts/collect_real_drive.py --stream-hf --max-segments 6 \
         --out ml/data/drive_real_pool
 
@@ -34,7 +34,7 @@ HF_SHARD_URL = "https://huggingface.co/datasets/commaai/commavq/resolve/main/{sh
 
 
 def _looks_like_tokens(p: Path) -> bool:
-    """A commaVQ token file reshapes to (T, 128) — last dims (8,16) or a trailing 128."""
+    """A commaVQ token file reshapes to (T, 128) - last dims (8,16) or a trailing 128."""
     try:
         a = np.load(p, mmap_mode="r")
     except Exception:
@@ -76,7 +76,7 @@ def discover_segments(root: Path) -> list[tuple[str, str | None]]:
 def stream_hf_sample(out_dir: Path, max_segments: int, shard: str = "data-0000.tar.gz",
                      max_frames: int = 0) -> list[tuple[str, str | None]]:
     """Stream the first `max_segments` REAL (token, pose) pairs out of a commaVQ shard tar.gz on
-    HuggingFace and write them as raw .npy under out_dir — early-aborting the HTTP stream so only a
+    HuggingFace and write them as raw .npy under out_dir - early-aborting the HTTP stream so only a
     few MB are pulled (each segment ≈ 0.3 MB tokens + 0.03 MB pose), never the full 500 MB shard."""
     out_dir.mkdir(parents=True, exist_ok=True)
     url = HF_SHARD_URL.format(shard=shard)
@@ -108,7 +108,7 @@ def stream_hf_sample(out_dir: Path, max_segments: int, shard: str = "data-0000.t
                 if len(done) >= max_segments:
                     break                                     # early-abort: stop pulling the shard
     if not done:
-        raise SystemExit("streamed shard yielded no complete (token,pose) pairs — check connectivity")
+        raise SystemExit("streamed shard yielded no complete (token,pose) pairs - check connectivity")
     return done
 
 
@@ -132,13 +132,13 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("pass --commavq-dir <dir> or --stream-hf")
         root = Path(args.commavq_dir)
         if not root.exists():
-            raise SystemExit(f"commaVQ dir not found: {root} — download a shard first (see this file's header)")
+            raise SystemExit(f"commaVQ dir not found: {root} - download a shard first (see this file's header)")
         segs = discover_segments(root)
         with_pose = [s for s in segs if s[1]]
         if not with_pose:
             raise SystemExit(
                 f"found {len(segs)} token file(s) but none with a matching pose in {root}. "
-                "Real control needs comma's ego log — download a commaVQ shard that includes .pose.npy.")
+                "Real control needs comma's ego log - download a commaVQ shard that includes .pose.npy.")
         if args.max_segments:
             with_pose = with_pose[: args.max_segments]
 
