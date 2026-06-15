@@ -187,7 +187,9 @@ def _real_holdout_pool():
         return str(pool)
     fixture = ml / "tests" / "fixtures" / "commavq_real"
     if fixture.exists():
-        import scripts.collect_real_drive as cr  # discover (token,pose) pairs in the fixture
+        import sys
+        sys.path.insert(0, str(ml / "scripts"))  # importable no matter the caller's cwd
+        import collect_real_drive as cr  # discover (token,pose) pairs in the fixture
         segs = [s for s in cr.discover_segments(fixture) if s[1]]
         if segs:
             out = ml / "data" / "drive_real_holdout"
