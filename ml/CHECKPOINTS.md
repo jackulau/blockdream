@@ -48,6 +48,25 @@ The previous driving model was a 100% **synthetic physics sim** (`drive.sim` / `
 asserts the served checkpoint is the real one). The sim checkpoint is preserved at
 `runs/drive/pre029_sim_backup.pt`.
 
+### Minecraft WM visual fidelity (goal-031)
+
+The served Minecraft WM rendered blurry/washed frames ("does not look like Minecraft"). Root cause
+(investigated, not guessed): the served checkpoint had **ar_step=1350** - `train_skills_hi.sh` requested
+`--ar-steps 16000` under `--max-minutes 22`, so the tokenizer phase (6000 steps) ate the budget and the
+AR phase was **wall-clock truncated to ~1350/16000 steps** -> it predicted averaged/blurry frames. The
+tokenizer recon (faithful but soft), per-skill rollout std (healthy 0.14-0.30, no collapse), and the
+serve frame->PNG path were all verified fine; the fix is TRAINING, not a pipeline bug.
+
+Fixes:
+- `train_skills_hi.sh`: `MAX_MIN` default 22 -> 90 (+ `AR_STEPS`/`TOK_STEPS`/`PRESET` overridable) so the
+  AR phase runs to completion by default - the truncation cannot silently recur.
+- `eval_mc_fidelity.py`: a fidelity gate (`detail_ratio` = rollout gradient energy / real-holdout energy)
+  so "looks like Minecraft" is mechanically measured, not eyeballed. Floor-gates on gray collapse.
+- Retrained the AR to completion on the real pools (resuming the trained tokenizer); promote-only-if-better
+  vs the served checkpoint on fidelity AND 9/9 movement-type distinctness. A stronger 64px tokenizer
+  (`hi64` preset: codebook 512->1024, base 48->64) is available to raise the recon sharpness ceiling.
+- `serve_demo.sh` restart picks up the promoted checkpoint. (Numbers recorded at promote time.)
+
 ### Temporal-context retrain experiment (2026-06-10, goal 027 - NOT promoted; sim-era, superseded)
 
 `runs/drive_v3/` (`best.pt`, n_history=3, 58k AR steps / 38 min MPS) wired the proven temporal-context
