@@ -22,7 +22,11 @@ cd "$(dirname "$0")/.."        # → ml/
 PY=.venv/bin/python
 OUT="${OUT:-runs/skills_hi}"
 DEVICE="${DEVICE:-mps}"
-MAX_MIN="${MAX_MIN:-22}"
+# NOTE: the AR phase MUST run to completion for sharp frames. The old 22-min default truncated the
+# AR at ~1350/16000 steps → blurry averaged frames (goal 031 root cause). Default is now generous so a
+# plain run finishes the AR; override MAX_MIN higher for max fidelity ("keep training").
+MAX_MIN="${MAX_MIN:-90}"
+AR_STEPS="${AR_STEPS:-24000}"
 
 # 1. real walk/general pools at 64px (idempotent — skip if already built)
 if [ ! -f data/pool_real_walk64/skill.txt ]; then
@@ -43,8 +47,8 @@ echo "[skills_hi] pools = $POOLS"
 
 # 3. train — strong tokenizer (real texture needs it; a weak tokenizer collapses all skills to blur)
 PYTORCH_ENABLE_MPS_FALLBACK=1 "$PY" -m blockdream_wm.train_long \
-  --pools "$POOLS" --out "$OUT" --preset quick \
-  --tok-steps 6000 --ar-steps 16000 --device "$DEVICE" \
+  --pools "$POOLS" --out "$OUT" --preset "${PRESET:-quick}" \
+  --tok-steps "${TOK_STEPS:-6000}" --ar-steps "$AR_STEPS" --device "$DEVICE" \
   --ckpt-every-min 3 --batch 16 --max-minutes "$MAX_MIN"
 
 # 4. serve/verify the best-by-val checkpoint
