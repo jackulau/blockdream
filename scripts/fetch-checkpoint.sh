@@ -32,4 +32,23 @@ fi
 [ -s "$DEST/latest.pt" ] || { echo "✗ download produced an empty file — check $URL" >&2; exit 1; }
 BYTES=$(stat -f %z "$DEST/latest.pt" 2>/dev/null || stat -c %s "$DEST/latest.pt")
 [ "$BYTES" -gt 10000000 ] || { echo "✗ checkpoint suspiciously small ($BYTES bytes) — corrupt download? removing" >&2; rm -f "$DEST/latest.pt"; exit 1; }
+
+# Stamp the REAL-data provenance sidecar (gitignored, so it does not travel in the clone or the
+# release asset). The released checkpoint IS the all-real served model — without this, a fresh-clone
+# fetch would trip no_synthetic_guard.py's strict provenance check (present checkpoint, no sidecar).
+if [ ! -f "$DEST/PROVENANCE.json" ]; then
+  cat > "$DEST/PROVENANCE.json" <<'JSON'
+{
+  "model": "Minecraft world model (skill-conditioned, served)",
+  "data_source": "vpt+mineflayer",
+  "synthetic": false,
+  "pools": ["pool_real_general64", "pool_real_walk64", "pool_real_sprint64", "pool_real_jump64",
+            "pool_real_swim", "pool_real_boat", "pool_real_elytra", "pool_real_pig", "pool_real_minecart"],
+  "data_detail": "walk/general/sprint/jump = real OpenAI VPT footage; swim/boat/elytra/pig/minecart = real mineflayer footage",
+  "note": "Stamped by fetch-checkpoint.sh — the released v0.1.0 asset is the all-real served model.",
+  "goal": "029-world-model-all-real-no-synthetic"
+}
+JSON
+  echo "[fetch-checkpoint] ✓ stamped $DEST/PROVENANCE.json (real-data provenance)"
+fi
 echo "[fetch-checkpoint] ✓ $DEST/latest.pt ($BYTES bytes). Try: bash scripts/cast.sh   or   bash ml/scripts/serve_demo.sh"

@@ -1,4 +1,9 @@
-"""Resumable long-run trainer for the multimodal driving world model.
+"""DEPRECATED — SYNTHETIC, NOT SERVED. Trains the driving WM on the physics-SIM pool (data/drive_pool
+from `drive.collect` + `drive.sim`) = SYNTHETIC data. The served driving model is now trained on 100%
+REAL comma.ai commaVQ footage via `drive.train_real` + `scripts/train_drive_real.sh`. Kept for
+research/repro only; `no_synthetic_guard.py` asserts the served checkpoint is the real one, not this.
+
+Resumable long-run trainer for the multimodal driving world model.
 
 Two-phase (RGB tokenizer -> multimodal transition), atomic time-based checkpoints,
 train/val loss logging, a --max-minutes wall-clock budget, and automatic resume from

@@ -18,17 +18,30 @@ from .transition import DriveTransition
 class DriveSession:
     def __init__(self, ckpt: dict, device: str = "auto"):
         self.device = pick_device(device)
-        self.tok = Tokenizer(TokenizerConfig(**ckpt["tokenizer_cfg"]))
-        self.tok.load_state_dict(ckpt["tokenizer"])
-        n_tokens = (ckpt["image"] // ckpt["downsample"]) ** 2
+        # REAL commaVQ path: pre-tokenized real dashcam (no RGB tokenizer to load), camera-only
+        # (n_lidar=0), rendered as a token field (photoreal decode needs comma's VQ decoder).
+        self.real_source = ckpt.get("real_source")
         self.n_history = int(ckpt.get("n_history", 0))  # legacy checkpoints carry no key → 0
-        self.trans = DriveTransition(DynamicsConfig(**ckpt["dynamics_cfg"]), n_tokens=n_tokens,
-                                     codebook_size=ckpt["codebook"], n_lidar=ckpt["n_lidar"],
-                                     n_telemetry=ckpt["n_telemetry"], n_history=self.n_history)
+        if self.real_source == "commavq":
+            self.tok = None
+            n_tokens = int(ckpt["n_tokens"])
+            self.token_grid = tuple(ckpt.get("token_grid", [8, 16]))
+            self.grid = self.token_grid  # (h, w) of the token field
+            self.trans = DriveTransition(DynamicsConfig(**ckpt["dynamics_cfg"]), n_tokens=n_tokens,
+                                         codebook_size=ckpt["codebook"], n_lidar=ckpt["n_lidar"],
+                                         n_telemetry=ckpt["n_telemetry"], n_history=self.n_history)
+            self.codebook = int(ckpt["codebook"])
+        else:
+            self.tok = Tokenizer(TokenizerConfig(**ckpt["tokenizer_cfg"]))
+            self.tok.load_state_dict(ckpt["tokenizer"])
+            n_tokens = (ckpt["image"] // ckpt["downsample"]) ** 2
+            self.trans = DriveTransition(DynamicsConfig(**ckpt["dynamics_cfg"]), n_tokens=n_tokens,
+                                         codebook_size=ckpt["codebook"], n_lidar=ckpt["n_lidar"],
+                                         n_telemetry=ckpt["n_telemetry"], n_history=self.n_history)
+            self.tok = self.tok.to(self.device).eval()
+            self.grid = ckpt["image"] // ckpt["downsample"]
         self.trans.load_state_dict(ckpt["transition"])
-        self.tok = self.tok.to(self.device).eval()
         self.trans = self.trans.to(self.device).eval()
-        self.grid = ckpt["image"] // ckpt["downsample"]
         self._init = (ckpt["init_tokens"], ckpt["init_lidar"], ckpt["init_telemetry"])
         self.step_idx = 0
         self.reset()
@@ -38,7 +51,7 @@ class DriveSession:
         t, l, te = self._init
         self.tokens = t.view(1, -1).clone().to(self.device)
         self.lidar = l.view(1, -1).clone().to(self.device)
-        self.tel = te.view(1, -1).clone().to(self.device)
+        self.tel = self._physical_tel(te.view(1, -1).clone().to(self.device))
         # temporal-context window of the last n_history (control, telemetry) rows — zeros at
         # reset (the model trains with zero-init windows, so this matches the data distribution)
         self.hist_rows = [
@@ -50,8 +63,24 @@ class DriveSession:
 
     @torch.no_grad()
     def _decode(self):
-        rgb = self.tok.decode_tokens(self.tokens.view(1, self.grid, self.grid))[0]
+        if self.real_source == "commavq":
+            rgb = self._token_field_rgb()
+        else:
+            rgb = self.tok.decode_tokens(self.tokens.view(1, self.grid, self.grid))[0]
         return {"rgb": rgb.cpu(), "lidar": self.lidar[0].cpu(), "telemetry": self.tel[0].cpu()}
+
+    @torch.no_grad()
+    def _token_field_rgb(self, out_h: int = 64, out_w: int = 128):
+        """Render the REAL model's predicted commaVQ token field as an image. Photoreal pixels need
+        comma's VQ decoder (not bundled — operator-gated); this shows the real, control-responsive
+        token dynamics directly (the field shifts as the world model rolls under control)."""
+        import torch.nn.functional as F
+        h, w = self.token_grid
+        t = self.tokens.view(h, w).float() / max(1, self.codebook)  # (h,w) in [0,1]
+        # 3-channel colormap so structure is legible (not flat gray): a smooth R/G/B ramp of the code id
+        rgb = torch.stack([t, (t * 1.7 % 1.0), (1.0 - t)], dim=0).unsqueeze(0)  # (1,3,h,w)
+        rgb = F.interpolate(rgb, size=(out_h, out_w), mode="nearest")[0]
+        return rgb.clamp(0, 1)
 
     @torch.no_grad()
     def step(self, control):
@@ -60,8 +89,21 @@ class DriveSession:
         if self.n_history > 0:  # row_t = (control applied at t, telemetry observed at t) — pre-step
             self.hist_rows = self.hist_rows[1:] + [torch.cat([c, self.tel], dim=-1)]
         self.tokens, self.lidar, self.tel = self.trans.step(self.tokens, self.lidar, self.tel, c, history=h)
+        self.tel = self._physical_tel(self.tel)
         self.step_idx += 1
         return self._decode()
+
+    def _physical_tel(self, tel):
+        """REAL commaVQ is forward dashcam video — the car never reverses, so the forward-speed
+        telemetry channels ([0]=vx/30, [3]=speed/30) are physically NON-NEGATIVE. The shared telemetry
+        bound uses a symmetric tanh (right for the sim's signed channels) which can dip a hair below 0
+        at a standstill; floor the speed channels at 0 for the camera-only real model so the recursively
+        fed-back state stays physical. Yaw/lat/sin/cos stay signed. No-op for the sim model."""
+        if self.real_source == "commavq":
+            tel = tel.clone()
+            tel[:, 0].clamp_(min=0.0)
+            tel[:, 3].clamp_(min=0.0)
+        return tel
 
     def fork(self) -> "DriveSession":
         """Independent recursive state (tokens/LiDAR/telemetry) over the SAME model
@@ -70,6 +112,9 @@ class DriveSession:
         s = object.__new__(DriveSession)
         s.device, s.tok, s.trans, s.grid, s._init = self.device, self.tok, self.trans, self.grid, self._init
         s.n_history = self.n_history
+        s.real_source = self.real_source
+        if self.real_source == "commavq":
+            s.token_grid, s.codebook = self.token_grid, self.codebook
         s.step_idx = 0
         s.reset()
         return s

@@ -68,7 +68,9 @@ class DriveTransition(nn.Module):
     def loss(self, prev_tokens, next_tokens, prev_lidar, prev_tel, control, next_lidar, next_tel, history=None):
         c = self._fuse(control, prev_lidar, prev_tel, history)
         rgb_loss = self.ar.loss(prev_tokens, next_tokens, c)
-        lidar_loss = F.mse_loss(torch.sigmoid(self.lidar_head(c)), next_lidar)
+        # n_lidar == 0 (e.g. the real commaVQ camera-only path) → no LiDAR modality. F.mse_loss over
+        # empty (B,0) tensors returns NaN, so skip the term entirely rather than feed a fake channel.
+        lidar_loss = c.new_zeros(()) if self.n_lidar == 0 else F.mse_loss(torch.sigmoid(self.lidar_head(c)), next_lidar)
         tel_loss = F.mse_loss(self.bound_tel(self.telemetry_head(c)), next_tel)
         return rgb_loss + lidar_loss + tel_loss, {"rgb": rgb_loss.item(), "lidar": lidar_loss.item(), "tel": tel_loss.item()}
 
@@ -107,9 +109,10 @@ class DriveTransition(nn.Module):
             if rows is not None:  # row_t = (control applied at t, telemetry observed at t)
                 rows = rows[1:] + [torch.cat([controls[:, t], tel], dim=-1)]
             tel = self.bound_tel(self.telemetry_head(c))
-            lidar = torch.sigmoid(self.lidar_head(c))
             tel_loss = tel_loss + F.mse_loss(tel, tel_targets[:, t])
-            lidar_loss = lidar_loss + F.mse_loss(lidar, lidar_targets[:, t])
+            if self.n_lidar > 0:  # camera-only real path has no LiDAR to roll
+                lidar = torch.sigmoid(self.lidar_head(c))
+                lidar_loss = lidar_loss + F.mse_loss(lidar, lidar_targets[:, t])
         return (tel_loss + lidar_loss) / k, {"roll_tel": tel_loss.item() / k, "roll_lidar": lidar_loss.item() / k}
 
     @torch.no_grad()

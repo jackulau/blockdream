@@ -73,15 +73,21 @@ else
 fi
 if [ -x "$PY" ] && [ -f "$ML/runs/drive/latest.pt" ]; then
   (cd "$ML" && "$PY" scripts/eval_drive_control.py >/dev/null)
-  ok "driving CONTROLLABLE (runs/drive)"
+  ok "driving CONTROLLABLE (runs/drive, real commaVQ)"
 else
-  skipped "drive control — ml/runs/drive/latest.pt absent (regen: ml/scripts/goal020_drive.sh + drive train_long rollout retrain; see ml/CHECKPOINTS.md)"
+  skipped "drive control — ml/runs/drive/latest.pt absent (regen: stream real commaVQ via ml/scripts/collect_real_drive.py --stream-hf, then PROMOTE=1 ml/scripts/train_drive_real.sh; see ml/CHECKPOINTS.md)"
 fi
 if [ -x "$PY" ] && [ -f "$ML/runs/drive/latest.pt" ]; then
   (cd "$ML" && "$PY" scripts/eval_drive_quality.py --checkpoint runs/drive/latest.pt --quick >/dev/null)
-  ok "driving QUALITY_OK (eval_drive_quality --quick: per-modality val, closed-loop drift, multi-track)"
+  ok "driving QUALITY_OK (eval_drive_quality --quick: real-holdout token CE + telemetry MSE, controllability, stability)"
 else
-  skipped "drive quality — ml/runs/drive/latest.pt absent (regen: ml/scripts/goal020_drive.sh; gate: ml/scripts/eval_drive_quality.py --quick)"
+  skipped "drive quality — ml/runs/drive/latest.pt absent (gate: ml/scripts/eval_drive_quality.py --quick)"
+fi
+if [ -x "$PY" ]; then
+  (cd "$ML" && "$PY" scripts/no_synthetic_guard.py >/dev/null)
+  ok "NO SYNTHETIC in any served/live world-model path (provenance sidecars + path refs + on-disk pools)"
+else
+  skipped "no-synthetic guard — ml venv absent (gate: ml/scripts/no_synthetic_guard.py)"
 fi
 if [ -x "$PY" ] && [ -f apps/web/public/onnx/transition.onnx ]; then
   (cd "$ML" && "$PY" scripts/verify_diffusion_export.py --onnx ../apps/web/public/onnx --steps 8 >/dev/null)

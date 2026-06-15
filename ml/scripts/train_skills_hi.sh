@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
-# train_skills_hi.sh — higher-FIDELITY skill-conditioned Minecraft world model.
+# train_skills_hi.sh — high-FIDELITY skill-conditioned Minecraft world model, 100% REAL footage.
 #
-# The original runs/skills was trained ONLY on synthetic per-skill pools (procedural gray tints) — it
-# proves skills are distinct but decodes to gray mush. This blends REAL VPT footage (pool_m4,
-# downsampled to 64px) for the common movement types (walk, general) with the synthetic pools for the
-# exotic skills (sprint/jump/swim/boat/elytra/pig/minecart), under a STRONG tokenizer. Result: the
-# demo renders a REAL-looking Minecraft world for the common case AND every movement type steers it
-# differently. Resumable (train_long resumes from runs/skills_hi/latest.pt).
+# This is the canonical all-real trainer for the served Minecraft world model. ALL 9 movement types
+# are trained on GENUINE footage — ZERO synthetic data:
+#   walk · general · sprint · jump  → real human OpenAI VPT contractor footage (button-labeled,
+#                                     downsampled to 64px; common types via prep_real_skill_pools.py,
+#                                     sprint/jump via extract_real_from_vpt.py's labeled-button runs)
+#   swim · boat · elytra · pig · minecart → real mineflayer-rendered gameplay footage
+#                                     (tools/mineflayer-collector, imported via import_mineflayer.py)
+# A STRONG tokenizer is used because real texture needs it (a weak tokenizer collapses skills to blur).
+# Result: the demo renders a REAL-looking Minecraft world AND every movement type steers it differently.
+# Resumable (train_long resumes from $OUT/latest.pt).
 #
-#   ml/scripts/train_skills_hi.sh
+# Historical note: an earlier proof (runs/skills via gen_movement_data.py — now DEPRECATED) used
+# procedural synthetic per-skill pools to prove conditioning. It is NOT used here and is NOT served.
+#
+#   ml/scripts/train_skills_hi.sh                       # → runs/skills_hi
+#   OUT=runs/skills_real ml/scripts/train_skills_hi.sh  # → the SERVED checkpoint (all-real)
 set -euo pipefail
 cd "$(dirname "$0")/.."        # → ml/
 PY=.venv/bin/python

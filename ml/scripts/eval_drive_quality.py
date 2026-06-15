@@ -1,13 +1,15 @@
 """Quality gate for the SERVED driving world model checkpoint (runs/drive/latest.pt).
 
-Unlike eval_drive.py (trains throwaway scratch models to validate the recipe), this loads the
-real served checkpoint and measures what the browser tester actually experiences:
+Two honest paths, auto-selected from the checkpoint's `real_source`:
 
-  1. one-step validation error per modality (telemetry MSE, LiDAR MSE, RGB token CE) on fresh
-     sim rollouts, per track kind — multi-track generalization, not just the oval;
-  2. closed-loop drift: free-run the model recursively under a fixed control schedule and
-     compare its telemetry against the wall-free physics ground truth started from the same
-     state (telemetry dynamics are position-independent, so this is exact).
+REAL (commaVQ camera-only, the served model) — measures what the browser tester experiences on the
+real model: one-step RGB next-token CE + telemetry MSE on a REAL commaVQ holdout (predicts real
+frames far better than chance?), controllability (throttle raises speed, steer left≠right, speed
+physical), and free-run stability (telemetry finite + tokens in codebook range). NO LiDAR / physics /
+multi-track — commaVQ has none, so a sim-shaped gate would be dishonest here.
+
+SIM (deprecated physics-sim checkpoint) — the original multi-track gate: per-modality one-step val on
+fresh sim rollouts + closed-loop drift vs the physics ground truth.
 
 Prints [drive-quality] diagnostics, then ONE verdict word — QUALITY_OK / QUALITY_FAIL — and
 exits 0/1. --report-only always exits 0 (measurement decoupled from gating). --quick keeps the
@@ -26,10 +28,9 @@ import time
 import numpy as np
 import torch
 
-from blockdream_wm.drive.collect import collect_rollout
-from blockdream_wm.drive.physics import CarParams, CarState, step as physics_step
 from blockdream_wm.drive.serve import load_drive_session
-from blockdream_wm.drive.sim import TRACK_KINDS, DriveConfig
+# NB: the sim modules (collect/physics/sim) are the DEPRECATED synthetic path — imported lazily in
+# the SIM branch only, so the REAL (commaVQ) gate has zero dependency on synthetic code.
 
 # Gate thresholds, set from the shipped checkpoint's measured numbers with headroom so a
 # healthy model passes across CPU/MPS nondeterminism but a collapsed/regressed one fails.
@@ -44,9 +45,10 @@ THRESHOLDS = {
 }
 
 
-def telemetry_to_carstate(tel: np.ndarray) -> CarState:
+def telemetry_to_carstate(tel: np.ndarray):
     """Invert sim.telemetry(): [vx/30, vy/15, r, speed/30, sin(yaw), cos(yaw)] → CarState.
     Position is unknowable (and irrelevant — physics has no walls), so x=y=0."""
+    from blockdream_wm.drive.physics import CarState
     return CarState(
         x=0.0,
         y=0.0,
@@ -57,7 +59,7 @@ def telemetry_to_carstate(tel: np.ndarray) -> CarState:
     )
 
 
-def carstate_to_telemetry(s: CarState) -> np.ndarray:
+def carstate_to_telemetry(s) -> np.ndarray:
     """sim.telemetry() for a bare CarState (same normalization)."""
     return np.array(
         [s.vx / 30, s.vy / 15, s.r, s.speed() / 30, math.sin(s.yaw), math.cos(s.yaw)],
@@ -148,6 +150,8 @@ def one_step_errors(session, roll: dict, rgb_pairs: int) -> dict[str, float]:
 def closed_loop_drift(session, steps: int) -> tuple[float, float]:
     """Free-run the model under control_schedule() and compare its telemetry against the
     physics ground truth integrated from the model's own start state."""
+    from blockdream_wm.drive.physics import CarParams, step as physics_step  # noqa: F811
+    from blockdream_wm.drive.sim import DriveConfig
     session.reset()
     start = session.tel[0].cpu().numpy()
     state = telemetry_to_carstate(start)
@@ -163,6 +167,119 @@ def closed_loop_drift(session, steps: int) -> tuple[float, float]:
     return drift_mae(np.stack(model_track), np.stack(phys_track))
 
 
+# REAL (commaVQ camera-only) quality bars — set from the served checkpoint's measured numbers with
+# headroom. Measured on the real served model (--quick): rgb_ce 2.27 (vs random 6.93), tel_mse 0.0005.
+REAL_THRESHOLDS = {
+    "rgb_ce": 4.0,         # one-step next-token CE on a REAL commaVQ holdout (random = ln(1024) = 6.93)
+    "tel_mse": 0.010,      # one-step telemetry MSE on the real holdout (normalized units)
+}
+
+
+def _real_holdout_pool():
+    """Locate (or build from the committed real fixture) a REAL commaVQ holdout pool. Prefers an
+    existing data/drive_real_pool; else builds a tiny pool from tests/fixtures/commavq_real so the
+    gate runs on a fresh clone (the fixture is committed). Returns the pool dir or None."""
+    from pathlib import Path
+    from blockdream_wm.drive.commavq import build_real_pool
+    ml = Path(__file__).resolve().parent.parent
+    pool = ml / "data" / "drive_real_pool"
+    if list(pool.glob("roll_*.npz")):
+        return str(pool)
+    fixture = ml / "tests" / "fixtures" / "commavq_real"
+    if fixture.exists():
+        import scripts.collect_real_drive as cr  # discover (token,pose) pairs in the fixture
+        segs = [s for s in cr.discover_segments(fixture) if s[1]]
+        if segs:
+            out = ml / "data" / "drive_real_holdout"
+            build_real_pool(segs, str(out))
+            return str(out)
+    return None
+
+
+@torch.no_grad()
+def real_quality(session, args, t0: float) -> int:
+    """Camera-only REAL quality gate: real-holdout next-token CE + telemetry MSE, controllability,
+    and free-run stability. No LiDAR / physics / multi-track (commaVQ has none)."""
+    from blockdream_wm.drive.commavq import load_real_token_pool, COMMAVQ_CODEBOOK
+    from eval_drive_control import _settled  # controllability rollout (reused gate)
+
+    pool = _real_holdout_pool()
+    measured: dict[str, float] = {}
+    if pool is None:
+        print("[drive-quality] no real holdout pool/fixture found — CE/MSE skipped (controllability still gated)")
+        measured.update(rgb_ce=0.0, tel_mse=0.0)
+    else:
+        tok, ctl, tel, pairs = load_real_token_pool(pool)
+        dev = session.device
+        tk = torch.from_numpy(tok).long().to(dev); ct = torch.from_numpy(ctl).float().to(dev)
+        te = torch.from_numpy(tel).float().to(dev); lid = torch.zeros((tok.shape[0], 0), device=dev)
+        n = min(64 if args.quick else 256, len(pairs))
+        idx = np.linspace(0, len(pairs) - 1, n).astype(np.int64)
+        b = pairs[idx]; i0 = torch.from_numpy(b[:, 0]).to(dev); i1 = torch.from_numpy(b[:, 1]).to(dev)
+        c = session.trans._fuse(ct[i0], lid[i0], te[i0])
+        rgb_ce = session.trans.ar.loss(tk[i0], tk[i1], c).item()
+        tel_mse = torch.mean((session.trans.bound_tel(session.trans.telemetry_head(c)) - te[i1]) ** 2).item()
+        measured.update(rgb_ce=rgb_ce, tel_mse=tel_mse)
+        print(f"[drive-quality] REAL holdout ({n} pairs): rgb_ce={rgb_ce:.3f} nats/token "
+              f"(random={float(np.log(COMMAVQ_CODEBOOK)):.2f}), tel_mse={tel_mse:.5f}")
+
+    # controllability (same checks as eval_drive_control)
+    coast, _ = _settled(session, [0.0, 0.0, 0.0]); thr, _ = _settled(session, [0.0, 1.0, 0.0])
+    _, lyaw = _settled(session, [1.0, 0.5, 0.0]); _, ryaw = _settled(session, [-1.0, 0.5, 0.0])
+    controllable = bool(thr > coast + 1.0 and lyaw > ryaw + 0.03 and 0.0 <= coast <= 60.0 and 0.0 <= thr <= 60.0)
+    print(f"[drive-quality] controllability: coast={coast:.2f} throttle={thr:.2f} m/s, "
+          f"yaw L={lyaw:+.3f} R={ryaw:+.3f} → controllable={controllable}")
+
+    # free-run stability: telemetry finite + tokens in codebook range over a recursive rollout
+    session.reset(); stable = True
+    for _ in range(40 if args.quick else 120):
+        o = session.step([0.3, 0.6, 0.0])
+        if not np.all(np.isfinite(o["telemetry"].numpy())):
+            stable = False; break
+    tok_ok = bool(session.tokens.min().item() >= 0 and session.tokens.max().item() < COMMAVQ_CODEBOOK)
+    print(f"[drive-quality] free-run stability: telemetry_finite={stable} tokens_in_codebook={tok_ok}")
+
+    ok, lines = verdict(measured, REAL_THRESHOLDS) if pool is not None else (True, [])
+    for line in lines:
+        print(f"[drive-quality] {line}")
+    ok = ok and controllable and stable and tok_ok
+    print(f"[drive-quality] wall-clock {time.time() - t0:.1f}s")
+    if args.report_only:
+        print("REPORT_ONLY"); return 0
+    print("QUALITY_OK" if ok else "QUALITY_FAIL — served REAL driving checkpoint below quality bar")
+    return 0 if ok else 1
+
+
+def sim_quality(session, args, t0: float) -> int:
+    """Original multi-track physics-sim quality gate (the DEPRECATED sim checkpoint)."""
+    from blockdream_wm.drive.collect import collect_rollout
+    from blockdream_wm.drive.sim import TRACK_KINDS, DriveConfig
+    steps = 40 if args.quick else 150
+    drift_steps = 48 if args.quick else 120
+    rgb_pairs = 8 if args.quick else 32
+
+    worst = {"tel_mse": 0.0, "lidar_mse": 0.0, "rgb_ce": 0.0}
+    for k, track in enumerate(TRACK_KINDS):
+        roll = collect_rollout(steps, seed=9000 + k, cfg=DriveConfig(track=track))
+        err = one_step_errors(session, roll, rgb_pairs)
+        print(f"[drive-quality] {track:8s} tel_mse={err['tel_mse']:.5f} "
+              f"lidar_mse={err['lidar_mse']:.5f} rgb_ce={err['rgb_ce']:.3f}")
+        for key in worst:
+            worst[key] = max(worst[key], err[key])
+    speed_mae, yaw_mae = closed_loop_drift(session, drift_steps)
+    print(f"[drive-quality] closed-loop drift over {drift_steps} steps: "
+          f"speed MAE={speed_mae:.2f} m/s, yaw-rate MAE={yaw_mae:.3f} rad/s")
+    measured = dict(worst, drift_speed_mae=speed_mae, drift_yaw_mae=yaw_mae)
+    ok, lines = verdict(measured, THRESHOLDS)
+    for line in lines:
+        print(f"[drive-quality] {line}")
+    print(f"[drive-quality] wall-clock {time.time() - t0:.1f}s")
+    if args.report_only:
+        print("REPORT_ONLY"); return 0
+    print("QUALITY_OK" if ok else "QUALITY_FAIL — served driving checkpoint below quality bar")
+    return 0 if ok else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("eval_drive_quality")
     ap.add_argument("--checkpoint", default="runs/drive/latest.pt")
@@ -172,41 +289,12 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     t0 = time.time()
-    steps = 40 if args.quick else 150
-    drift_steps = 48 if args.quick else 120
-    rgb_pairs = 8 if args.quick else 32
-
     session = load_drive_session(args.checkpoint, device=args.device)
     n_hist = getattr(session.trans, "n_history", 0)
-    print(f"[drive-quality] checkpoint {args.checkpoint} (n_history={n_hist}, "
-          f"{session.grid * session.grid} tokens/frame)")
-
-    # 1. one-step val error per track kind (fresh rollouts, eval-only seed ≠ training seeds)
-    worst = {"tel_mse": 0.0, "lidar_mse": 0.0, "rgb_ce": 0.0}
-    for k, track in enumerate(TRACK_KINDS):
-        roll = collect_rollout(steps, seed=9000 + k, cfg=DriveConfig(track=track))
-        err = one_step_errors(session, roll, rgb_pairs)
-        print(f"[drive-quality] {track:8s} tel_mse={err['tel_mse']:.5f} "
-              f"lidar_mse={err['lidar_mse']:.5f} rgb_ce={err['rgb_ce']:.3f}")
-        for key in worst:
-            worst[key] = max(worst[key], err[key])
-
-    # 2. closed-loop drift vs physics ground truth
-    speed_mae, yaw_mae = closed_loop_drift(session, drift_steps)
-    print(f"[drive-quality] closed-loop drift over {drift_steps} steps: "
-          f"speed MAE={speed_mae:.2f} m/s, yaw-rate MAE={yaw_mae:.3f} rad/s")
-
-    measured = dict(worst, drift_speed_mae=speed_mae, drift_yaw_mae=yaw_mae)
-    ok, lines = verdict(measured, THRESHOLDS)
-    for line in lines:
-        print(f"[drive-quality] {line}")
-    print(f"[drive-quality] wall-clock {time.time() - t0:.1f}s")
-
-    if args.report_only:
-        print("REPORT_ONLY")
-        return 0
-    print("QUALITY_OK" if ok else "QUALITY_FAIL — served driving checkpoint below quality bar")
-    return 0 if ok else 1
+    real = session.real_source == "commavq"
+    print(f"[drive-quality] checkpoint {args.checkpoint} ({'REAL commaVQ' if real else 'sim'}, "
+          f"n_history={n_hist})")
+    return real_quality(session, args, t0) if real else sim_quality(session, args, t0)
 
 
 if __name__ == "__main__":
