@@ -30,6 +30,11 @@ from .device import pick_device, device_name
 PRESETS = {
     # name:      (downsample, base, latent, codebook, dim, depth, heads)
     "quick": (4, 48, 6, 512, 192, 4, 6),    # tiny, any device
+    # hi64: STRONGER tokenizer at 64px (base 48->64, latent 6->8, codebook 512->1024) for a sharper
+    # recon ceiling (the served 'quick' tokenizer caps frame detail at ~0.62 of real -> blur). The AR
+    # stays dim192/depth4 so the demo keeps its interactive fps (the tokenizer is not the rollout
+    # bottleneck). 64px -> 256 tok. Goal 031 fidelity push.
+    "hi64": (4, 64, 8, 1024, 192, 4, 6),
     "m4": (8, 64, 8, 1024, 384, 6, 8),       # 128px → 256 tok, fits 24GB MPS (~12M)
     "full": (4, 96, 8, 8192, 768, 12, 12),   # GPU, big (256px → 4096 tok, ~100M)
 }
