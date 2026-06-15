@@ -67,6 +67,22 @@ Fixes:
   (`hi64` preset: codebook 512->1024, base 48->64) is available to raise the recon sharpness ceiling.
 - `serve_demo.sh` restart picks up the promoted checkpoint. (Numbers recorded at promote time.)
 
+### More real footage + 128px (goal-033)
+
+Follow-up after a user reported the demo still gray. Two findings:
+1. **The live serve path is correct** - a WS round-trip (serve.py -> frame_to_png_b64) and an actual
+   chrome-devtools browser shot of `serve_demo` both render RECOGNIZABLE Minecraft (blue sky, green
+   terrain, horizon, hotbar) on the promoted 0.735 model. A flat-gray demo is a **STALE server**:
+   restart `ml/scripts/serve_demo.sh` to load a promoted checkpoint.
+2. **The data, not the model, was the ceiling.** The skill pools used <1% of pool_m4's 82,500 real
+   128px VPT frames, downsampled to 64px. `prep_real_skill_pools.py` + `extract_real_from_vpt.py` gained
+   a `--size 128` path; rebuilt walk/general (~12k frames each), jump (7k), sprint (1.1k) at native 128px;
+   mineflayer skills (swim/boat/elytra/pig/minecart) upscaled real-64->128 (new in-game collection is
+   operator-gated: needs Java 21 + a live server). `train_skills_hi.sh POOLS` is overridable; a 128px
+   retrain (`PRESET=m4`, codebook 1024) on the 9 bigger pools is promote-only-if-better vs 0.735.
+   Tradeoff: 128px gen is slower (~1.5 fps vs 3.8) but the display is rAF-decoupled, so it stays smooth.
+   (Final promoted numbers recorded at promote time.)
+
 ### Temporal-context retrain experiment (2026-06-10, goal 027 - NOT promoted; sim-era, superseded)
 
 `runs/drive_v3/` (`best.pt`, n_history=3, 58k AR steps / 38 min MPS) wired the proven temporal-context
