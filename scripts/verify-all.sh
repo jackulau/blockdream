@@ -68,6 +68,8 @@ note "ML runtime gates (served checkpoints)"
 if [ -x "$PY" ] && [ -f "$ML/runs/skills_real/latest.pt" ]; then
   (cd "$ML" && "$PY" scripts/verify_movement_types.py --checkpoint runs/skills_real/latest.pt >/dev/null)
   ok "movement types DISTINCT (runs/skills_real)"
+  (cd "$ML" && "$PY" scripts/eval_mc_fidelity.py --checkpoint runs/skills_real/latest.pt >/dev/null)
+  ok "MC WM visual FIDELITY (runs/skills_real, not gray-collapsed)"
 else
   skipped "movement types - ml/runs/skills_real/latest.pt absent (regen: collect real footage via tools/mineflayer-collector + ml/scripts/import_mineflayer.py, then ml/scripts/train_skills_hi.sh; see ml/CHECKPOINTS.md)"
 fi
