@@ -1,4 +1,10 @@
-"""Collect multimodal driving rollouts (RGB + LiDAR + telemetry + control) with a
+"""DEPRECATED — SYNTHETIC, NOT SERVED. Collects driving rollouts from the physics SIM
+(`drive.sim.DriveSim` + a pursuit autopilot) = SYNTHETIC data. The served driving world model is now
+trained on 100% REAL comma.ai commaVQ footage (`drive.commavq` + `scripts/collect_real_drive.py` +
+`scripts/train_drive_real.sh`). Kept for research/repro only; `no_synthetic_guard.py` asserts the
+served path never imports this.
+
+Collect multimodal driving rollouts (RGB + LiDAR + telemetry + control) with a
 pursuit autopilot (+ noise for diversity), saved as a resumable pool of .npz."""
 
 from __future__ import annotations

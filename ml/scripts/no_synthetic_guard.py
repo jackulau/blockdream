@@ -35,19 +35,26 @@ SERVED = [
 ]
 
 # Canonical trainers/collectors that feed a SERVED checkpoint — none may touch synthetic data.
+# (The driving SIM trainer/collector — train_long.py, collect.py — is NO LONGER here: it is the
+# deprecated synthetic path, moved to SYNTH_GENERATORS. The served driving model trains on real
+# commaVQ via train_real.py + collect_real_drive.py + train_drive_real.sh.)
 LIVE_TRAINERS = [
     "scripts/train_skills_hi.sh",
     "scripts/train_real.sh",
     "scripts/train_drive_real.sh",
     "scripts/collect_real_drive.py",
-    "src/blockdream_wm/drive/train_long.py",
-    "src/blockdream_wm/drive/collect.py",
+    "src/blockdream_wm/drive/train_real.py",
+    "src/blockdream_wm/drive/commavq.py",
 ]
 
-# Scripts that GENERATE synthetic data — proof-only, must be clearly deprecated.
+# Scripts that GENERATE synthetic data — proof-only / research, must be clearly DEPRECATED so nobody
+# mistakes them for a served path. Includes the driving physics SIM (sim/collect/train_long).
 SYNTH_GENERATORS = [
     "scripts/gen_movement_data.py",
     "scripts/goal020_train_skills.sh",
+    "src/blockdream_wm/drive/sim.py",
+    "src/blockdream_wm/drive/collect.py",
+    "src/blockdream_wm/drive/train_long.py",
 ]
 
 REAL_SOURCES = {"real", "vpt", "mineflayer", "vpt+mineflayer", "commavq", "commavq-real", "comma"}

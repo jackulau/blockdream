@@ -1,11 +1,15 @@
-"""Driving environment: an oval track (walls), raycast LiDAR, ego-centric top-down
+"""DEPRECATED — SYNTHETIC, NOT SERVED. A physics SIMULATOR that synthesizes driving observations;
+the served driving world model is now trained on 100% REAL comma.ai commaVQ footage (see
+`drive.commavq`). Kept for research/repro only.
+
+Driving environment: an oval track (walls), raycast LiDAR, ego-centric top-down
 RGB render, and telemetry — the multimodal observation (RGB + LiDAR + telemetry)
 the world model learns to predict, driven by (steer, throttle, brake)."""
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
