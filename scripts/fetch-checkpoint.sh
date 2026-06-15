@@ -52,3 +52,4 @@ JSON
   echo "[fetch-checkpoint] ✓ stamped $DEST/PROVENANCE.json (real-data provenance)"
 fi
 echo "[fetch-checkpoint] ✓ $DEST/latest.pt ($BYTES bytes). Try: bash scripts/cast.sh   or   bash ml/scripts/serve_demo.sh"
+echo "[fetch-checkpoint] ℹ for the REAL driving world model (runs/drive, comma.ai commaVQ), reproduce it from the committed fixture: bash ml/scripts/setup_drive_real.sh"

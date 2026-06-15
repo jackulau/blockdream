@@ -3,7 +3,7 @@
 #
 # One command brings up everything the single-page demo (apps/web) needs:
 #   1. Minecraft WM server   ws://127.0.0.1:8765  ← runs/skills_real (skill-DISTINCT; pig/elytra/boat differ)
-#   2. Driving WM server     ws://127.0.0.1:8766  ← runs/drive       (telemetry bounded, drive D1)
+#   2. Driving WM server     ws://127.0.0.1:8766  ← runs/drive       (REAL comma.ai commaVQ, camera-only)
 #   3. Web dev server        http://127.0.0.1:5173
 #
 # IMPORTANT: serve runs/skills_real, NOT runs/m4. The m4 checkpoint is real-VPT walking-only — its skill
@@ -26,8 +26,8 @@ DRIVE_PORT="${DRIVE_PORT:-8766}"
 [ -x "$PY" ] || { echo "✗ no venv python at $PY — run ml/scripts/setup_venv.sh first" >&2; exit 1; }
 
 missing=0
-[ -f "$MC_CKPT" ]    || { echo "✗ MC checkpoint missing: $MC_CKPT (train: ml/scripts/goal020_train_skills.sh)" >&2; missing=1; }
-[ -f "$DRIVE_CKPT" ] || { echo "✗ drive checkpoint missing: $DRIVE_CKPT (train: ml/scripts/goal020_drive.sh)" >&2; missing=1; }
+[ -f "$MC_CKPT" ]    || { echo "✗ MC checkpoint missing: $MC_CKPT (fetch the released real model: bash scripts/fetch-checkpoint.sh)" >&2; missing=1; }
+[ -f "$DRIVE_CKPT" ] || { echo "✗ drive checkpoint missing: $DRIVE_CKPT (reproduce the real commaVQ model from the committed fixture: bash ml/scripts/setup_drive_real.sh)" >&2; missing=1; }
 [ "$missing" -eq 0 ] || exit 1
 
 pids=()

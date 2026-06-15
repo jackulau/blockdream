@@ -1,8 +1,19 @@
-# Driving world model (drift-sim) — datasets, sim, architecture, browser
+# Driving world model — real comma.ai commaVQ, datasets, architecture, browser
 
-A browser-playable, **recursive**, **multimodal (RGB + LiDAR + telemetry)** neural
-driving world model with **good physics**, trained on driving rollouts, runs
+A browser-playable, **recursive**, control-conditioned neural driving world model, runs
 locally, fully open source. Built in `blockdream_wm.drive`.
+
+> **The served model is 100% REAL (goal 029).** `runs/drive` is trained on comma.ai
+> **commaVQ** — real dashcam VQ tokens (128/frame) + control/telemetry derived from comma's
+> **real logged ego-motion** (`.pose.npy`), **zero synthesis**. It is **camera-only** (commaVQ has
+> no LiDAR), served as a control-responsive token field (photoreal pixels need comma's VQ decoder,
+> operator-gated). Reproduce it on any clone from the committed real fixture:
+> `bash ml/scripts/setup_drive_real.sh` → `runs/drive` (CONTROLLABLE). Provenance is locked in
+> `runs/drive/PROVENANCE.json` and enforced by `scripts/no_synthetic_guard.py`.
+>
+> **The physics SIM below (`drive/sim.py` / `collect.py` / `train_long.py`) is DEPRECATED — it
+> synthesizes RGB + LiDAR + telemetry and is NOT served.** It is kept for research/repro only; the
+> sim sections in this doc are historical. See `ml/CHECKPOINTS.md` for the real served model.
 
 ## Datasets found (verified June 2026)
 
@@ -24,7 +35,10 @@ Perception-only (no control, secondary): Waymo, KITTI-360, Argoverse 2, PandaSet
 control match) for scale-up; **commaVQ** (`drive/commavq.py` loader) as a tiny
 real-driving in-browser testbed.
 
-## Local good-physics generation (this repo)
+## Local good-physics generation (this repo) — DEPRECATED (synthetic, NOT served)
+
+> Historical: this is the synthetic physics sim, replaced as the served model by real commaVQ
+> (top of doc). Kept for research/repro only.
 
 CARLA does **not** run on Apple Silicon (confirmed). So we ship a from-scratch
 good-physics sim (`drive/sim.py`): **dynamic bicycle model + Pacejka magic-formula
@@ -95,9 +109,12 @@ plus **Oasis/MineWorld** for stable real-time recursive rollout.
 
 ## Run it
 ```bash
-python -m blockdream_wm.drive.train --rollouts 40 --device mps --out ml/runs/drive/latest.pt
+# REAL served model (commaVQ) — reproduce from the committed real fixture, then serve:
+bash ml/scripts/setup_drive_real.sh                                              # → runs/drive (CONTROLLABLE)
 python -m blockdream_wm.drive.serve --checkpoint ml/runs/drive/latest.pt --port 8766
-# open apps/web /driving.html → Connect → drive with arrows (RGB + LiDAR BEV + telemetry HUD)
+# open apps/web /driving.html → Connect → drive with arrows (camera token field + telemetry HUD;
+# LiDAR BEV is n/a — commaVQ is camera-only). Scale up: stream more shards with
+# scripts/collect_real_drive.py --stream-hf, train longer (operator-gated GPU).
 ```
 
 ## Browser (local, open)
