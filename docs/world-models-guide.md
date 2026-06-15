@@ -11,7 +11,7 @@ Checkpoints/data/runs are gitignored (local only).
 | **Minecraft AR** (base) | `transition_ar.py` `ARTransition` | MineWorld-style: next-frame VQ tokens from `[action, prev tokens]`, autoregressive, KV-cached | `runs/m4` is **not served** (walking-only — dead skill embeddings) |
 | **Skill-conditioned AR** (primary, served) | `movement.py` `SkillRealEncoder` + `train_long.py` | adds a per-movement-type embedding so the 9 movement types produce distinct dynamics; trained on genuine per-skill footage | `runs/skills_real/latest.pt` |
 | **Latent diffusion** (browser) | `transition_diffusion.py` `LatentDiffusionTransition` | rectified-flow over continuous VAE latents, few-step Euler — the >=30fps in-browser route | exported ONNX |
-| **Driving** | `drive/transition.py` `DriveTransition` | multimodal driving world model (RGB + LiDAR + telemetry) | `runs/drive/latest.pt` |
+| **Driving** (served, **100% real**) | `drive/transition.py` `DriveTransition` + `drive/train_real.py` | control-conditioned driving world model on real comma.ai **commaVQ** footage (real VQ video tokens + telemetry from comma's real ego-motion log); camera-only (no LiDAR — commaVQ has none); zero synthesis | `runs/drive/latest.pt` (the physics **sim** `drive/sim.py`+`train_long.py` is DEPRECATED, not served) |
 
 All share the conv VQ/continuous **tokenizer** (`tokenizer.py`) and an **action encoder**
 (`actions.py`; orientation-aware variant adds yaw/pitch/roll).
@@ -60,9 +60,11 @@ pump requests the next frame only when the previous arrives (true gen fps). Logg
 `movement.py` defines 9: `general, walk, sprint, jump, swim, boat, elytra, pig, minecart`. The VPT
 contractor data is walking/general only, so the other skills need their own gradient. Two paths:
 
-- **Synthetic, fast, provable:** `scripts/gen_movement_data.py` writes per-skill pools with
-  distinct learnable dynamics (colour cast + scroll speed + bob) in the real on-disk format;
-  `goal020_train_skills.sh` trains one skill-conditioned model on all 9.
+- **Synthetic, fast, provable (DEPRECATED — proof-only, NOT served):** `scripts/gen_movement_data.py`
+  writes per-skill pools with distinct learnable dynamics (colour cast + scroll speed + bob) in the
+  real on-disk format; `goal020_train_skills.sh` trains one skill-conditioned model on all 9. These
+  carry a DEPRECATED banner and `no_synthetic_guard.py` asserts they never feed the served model — the
+  served `runs/skills_real` is 100% real footage (below). Kept only to demonstrate the mechanism.
 - **Verify it works:** `scripts/verify_movement_types.py --checkpoint runs/skills_real/latest.pt`
   rolls every type out from the same seed and asserts the rollouts diverge (the embedding actually
   steers the world). Real per-skill footage drops into the same pool layout — that's how the served
@@ -78,9 +80,11 @@ through each movement type on a real server and records its first-person view (m
 (position, velocity, yaw/pitch, on-ground, in-water, speed). `scripts/import_mineflayer.py` aligns
 frames with the action+physics logs into `data/pool_real_<skill>/` (the trainer's pool format +
 `physics.npy`). Then `train_long --pools data/pool_real_*` learns real per-skill dynamics, and
-`physics.npy` is there for a physics-conditioned multimodal variant (like the driving model's
-RGB+LiDAR+telemetry stack). Operator-gated (needs a server); the importer's resampling core is unit
-tested (`tests/test_import_mineflayer.py`). See `tools/mineflayer-collector/README.md`.
+`physics.npy` is there for a physics-conditioned variant. Operator-gated (needs a server); the
+importer's resampling core is unit tested (`tests/test_import_mineflayer.py`). See
+`tools/mineflayer-collector/README.md`. (The **driving** world model takes the same real-footage
+approach on comma.ai commaVQ — real dashcam VQ tokens + real ego-motion telemetry, camera-only; the
+old RGB+LiDAR+telemetry physics sim is deprecated. See `ml/CHECKPOINTS.md`.)
 
 ## Browser diffusion
 
