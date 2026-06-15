@@ -42,7 +42,8 @@ fi
 # 2. pools in movement-type order - ALL 9 types are now REAL footage:
 #    walk/general/sprint/jump = real human VPT (button-labeled); swim/boat/elytra/pig/minecart = real
 #    mineflayer-rendered footage (tools/mineflayer-collector, imported via import_mineflayer.py).
-POOLS="data/pool_real_general64,data/pool_real_walk64,data/pool_real_sprint64,data/pool_real_jump64,data/pool_real_swim,data/pool_real_boat,data/pool_real_elytra,data/pool_real_pig,data/pool_real_minecart"
+# Override POOLS to train at higher res (e.g. the 128px pools: pool_real_*128) - see goal 033.
+POOLS="${POOLS:-data/pool_real_general64,data/pool_real_walk64,data/pool_real_sprint64,data/pool_real_jump64,data/pool_real_swim,data/pool_real_boat,data/pool_real_elytra,data/pool_real_pig,data/pool_real_minecart}"
 echo "[skills_hi] pools = $POOLS"
 
 # 3. train - strong tokenizer (real texture needs it; a weak tokenizer collapses all skills to blur)
