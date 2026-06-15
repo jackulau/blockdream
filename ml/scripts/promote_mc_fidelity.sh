@@ -29,7 +29,13 @@ if [ "${FORCE:-0}" != "1" ] && [ "$better" != "1" ]; then
 fi
 
 mkdir -p "$SERVED"
-[ -f "$SERVED/latest.pt" ] && cp "$SERVED/latest.pt" "$SERVED/pre031_backup.pt" && echo "[promote] backed up served -> $SERVED/pre031_backup.pt"
+# Back up the served model ONLY if it differs from the candidate - otherwise a re-run (or a racing
+# second promote) would self-copy the candidate over the backup, losing the real rollback point.
+if [ -f "$SERVED/latest.pt" ] && ! cmp -s "$SERVED/latest.pt" "$CAND/latest.pt"; then
+  cp "$SERVED/latest.pt" "$SERVED/pre031_backup.pt" && echo "[promote] backed up served -> $SERVED/pre031_backup.pt"
+else
+  echo "[promote] skip backup (served already == candidate; existing backup preserved)"
+fi
 cp "$CAND/latest.pt" "$SERVED/latest.pt"
 [ -f "$CAND/best.pt" ] && cp "$CAND/best.pt" "$SERVED/best.pt" || true
 echo "[promote] PROMOTED $CAND -> $SERVED (fidelity $SF -> $CF, 9/9 distinct)"
