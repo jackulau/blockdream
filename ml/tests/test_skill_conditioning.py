@@ -48,6 +48,6 @@ def test_skill_conditioning_changes_the_rollout():
     acc_walk = (gen_walk == psc._next(prev.view(-1), "walk")).float().mean().item()
     acc_boat = (gen_boat == psc._next(prev.view(-1), "boat")).float().mean().item()
     cross = (gen_boat == psc._next(prev.view(-1), "walk")).float().mean().item()
-    assert differ >= 0.5, f"boat and walk rollouts barely differ ({differ:.2f}) — conditioning not learned"
+    assert differ >= 0.5, f"boat and walk rollouts barely differ ({differ:.2f}) - conditioning not learned"
     assert acc_walk >= 0.6 and acc_boat >= 0.6, f"rollouts don't match their skill dynamics ({acc_walk:.2f},{acc_boat:.2f})"
-    assert acc_boat > cross + 0.2, "boat rollout follows walk dynamics — skill is being ignored"
+    assert acc_boat > cross + 0.2, "boat rollout follows walk dynamics - skill is being ignored"

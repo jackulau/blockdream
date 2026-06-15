@@ -23,7 +23,7 @@ export interface BehaviorPackOptions {
   optimizeFills?: boolean;
 }
 
-/** Deterministic UUID (v4-shaped) from a seed string — reproducible packs/tests. */
+/** Deterministic UUID (v4-shaped) from a seed string - reproducible packs/tests. */
 function uuidFromSeed(seed: string): string {
   const h = createHash("sha1").update(seed).digest("hex");
   // shape xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
@@ -180,7 +180,7 @@ export function generateBedrockBehaviorPack(
   files.set(`functions/${ns}/start.mcfunction`, `scoreboard players set play ma 1\n`);
   files.set(`functions/${ns}/stop.mcfunction`, `scoreboard players set play ma 0\n`);
 
-  // tick.json — Bedrock auto-runs these every tick
+  // tick.json - Bedrock auto-runs these every tick
   files.set(`functions/tick.json`, JSON.stringify({ values: [`${ns}/driver`] }, null, 2) + "\n");
 
   const headerUuid = opts.uuids?.[0] ?? uuidFromSeed(`${ns}:header`);

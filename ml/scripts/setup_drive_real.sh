@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_drive_real.sh — reproduce the SERVED real driving world model on a fresh clone, from the
+# setup_drive_real.sh - reproduce the SERVED real driving world model on a fresh clone, from the
 # COMMITTED real commaVQ fixture (tests/fixtures/commavq_real). No download, no GPU: builds a real
 # pool → trains a tiny real checkpoint → promotes it to runs/drive (with a commavq-real PROVENANCE).
 # This is the driving analogue of scripts/fetch-checkpoint.sh, except the drive model is cheaply
@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."        # → ml/
 PY=.venv/bin/python
-[ -x "$PY" ] || { echo "✗ ml/.venv missing — create it first (see ml/README or CHECKPOINTS.md)" >&2; exit 1; }
+[ -x "$PY" ] || { echo "✗ ml/.venv missing - create it first (see ml/README or CHECKPOINTS.md)" >&2; exit 1; }
 
 FIXTURE="tests/fixtures/commavq_real"
 POOL="${POOL:-data/drive_real_pool}"
@@ -27,7 +27,7 @@ ck = torch.load(sys.argv[1], map_location="cpu", weights_only=False)
 sys.exit(0 if ck.get("real_source") == "commavq" else 1)
 PYEOF
 then
-  echo "[setup_drive_real] ✓ $SERVED/latest.pt is already the real commaVQ model — nothing to do (FORCE=1 to rebuild)."
+  echo "[setup_drive_real] ✓ $SERVED/latest.pt is already the real commaVQ model - nothing to do (FORCE=1 to rebuild)."
   exit 0
 fi
 

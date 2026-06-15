@@ -2,7 +2,7 @@
 // grid (a voxel shell of the mesh), optionally flood-filling the interior solid. Pure TS.
 // The triangle rasterizer (trisToVolume) is shared with the glTF / animated-sequence importer
 // (gltf.ts) and accepts SHARED bounds so a whole animation can be voxelized into one consistent
-// world box — the object then moves/deforms in place instead of being re-fit every frame.
+// world box - the object then moves/deforms in place instead of being re-fit every frame.
 
 import { createVolume, getVoxel, setVoxel, EMPTY, type VoxelVolume } from "./volume";
 
@@ -67,7 +67,7 @@ export function meshBounds(verts: V3[]): Bounds {
   return { min, max };
 }
 
-/** Union of several bounds — the shared world box for an animation/sequence. */
+/** Union of several bounds - the shared world box for an animation/sequence. */
 export function unionBounds(all: Bounds[]): Bounds {
   const min: V3 = [Infinity, Infinity, Infinity];
   const max: V3 = [-Infinity, -Infinity, -Infinity];

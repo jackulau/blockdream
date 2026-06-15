@@ -6,7 +6,7 @@ const blockFor = (id: number) => ({ name: `minecraft:c${id}` });
 
 describe("buildVoxelMcStructure (real 3D)", () => {
   it("emits a depth>1 structure that round-trips with correct size and blocks", () => {
-    const v = createVolume(2, 2, 3); // W=2 H=2 D=3 — real 3D
+    const v = createVolume(2, 2, 3); // W=2 H=2 D=3 - real 3D
     setVoxel(v, 0, 0, 0, 7);
     setVoxel(v, 1, 1, 2, 9);
     const buf = buildVoxelMcStructure(v, blockFor);

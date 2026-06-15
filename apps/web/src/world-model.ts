@@ -1,4 +1,4 @@
-// Interactive Minecraft world-model tester — now decoupled: a smooth render loop
+// Interactive Minecraft world-model tester - now decoupled: a smooth render loop
 // (Viewer) shows the latest generated frame while generation runs flat-out underneath.
 
 import { Viewer } from "./viewer";

@@ -1,13 +1,13 @@
 """Build REAL walk/general skill pools at 64px from the real VPT pool (pool_m4, 128px).
 
 This downsamples contiguous pool_m4 segments (real OpenAI VPT contractor footage) to 64px and writes
-them as two tagged pools — `walk` and `general`. It is ONE link in the all-real data chain for the
-served Minecraft world model; the other movement types are ALSO 100% real — sprint/jump come from
+them as two tagged pools - `walk` and `general`. It is ONE link in the all-real data chain for the
+served Minecraft world model; the other movement types are ALSO 100% real - sprint/jump come from
 VPT's labeled buttons (extract_real_from_vpt.py) and swim/boat/elytra/pig/minecart come from real
 mineflayer gameplay footage (import_mineflayer.py). ZERO synthetic data feeds the served model.
 Temporal contiguity is preserved per segment (within-segment consecutive pairs stay valid).
 
-(Historical: an earlier proof used procedural synthetic pools — gen_movement_data.py, now DEPRECATED —
+(Historical: an earlier proof used procedural synthetic pools - gen_movement_data.py, now DEPRECATED -
 for the exotic skills before real footage was collected. That path is no longer used or served.)
 
     ml/.venv/bin/python scripts/prep_real_skill_pools.py --src data/pool_m4 --frames-per 2560

@@ -1,4 +1,4 @@
-// VoxelVolume — the core 3D block model for the custom engine. A dense grid of
+// VoxelVolume - the core 3D block model for the custom engine. A dense grid of
 // map-colour ids (one byte per voxel); EMPTY marks air. Map colour ids are 0..~243,
 // so 255 is a safe air sentinel. Index order is x-fastest then y then z.
 

@@ -1,12 +1,12 @@
 """Import Mineflayer-collected episodes (tools/mineflayer-collector) into the tagged on-disk pool
-format the world-model trainer consumes — so the Minecraft WM trains on REAL per-movement-type
+format the world-model trainer consumes - so the Minecraft WM trains on REAL per-movement-type
 footage + physics (the comma.ai analogue), not synthetic stand-ins.
 
 For each <skill>.mp4 + <skill>.json under --in:
   • decode the mp4 to frames (ffmpeg, forced size, resampled to the clip fps)
   • align each frame with the nearest per-tick action (9 buttons + 2 camera) and PHYSICS telemetry
     (pos, vel, yaw/pitch, on-ground, in-water, speed) by timestamp
-  • write data/pool_real_<skill>/seg_NNNNN.npz (frames, actions), skill.txt, and physics.npy —
+  • write data/pool_real_<skill>/seg_NNNNN.npz (frames, actions), skill.txt, and physics.npy -
     the seg index auto-increments past existing segments so re-imports append, never overwrite
 
     ml/.venv/bin/python scripts/import_mineflayer.py --in ../tools/mineflayer-collector/out --out data

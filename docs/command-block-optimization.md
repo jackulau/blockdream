@@ -1,4 +1,4 @@
-# Command-block optimization — building & animating blocks in vanilla, efficiently
+# Command-block optimization - building & animating blocks in vanilla, efficiently
 
 This is the deep version of `vanilla-command-budgets.md`. It covers how blockdream places
 and animates thousands of blocks per tick in **100% vanilla** Minecraft, why each choice
@@ -25,10 +25,10 @@ below assumes datapack functions.
 
 Two hard limits bound a single tick:
 
-- **`maxCommandChainLength`** (gamerule, default **65536**) — the max commands a single
+- **`maxCommandChainLength`** (gamerule, default **65536**) - the max commands a single
   function (and its `function`-callees) may execute in one tick before the chain is cut.
   Exceed it and the frame silently truncates.
-- **Practical hitch threshold** — long before 65536, running many thousands of
+- **Practical hitch threshold** - long before 65536, running many thousands of
   `/setblock`s in one tick causes a visible frame stall (each is a block update + lighting
   + neighbour notification). Smooth playback wants the *per-advance* command count low.
 
@@ -47,14 +47,14 @@ The keyframe (frame 0) is the worst case. **Sustained cost is the delta, not the
 
 ## 2. /setblock vs /fill vs /clone vs structure blocks
 
-- **`/setblock x y z block`** — one block. Baseline; O(N) commands for N cells.
-- **`/fill x1 y1 z1 x2 y2 z2 block`** — a whole cuboid in **one** command (vanilla caps the
+- **`/setblock x y z block`** - one block. Baseline; O(N) commands for N cells.
+- **`/fill x1 y1 z1 x2 y2 z2 block`** - a whole cuboid in **one** command (vanilla caps the
   fill volume at **32,768** blocks). A solid 64-wide row → 1 command instead of 64. This is
   the single biggest lever for block-art, which is full of same-colour runs.
-- **`/clone`** — copies an existing region. Great for *repeating* a pre-built motif or for
+- **`/clone`** - copies an existing region. Great for *repeating* a pre-built motif or for
   double-buffering (build off-screen, clone into place), but needs the source to already
   exist; not a primary placement tool here.
-- **Structure blocks / `place template`** — load a saved `.nbt`/`.mcstructure` instantly,
+- **Structure blocks / `place template`** - load a saved `.nbt`/`.mcstructure` instantly,
   bypassing per-block commands entirely. Best for a *static* 3D build or a small set of
   discrete frames (swap structures per frame). The cost moves from per-tick commands to
   load I/O. blockdream emits `.mcstructure` (`buildVoxelMcStructure`) for exactly this path.
@@ -75,7 +75,7 @@ region while frame N is shown, then `/clone` it into place in one command. This 
 space for a single-command swap and zero mid-build tearing. (Documented here; the default
 emitter uses in-place deltas, which are cheaper for typical low-to-medium motion.)
 
-## 4. /fill run-batching — the core optimizer
+## 4. /fill run-batching - the core optimizer
 
 `fill.ts:fillBatch` groups a frame's cells by `(y,z)` row and collapses maximal runs of
 **contiguous, same-block** cells along X into one `/fill`; singletons stay `/setblock`.
@@ -99,7 +99,7 @@ respected because runs are 1-D. This is wired into the 3D datapack via the `opti
 Generating the commands is itself CPU-bound (voxelize + delta + fill-batch over many
 frames). `parallel.ts:fillBatchFrames` spreads per-frame fill-batching across
 `cpus-1` real OS threads via node **worker** threads (`emit-worker.mjs`), merging results
-in frame order. The output is **byte-identical** to the serial path — parallelism is purely
+in frame order. The output is **byte-identical** to the serial path - parallelism is purely
 an efficiency win, verified in `parallel.test.ts`. The browser viewer uses vite-native
 `Worker`s for the same effect in-page. A serial fallback runs when workers are unavailable
 or there is ≤1 frame.
@@ -120,7 +120,7 @@ Pick the budget so the *delta* per advance stays under a few thousand post-`/fil
 
 1. Emit a **datapack function** driven by `#minecraft:tick` (never literal command-block chains).
 2. **Delta-encode** frames; keyframe 0 only, then changed cells.
-3. **`/fill` run-batch** every frame (`fillBatch`) — the dominant command-count cut.
+3. **`/fill` run-batch** every frame (`fillBatch`) - the dominant command-count cut.
 4. **Split** any frame over `maxCommandsPerFunction` into sub-functions, staying under `maxCommandChainLength`.
 5. Clear the 3D build box once with `/fill … air`; place via 3D `/setblock`/`/fill`.
 6. **Parallelize** emission across cores (worker threads); output identical to serial.

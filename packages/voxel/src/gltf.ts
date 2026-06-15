@@ -1,11 +1,11 @@
 // Import a real animated 3D model → a sequence of VoxelVolume frames so Minecraft blocks "follow"
-// the animation (e.g. one exported from Blender). Two source formats — both standard Blender
+// the animation (e.g. one exported from Blender). Two source formats - both standard Blender
 // exports:
 //   • glTF 2.0 (.gltf JSON, embedded base64 or caller-supplied buffers): meshes + node TRS
 //     animation channels are sampled at N times and baked to world space.
 //   • .obj-per-frame sequence: Blender's "Animation" OBJ export writes frame_001.obj, frame_002.obj…
 // Every frame is normalized into ONE shared world box (the union of all frames' bounds), so the
-// model translates/rotates/deforms in place rather than being re-fit each frame — the key to a
+// model translates/rotates/deforms in place rather than being re-fit each frame - the key to a
 // coherent block animation. Each frame is voxelized solid via the shared trisToVolume rasterizer.
 
 import { parseObj, trisToVolume, meshBounds, unionBounds, type V3, type Tri, type Bounds } from "./obj";

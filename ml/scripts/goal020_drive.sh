@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# D13: make the driving world model better — more + longer sim rollouts, then a best-by-val retrain
+# D13: make the driving world model better - more + longer sim rollouts, then a best-by-val retrain
 # (the prior run hit a fixed 200k-step target with no peak-capture; best.pt now preserves the peak).
 set -uo pipefail
 cd "$(dirname "$0")/.."            # -> ml/

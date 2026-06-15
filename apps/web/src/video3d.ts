@@ -13,7 +13,7 @@ export type { Video3dOptions };
 type Palette = Parameters<typeof quantizeFrame>[1];
 
 /** Quantize a sequence of decoded RGB frames to the block palette, then voxelize them into a
- *  temporally-coherent 3D block animation. `quantize` defaults to gamut-mapped nearest matching —
+ *  temporally-coherent 3D block animation. `quantize` defaults to gamut-mapped nearest matching -
  *  per-frame error-diffusion dither would speckle differently frame-to-frame and defeat the
  *  temporal stabilizer; stills that want dither pass it explicitly. */
 export function rgbFramesToAnimated3d(

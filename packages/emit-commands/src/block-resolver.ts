@@ -1,12 +1,12 @@
-// mapColorId → placeable block id — the standalone form of the `resolveBlock` callback
+// mapColorId → placeable block id - the standalone form of the `resolveBlock` callback
 // every command emitter here consumes (datapack.ts / datapack3d.ts / behaviorpack.ts take
 // `(mapColorId) => string | undefined` plus a fallback block; callers like the CLI's render.ts
 // have until now rebuilt that closure from @blockdream/palette by hand). `makeBlockResolver`
 // packages that wiring once, with the same air fallback the generators apply.
 //
 // Browser-safe on purpose: this module imports the palette DATA file directly (the same
-// pattern apps/web uses) plus the dependency-free version registry — NOT the node-only
-// @blockdream/palette runtime loader (node:fs) — so re-exporting it from the package's
+// pattern apps/web uses) plus the dependency-free version registry - NOT the node-only
+// @blockdream/palette runtime loader (node:fs) - so re-exporting it from the package's
 // browser-safe entry keeps that entry browser-safe.
 
 import { resolveMcVersion } from "@blockdream/palette/versions";
@@ -27,7 +27,7 @@ export interface BlockResolverOptions {
 let _solidById: Map<number, string> | null = null;
 
 /**
- * mapColorId → namespaced block id for the cross-edition-safe SOLID block set —
+ * mapColorId → namespaced block id for the cross-edition-safe SOLID block set -
  * the exact mapping `getSolidBlockMapPalette` (@blockdream/palette) produces: one
  * biome-independent, support-free block per base, keyed by the base's full-shade
  * map colour id (`baseId*4 + 2`). The quantizer emits these ids; this recovers
@@ -61,7 +61,7 @@ export function makeBlockResolver(
   paletteVersion?: string,
   opts: BlockResolverOptions = {},
 ): (mapColorId: number) => string {
-  resolveMcVersion(paletteVersion); // validate / alias — data is canonical for the whole line
+  resolveMcVersion(paletteVersion); // validate / alias - data is canonical for the whole line
   const byId = solidBlockByMapColorId();
   const fallback = opts.fallbackBlock ?? FALLBACK_BLOCK;
   return (mapColorId: number) => byId.get(mapColorId) ?? fallback;

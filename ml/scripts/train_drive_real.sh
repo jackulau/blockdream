@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# train_drive_real.sh — train the SERVED driving world model on 100% REAL commaVQ data (no synthetic
+# train_drive_real.sh - train the SERVED driving world model on 100% REAL commaVQ data (no synthetic
 # sim). Pre-tokenized real comma.ai dashcam (128 tokens/frame) + real-pose-derived control/telemetry;
 # camera-only (no LiDAR). The checkpoint carries real_source="commavq" so serve + eval treat it as the
 # real model. Resumable (re-run to continue). Photoreal pixel decode needs comma's VQ decoder
@@ -47,6 +47,6 @@ if [ "${PROMOTE:-0}" = "1" ] && [ "$CONTROLLABLE" = "0" ]; then
   echo "[train_drive_real] PROMOTED real commaVQ model → $SERVED (served path is now 100% real)"
   "$PY" scripts/eval_drive_control.py --checkpoint "$SERVED/latest.pt" || true
 elif [ "$CONTROLLABLE" != "0" ]; then
-  echo "[train_drive_real] NOT promoting — checkpoint failed the controllability gate"
+  echo "[train_drive_real] NOT promoting - checkpoint failed the controllability gate"
 fi
 echo "[train_drive_real] done → $OUT/latest.pt"

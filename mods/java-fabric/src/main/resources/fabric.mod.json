@@ -3,7 +3,7 @@
   "id": "blockdream_mapwall",
   "version": "${version}",
   "name": "blockdream Map Wall",
-  "description": "Plays a block-art video on a wall of filled maps by swapping each map's 16384-byte color array per tick — the high-FPS path that a setblock wall can't match.",
+  "description": "Plays a block-art video on a wall of filled maps by swapping each map's 16384-byte color array per tick - the high-FPS path that a setblock wall can't match.",
   "authors": ["blockdream"],
   "license": "MIT",
   "environment": "*",

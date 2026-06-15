@@ -1,4 +1,4 @@
-// datapack-e2e.mjs — headless END-TO-END proof of Blockdream's OFFLINE vanilla import path.
+// datapack-e2e.mjs - headless END-TO-END proof of Blockdream's OFFLINE vanilla import path.
 //
 // The static validators prove our .mcfunction files LOOK right; this proves a STOCK
 // vanilla server actually EXECUTES them. One command, no mods, no Microsoft account:
@@ -6,14 +6,14 @@
 // the .zip into a throwaway vanilla 1.21.1 world (scripts/vanilla-server.sh --datapack),
 // boots the server, then asserts over RCON that:
 //
-//   1. the pack is ENABLED (boot-load) and SURVIVES /reload — the exact path a user
+//   1. the pack is ENABLED (boot-load) and SURVIVES /reload - the exact path a user
 //      takes dropping blockdream.zip into world/datapacks/ (supported_formats honored:
 //      the pack is stamped pack_format 48, the 1.21.1 server wants 57)
 //   2. /function blockdream:setup paints frame 0 CELL-EXACTLY as the emitter intended
 //      (sampled `execute if block` asserts against the parsed frames/0.mcfunction)
 //   3. /function blockdream:start really animates: the tick-tag driver advances the
 //      scoreboard frame counter and the vanilla MACRO dispatch ($function with storage)
-//      executes delta frames — after :stop at frame N, sampled delta cells match the
+//      executes delta frames - after :stop at frame N, sampled delta cells match the
 //      cumulative frame-N state reconstructed from the pack's own function files
 //
 //   clip.mp4 ─CLI→ blockdream.zip ─vanilla-server.sh→ world/datapacks/ ─RCON→ asserts
@@ -36,7 +36,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const MC_VERSION = "1.21.1";
 const RCON_PASS = "blockdream-dp-e2e";
 
-// ephemeral free port — concurrent e2e runs (e.g. parallel audit skeptics) must not
+// ephemeral free port - concurrent e2e runs (e.g. parallel audit skeptics) must not
 // race a hardcoded 25565/25575: both RCON clients would reach whichever server won
 // the bind, and the loser's setup (#play=0) silently freezes the winner's playback
 function freePort() {
@@ -67,7 +67,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- expected-state reconstruction from the pack's own function files ----------
 // Parses setblock/fill/function lines (the only commands frame functions contain) and
-// applies them to a sparse world map — the emitter's intent, straight from the artifact.
+// applies them to a sparse world map - the emitter's intent, straight from the artifact.
 function applyFunctionFile(fnDir, ref, world) {
   // ref like "blockdream:frames/0" → <fnDir>/frames/0.mcfunction
   const rel = ref.split(":")[1];
@@ -112,7 +112,7 @@ async function cleanup() {
     if (dead !== true) server.kill("SIGKILL");
   }
 }
-process.on("SIGINT", () => { log("SIGINT — cleaning up"); cleanup().finally(() => process.exit(130)); });
+process.on("SIGINT", () => { log("SIGINT - cleaning up"); cleanup().finally(() => process.exit(130)); });
 
 const t0 = Date.now();
 const dir = mkdtempSync(join(tmpdir(), "bd-datapack-e2e-"));
@@ -126,7 +126,7 @@ try {
   if (ff.status !== 0) throw new Error(`ffmpeg clip gen failed: ${ff.stderr?.toString().slice(0, 300)}`);
   log(`test clip generated: ${clip}`);
 
-  // ---- 2. render through the REAL CLI — the exact command a user runs
+  // ---- 2. render through the REAL CLI - the exact command a user runs
   const outDir = join(work, "out");
   const tsx = join(ROOT, "node_modules/.bin/tsx");
   const cliArgs = ["packages/cli/src/index.ts", "render", clip, "--target", "datapack",
@@ -178,7 +178,7 @@ try {
     RCON_PORT = await freePort();
     writeFileSync(propsPath,
       setProp(setProp(readFileSync(propsPath, "utf8"), "server-port", SERVER_PORT), "rcon.port", RCON_PORT));
-    log(`starting server (java 21, ports: server ${SERVER_PORT}, rcon ${RCON_PORT}) — waiting for RCON (≤180 s)`);
+    log(`starting server (java 21, ports: server ${SERVER_PORT}, rcon ${RCON_PORT}) - waiting for RCON (≤180 s)`);
     server = spawn(join(javaHome, "bin", "java"), ["-Xmx2G", "-jar", "server.jar", "nogui"], {
       cwd: dir, env: { ...process.env, JAVA_HOME: javaHome }, stdio: ["ignore", "pipe", "pipe"],
     });
@@ -187,7 +187,7 @@ try {
     let bootBuf = "";
     try {
       await new Promise((res, rej) => {
-        const timer = setTimeout(() => rej(new Error(`server not ready after 180 s — see ${dir}/boot-stdout.log`)), 180_000);
+        const timer = setTimeout(() => rej(new Error(`server not ready after 180 s - see ${dir}/boot-stdout.log`)), 180_000);
         const onData = (d) => {
           bootBuf += d.toString();
           if (/RCON running on/.test(bootBuf)) {
@@ -196,12 +196,12 @@ try {
           }
         };
         server.stdout.on("data", onData);
-        server.once("exit", (code) => { clearTimeout(timer); rej(new Error(`server exited early (code ${code}) — see ${dir}/boot-stdout.log`)); });
+        server.once("exit", (code) => { clearTimeout(timer); rej(new Error(`server exited early (code ${code}) - see ${dir}/boot-stdout.log`)); });
       });
       break; // booted
     } catch (bootErr) {
       if (attempt < 3 && /Address already in use/.test(bootBuf)) {
-        log(`port collision on boot (attempt ${attempt}) — retrying with fresh ports`);
+        log(`port collision on boot (attempt ${attempt}) - retrying with fresh ports`);
         continue;
       }
       throw bootErr;
@@ -221,7 +221,7 @@ try {
   if (!packs.includes(`${NS}.zip`)) throw new Error(`datapack lost after /reload: ${packs}`);
   log("pack still enabled after /reload");
 
-  // ---- 6. setup paints frame 0 — cell-exact against the emitter's intent
+  // ---- 6. setup paints frame 0 - cell-exact against the emitter's intent
   // (setup forceloads the wall strip itself; clear the plane first so stale terrain
   //  can never fake a pass, then assert EXACT expected blocks, air included)
   await rcon(`forceload add ${ORIGIN.x} ${ORIGIN.z} ${ORIGIN.x + GRID.w - 1} ${ORIGIN.z}`);
@@ -230,7 +230,7 @@ try {
   if (/error|failed|unknown/i.test(setupOut)) throw new Error(`/function ${NS}:setup failed: ${setupOut}`);
   const count = await rcon("scoreboard players get #count ma");
   if (!count.includes(` ${FRAMES} `) && !count.includes(`has ${FRAMES}`)) {
-    throw new Error(`setup scoreboard wiring wrong — #count: ${count}`);
+    throw new Error(`setup scoreboard wiring wrong - #count: ${count}`);
   }
 
   const assertCells = async (state, keys, label) => {
@@ -245,14 +245,14 @@ try {
     }
     log(`${label}: ${pass}/${keys.length} sampled cells exact-match`);
     for (const f of fails.slice(0, 6)) log(`  ✗ ${f}`);
-    if (pass !== keys.length) throw new Error(`${label}: ${fails.length} cell(s) wrong — vanilla did not execute the pack as emitted`);
+    if (pass !== keys.length) throw new Error(`${label}: ${fails.length} cell(s) wrong - vanilla did not execute the pack as emitted`);
   };
   await assertCells(stateAt[0], sampleCells(stateAt[0], 24), "frame-0 (setup keyframe)");
 
   // ---- 7. start → the tick driver + vanilla MACRO dispatch must really animate
   await rcon(`function ${NS}:start`);
   // POLL CADENCE MATTERS: the animation cycle is FRAMES×speedTicks×50 ms = 400 ms, and a
-  // 400 ms poll phase-locks onto it — it can land on the wrap-to-zero tick every single
+  // 400 ms poll phase-locks onto it - it can land on the wrap-to-zero tick every single
   // time and read #f==0 forever while the wall visibly animates (the goal-028 audit
   // caught exactly that, ~25% false-fail). 90 ms is deliberately co-prime with the
   // cycle (gcd(90,400)=10 ≠ 0 phase drift per poll), so consecutive reads sweep all
@@ -266,7 +266,7 @@ try {
     await sleep(90);
   }
   if (![...seen].some((v) => v > 0)) {
-    throw new Error(`frame counter never advanced after :start — macro driver not ticking (saw #f ∈ {${[...seen].join(",") || "∅"}})`);
+    throw new Error(`frame counter never advanced after :start - macro driver not ticking (saw #f ∈ {${[...seen].join(",") || "∅"}})`);
   }
   await rcon(`function ${NS}:stop`);
   const readF = async () => {
@@ -275,8 +275,8 @@ try {
     return Number(m[1]);
   };
   const N = await readF();
-  await sleep(600); // > speedTicks(2)·6 ticks — if :stop didn't take, #f would have moved
-  if ((await readF()) !== N) throw new Error(`:stop did not freeze the driver — #f still advancing past ${N}`);
+  await sleep(600); // > speedTicks(2)·6 ticks - if :stop didn't take, #f would have moved
+  if ((await readF()) !== N) throw new Error(`:stop did not freeze the driver - #f still advancing past ${N}`);
   if (N < 0 || N >= FRAMES) throw new Error(`#f out of range after stop: ${N}`);
   log(`animation ran and stopped deterministically at frame ${N} (frozen across 600 ms)`);
 
@@ -290,7 +290,7 @@ try {
   await cleanup();
   rmSync(dir, { recursive: true, force: true });
   rmSync(work, { recursive: true, force: true });
-  log(`PASS in ${((Date.now() - t0) / 1000).toFixed(1)} s — vanilla server loaded, reloaded, painted and ANIMATED the generated datapack (temp dirs removed)`);
+  log(`PASS in ${((Date.now() - t0) / 1000).toFixed(1)} s - vanilla server loaded, reloaded, painted and ANIMATED the generated datapack (temp dirs removed)`);
   process.exit(0);
 } catch (e) {
   console.error(`[datapack-e2e] FAIL: ${e.message}`);

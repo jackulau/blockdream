@@ -1,5 +1,5 @@
 // Contract-drift guard: the driving WM's physical telemetry bounds are hardcoded INDEPENDENTLY
-// on both sides of the wire —
+// on both sides of the wire -
 //   model side: ml/src/blockdream_wm/drive/transition.py  (bound_tel's per-channel scale*tanh)
 //   web side:   apps/web/src/drive.ts + apps/web/src/showcase.ts  (HUD clamps on speed / yaw-rate)
 // If someone changes one side, the other silently drifts (e.g. model allows 80 m/s but the HUD
@@ -11,7 +11,7 @@
 //   channel 3 = speed/30, normalized → model bound (m/s) = tel_scale[3] * 30
 //
 // Every extraction FAILS LOUDLY if its pattern stops matching, so a refactor can't silently
-// disable the guard — it forces whoever refactors to update this test (and re-check the contract).
+// disable the guard - it forces whoever refactors to update this test (and re-check the contract).
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -31,7 +31,7 @@ const showcaseTs = readFileSync(SHOWCASE_TS, "utf8");
 
 const HOW_TO_FIX =
   "If that code was refactored, update the extraction regex in apps/web/test/telemetry-bounds.test.ts " +
-  "AND re-verify the model-side bounds vs web-side clamps still agree — this guard must never be " +
+  "AND re-verify the model-side bounds vs web-side clamps still agree - this guard must never be " +
   "silently disabled.";
 
 function mustMatch(src: string, re: RegExp, what: string, file: string): RegExpMatchArray {
@@ -152,7 +152,7 @@ describe("driving telemetry bounds: model (transition.py) vs web HUD clamps", ()
         expect(
           web.speedMult,
           `${file} multiplies telemetry[3] by ${web.speedMult}, but transition.py documents the ` +
-            `layout as speed/${model.speedDenorm} — the displayed m/s would be wrong. ${HOW_TO_FIX}`,
+            `layout as speed/${model.speedDenorm} - the displayed m/s would be wrong. ${HOW_TO_FIX}`,
         ).toBe(model.speedDenorm);
       });
 
@@ -160,7 +160,7 @@ describe("driving telemetry bounds: model (transition.py) vs web HUD clamps", ()
         expect(
           web.speedHi,
           `${file} clamps speed to <= ${web.speedHi} m/s, tighter than the model's physical bound ` +
-            `of ${model.speedMs} m/s (tel_scale[3] * ${model.speedDenorm}) — live values would be clipped. ${HOW_TO_FIX}`,
+            `of ${model.speedMs} m/s (tel_scale[3] * ${model.speedDenorm}) - live values would be clipped. ${HOW_TO_FIX}`,
         ).toBeGreaterThanOrEqual(model.speedMs);
         // Speed is displayed as a non-negative magnitude; clamping its floor at 0 is intentional,
         // but the floor must never rise above 0.
@@ -174,7 +174,7 @@ describe("driving telemetry bounds: model (transition.py) vs web HUD clamps", ()
         expect(
           web.yawHi,
           `${file} clamps yaw-rate to <= ${web.yawHi} rad/s, tighter than the model's physical bound ` +
-            `of ${model.yawRateRadS} rad/s (tel_scale[2]) — live values would be clipped. ${HOW_TO_FIX}`,
+            `of ${model.yawRateRadS} rad/s (tel_scale[2]) - live values would be clipped. ${HOW_TO_FIX}`,
         ).toBeGreaterThanOrEqual(model.yawRateRadS);
         expect(
           web.yawLo,

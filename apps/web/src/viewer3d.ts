@@ -1,5 +1,5 @@
 // Custom voxel viewer + replay engine over three.js. three handles the GL context; the
-// engine layer is ours: it turns a VoxelVolume (or a sequence — a spin/animation) into
+// engine layer is ours: it turns a VoxelVolume (or a sequence - a spin/animation) into
 // instanced textured cubes (one InstancedMesh per distinct block, real goal-014 textures),
 // caches a mesh group per frame, and plays them back frame-by-frame with orbit + spin.
 
@@ -161,7 +161,7 @@ export class Viewer3D {
    * Load a frame sequence. `opts.durationsMs` (e.g. a GIF's real per-frame delays) makes
    * playback honor the source cadence; without it, playback falls back to a fixed fps.
    * Turntable-spin is DECOUPLED from frame playback: a multi-frame animation defaults
-   * spin OFF (the frames ARE the motion — spinning on top double-rotates), a single static
+   * spin OFF (the frames ARE the motion - spinning on top double-rotates), a single static
    * volume defaults spin ON (turntable showcase).
    */
   setFrames(frames: VoxelVolume[], opts: { durationsMs?: Array<number | undefined | null> } = {}): void {
@@ -171,7 +171,7 @@ export class Viewer3D {
     this.index = 0;
     this.schedule = opts.durationsMs ? buildSchedule(opts.durationsMs) : uniformSchedule(frames.length, this.fps);
     // a single static volume turntable-spins; a multi-frame animation defaults its transform off
-    // (the frames ARE the motion — a transform on top would double-animate).
+    // (the frames ARE the motion - a transform on top would double-animate).
     this.animName = frames.length <= 1 ? "spin" : "none";
     this.animStart = performance.now();
     this.playStart = performance.now();
@@ -238,7 +238,7 @@ export class Viewer3D {
 
   private loop = (t: number): void => {
     this.raf = requestAnimationFrame(this.loop);
-    // apply the live transform animation as an ABSOLUTE pose (refresh-rate independent — no accumulator)
+    // apply the live transform animation as an ABSOLUTE pose (refresh-rate independent - no accumulator)
     const p = poseAt(this.animName, (t - this.animStart) / 1000, this.maxDim);
     this.root.position.set(p.px, p.py, p.pz);
     this.root.rotation.set(p.rx, p.ry, p.rz);
@@ -252,7 +252,7 @@ export class Viewer3D {
   };
 
   /** Dispose every mesh geometry under the root (the leak: BufferGeometries held GPU buffers
-   *  across setFrames calls — re-importing animations grew GPU memory unboundedly). */
+   *  across setFrames calls - re-importing animations grew GPU memory unboundedly). */
   private disposeGroups(): void {
     this.root.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose();

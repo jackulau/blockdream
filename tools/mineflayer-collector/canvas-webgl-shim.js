@@ -2,14 +2,14 @@
 // node-canvas-webgl's own native build fails on this machine, but canvas (3.x) + headless-gl (8.x)
 // both build + run, so we bridge them: prismarine-viewer's headless renderer asks for createCanvas,
 // renders the THREE scene into a headless-gl WebGL1 context, then encodes via node-canvas's
-// createJPEGStream — so we readPixels from gl and blit (vertically flipped) onto the 2D surface
+// createJPEGStream - so we readPixels from gl and blit (vertically flipped) onto the 2D surface
 // before each encode. Faithful to the API prismarine-viewer/lib/headless.js uses (createCanvas,
 // canvas.getContext('webgl'), canvas.createJPEGStream, canvas.toBuffer, loadImage).
 const Canvas = require('canvas')
 const createGL = require('gl')
 
 // Extract RGBA pixels from a texture source (ImageData | node-canvas Canvas | Image) so headless-gl's
-// raw texImage2D overload can consume it — headless-gl has no DOM, so the (…, source) overload throws.
+// raw texImage2D overload can consume it - headless-gl has no DOM, so the (…, source) overload throws.
 function toPixels (source) {
   if (!source) return { width: 0, height: 0, data: new Uint8Array(0) }
   if (source.data && source.width != null) { // ImageData

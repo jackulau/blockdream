@@ -1,6 +1,6 @@
 // CLI-level proof of the mcstructure3d target: `blockdream render --target mcstructure3d`
 // emits a TRUE 3D Bedrock .mcstructure (depth > 1) built by the voxel pipeline, with a sane
-// placeable block palette — surfacing the previously dead-code buildVoxelMcStructure.
+// placeable block palette - surfacing the previously dead-code buildVoxelMcStructure.
 import { describe, it, expect, beforeAll } from "vitest";
 import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,7 +36,7 @@ d("render --target mcstructure3d", () => {
     const [w, h, depth] = parsed.size;
     expect(w).toBeGreaterThan(1);
     expect(h).toBeGreaterThan(1);
-    expect(depth).toBeGreaterThan(1); // TRUE 3D — not the flat 1-thick wall
+    expect(depth).toBeGreaterThan(1); // TRUE 3D - not the flat 1-thick wall
 
     // palette: air + real namespaced solid blocks (the solid-block resolver output)
     expect(parsed.blockNames).toContain("minecraft:air");

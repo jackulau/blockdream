@@ -74,7 +74,7 @@ describe("vanilla bedrock behavior pack generator", () => {
     expect(leaf.trim()).toBe("function blockdream/frames/2");
   });
 
-  it("avoids `return` (unsupported on Bedrock) — uses nested guard functions", () => {
+  it("avoids `return` (unsupported on Bedrock) - uses nested guard functions", () => {
     const driver = pack.files.get("functions/blockdream/driver.mcfunction")!;
     expect(driver).not.toContain("return");
     expect(driver).toContain("run function blockdream/advance");

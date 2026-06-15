@@ -75,7 +75,7 @@ describe("delta playback reconstructs every frame + loops correctly (the core pl
   });
 });
 
-describe("Java vanilla datapack — playback wiring + version stamps", () => {
+describe("Java vanilla datapack - playback wiring + version stamps", () => {
   const pack = generateJavaDatapack(FRAMES, rb, {
     packFormat: 71,
     supportedFormats: { min_inclusive: 48, max_inclusive: 88 },
@@ -109,7 +109,7 @@ describe("Java vanilla datapack — playback wiring + version stamps", () => {
   });
 });
 
-describe("Bedrock behavior pack — playback wiring", () => {
+describe("Bedrock behavior pack - playback wiring", () => {
   const pack = generateBedrockBehaviorPack(FRAMES, rb, {});
   const f = pack.files;
 
@@ -136,7 +136,7 @@ describe("Bedrock behavior pack — playback wiring", () => {
   });
 });
 
-describe("Bedrock Script-API addon — playback wiring + autoplay keyframe regression", () => {
+describe("Bedrock Script-API addon - playback wiring + autoplay keyframe regression", () => {
   it("the runtime draws frame 0 on load so AUTOPLAY does not start mid-animation on an empty wall", () => {
     // Regression for the fixed bug: reset() (which applies the keyframe) was only
     // wired to `!mw start`, so autoplay jumped straight to frame 1's delta.
@@ -154,7 +154,7 @@ describe("Bedrock Script-API addon — playback wiring + autoplay keyframe regre
   });
 });
 
-describe("3D voxel datapack — playback wiring + version stamps", () => {
+describe("3D voxel datapack - playback wiring + version stamps", () => {
   it("builds an animated 3D datapack with the same loop driver + supported_formats", () => {
     const volumes = framesToAnimated3d(FRAMES, { maxDepth: 4 });
     expect(volumes.length).toBe(FRAMES.length);

@@ -6,7 +6,7 @@ responds to control the way physics demands:
   - steering left yields a higher yaw-rate than steering right,
   - speed stays in a physical band the whole time (the D1 bound guarantees finiteness; this adds sense).
 
-Exits 0 and prints "CONTROLLABLE" when all hold, else 1. This is the D2 ground-truth gate — a model
+Exits 0 and prints "CONTROLLABLE" when all hold, else 1. This is the D2 ground-truth gate - a model
 that collapses to a flat, control-independent attractor (the pre-fix behaviour) fails it.
 
     ml/.venv/bin/python scripts/eval_drive_control.py --checkpoint runs/drive/latest.pt
@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[drive-control] speed physical (0..60): {physical}")
 
     ok = throttle_responds and steer_responds and physical
-    print("CONTROLLABLE" if ok else "NOT CONTROLLABLE — telemetry does not respond to control")
+    print("CONTROLLABLE" if ok else "NOT CONTROLLABLE - telemetry does not respond to control")
     return 0 if ok else 1
 
 

@@ -1,7 +1,7 @@
 """Real commaVQ driving path: pose→(control,telemetry) derivation for BOTH pose formats (commaVQ's
 native velocity+rate `.pose.npy` and the rarer absolute-position trajectory), real-pool build/load
 round-trip, and a no-LiDAR DriveTransition train-step smoke. Uses commaVQ-SHAPED fixtures (known
-left/right curves) so we assert DIRECTIONAL correctness — no multi-GB download, no synthetic TRAINING
+left/right curves) so we assert DIRECTIONAL correctness - no multi-GB download, no synthetic TRAINING
 data (the served model trains on real commaVQ tokens; this only exercises the code paths)."""
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def _commavq_pose(T=120, yaw_rate=+0.05, v0=4.0, accel=0.02) -> np.ndarray:
     p = np.zeros((T, 6), dtype=np.float32)
     p[:, 0] = v0 + accel * np.arange(T)        # forward velocity (m/s), real-format col 0
     p[:, 5] = yaw_rate                          # yaw rate (rad/s), real-format col 5
-    p[0, :] = np.nan                            # commaVQ leaves ~0.1% NaN (usually frame 0) — must survive
+    p[0, :] = np.nan                            # commaVQ leaves ~0.1% NaN (usually frame 0) - must survive
     return p
 
 

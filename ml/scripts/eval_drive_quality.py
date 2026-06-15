@@ -2,16 +2,16 @@
 
 Two honest paths, auto-selected from the checkpoint's `real_source`:
 
-REAL (commaVQ camera-only, the served model) — measures what the browser tester experiences on the
+REAL (commaVQ camera-only, the served model) - measures what the browser tester experiences on the
 real model: one-step RGB next-token CE + telemetry MSE on a REAL commaVQ holdout (predicts real
 frames far better than chance?), controllability (throttle raises speed, steer left≠right, speed
 physical), and free-run stability (telemetry finite + tokens in codebook range). NO LiDAR / physics /
-multi-track — commaVQ has none, so a sim-shaped gate would be dishonest here.
+multi-track - commaVQ has none, so a sim-shaped gate would be dishonest here.
 
-SIM (deprecated physics-sim checkpoint) — the original multi-track gate: per-modality one-step val on
+SIM (deprecated physics-sim checkpoint) - the original multi-track gate: per-modality one-step val on
 fresh sim rollouts + closed-loop drift vs the physics ground truth.
 
-Prints [drive-quality] diagnostics, then ONE verdict word — QUALITY_OK / QUALITY_FAIL — and
+Prints [drive-quality] diagnostics, then ONE verdict word - QUALITY_OK / QUALITY_FAIL - and
 exits 0/1. --report-only always exits 0 (measurement decoupled from gating). --quick keeps the
 whole run under ~2 min on CPU/MPS so it can ride scripts/verify-all.sh.
 
@@ -29,7 +29,7 @@ import numpy as np
 import torch
 
 from blockdream_wm.drive.serve import load_drive_session
-# NB: the sim modules (collect/physics/sim) are the DEPRECATED synthetic path — imported lazily in
+# NB: the sim modules (collect/physics/sim) are the DEPRECATED synthetic path - imported lazily in
 # the SIM branch only, so the REAL (commaVQ) gate has zero dependency on synthetic code.
 
 # Gate thresholds, set from the shipped checkpoint's measured numbers with headroom so a
@@ -47,7 +47,7 @@ THRESHOLDS = {
 
 def telemetry_to_carstate(tel: np.ndarray):
     """Invert sim.telemetry(): [vx/30, vy/15, r, speed/30, sin(yaw), cos(yaw)] → CarState.
-    Position is unknowable (and irrelevant — physics has no walls), so x=y=0."""
+    Position is unknowable (and irrelevant - physics has no walls), so x=y=0."""
     from blockdream_wm.drive.physics import CarState
     return CarState(
         x=0.0,
@@ -69,7 +69,7 @@ def carstate_to_telemetry(s) -> np.ndarray:
 
 def control_schedule(steps: int) -> list[list[float]]:
     """Fixed deterministic [steer, throttle, brake] schedule exercising accelerate / turn left /
-    turn right / brake — the behaviours the browser tester drives."""
+    turn right / brake - the behaviours the browser tester drives."""
     out = []
     for t in range(steps):
         phase = (4 * t) // steps
@@ -93,7 +93,7 @@ def drift_mae(model_tel: np.ndarray, phys_tel: np.ndarray) -> tuple[float, float
 
 def history_rows(ctl: torch.Tensor, tel: torch.Tensor, n_history: int) -> torch.Tensor:
     """Teacher-forced flattened (control, telemetry) history windows for every prev index
-    t in 0..T-2, zero-padded before the rollout start — same layout as training/serve."""
+    t in 0..T-2, zero-padded before the rollout start - same layout as training/serve."""
     T, n_ctl, n_tel = tel.shape[0], ctl.shape[1], tel.shape[1]
     width = n_ctl + n_tel
     out = torch.zeros((T - 1, n_history * width), dtype=tel.dtype, device=tel.device)
@@ -167,7 +167,7 @@ def closed_loop_drift(session, steps: int) -> tuple[float, float]:
     return drift_mae(np.stack(model_track), np.stack(phys_track))
 
 
-# REAL (commaVQ camera-only) quality bars — set from the served checkpoint's measured numbers with
+# REAL (commaVQ camera-only) quality bars - set from the served checkpoint's measured numbers with
 # headroom. Measured on the real served model (--quick): rgb_ce 2.27 (vs random 6.93), tel_mse 0.0005.
 REAL_THRESHOLDS = {
     "rgb_ce": 4.0,         # one-step next-token CE on a REAL commaVQ holdout (random = ln(1024) = 6.93)
@@ -187,7 +187,9 @@ def _real_holdout_pool():
         return str(pool)
     fixture = ml / "tests" / "fixtures" / "commavq_real"
     if fixture.exists():
-        import scripts.collect_real_drive as cr  # discover (token,pose) pairs in the fixture
+        import sys
+        sys.path.insert(0, str(ml / "scripts"))  # importable no matter the caller's cwd
+        import collect_real_drive as cr  # discover (token,pose) pairs in the fixture
         segs = [s for s in cr.discover_segments(fixture) if s[1]]
         if segs:
             out = ml / "data" / "drive_real_holdout"
@@ -206,7 +208,7 @@ def real_quality(session, args, t0: float) -> int:
     pool = _real_holdout_pool()
     measured: dict[str, float] = {}
     if pool is None:
-        print("[drive-quality] no real holdout pool/fixture found — CE/MSE skipped (controllability still gated)")
+        print("[drive-quality] no real holdout pool/fixture found - CE/MSE skipped (controllability still gated)")
         measured.update(rgb_ce=0.0, tel_mse=0.0)
     else:
         tok, ctl, tel, pairs = load_real_token_pool(pool)
@@ -246,7 +248,7 @@ def real_quality(session, args, t0: float) -> int:
     print(f"[drive-quality] wall-clock {time.time() - t0:.1f}s")
     if args.report_only:
         print("REPORT_ONLY"); return 0
-    print("QUALITY_OK" if ok else "QUALITY_FAIL — served REAL driving checkpoint below quality bar")
+    print("QUALITY_OK" if ok else "QUALITY_FAIL - served REAL driving checkpoint below quality bar")
     return 0 if ok else 1
 
 
@@ -276,7 +278,7 @@ def sim_quality(session, args, t0: float) -> int:
     print(f"[drive-quality] wall-clock {time.time() - t0:.1f}s")
     if args.report_only:
         print("REPORT_ONLY"); return 0
-    print("QUALITY_OK" if ok else "QUALITY_FAIL — served driving checkpoint below quality bar")
+    print("QUALITY_OK" if ok else "QUALITY_FAIL - served driving checkpoint below quality bar")
     return 0 if ok else 1
 
 
@@ -284,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("eval_drive_quality")
     ap.add_argument("--checkpoint", default="runs/drive/latest.pt")
     ap.add_argument("--device", default="cpu")  # CPU beats MPS for sequential AR decode (see serve.py)
-    ap.add_argument("--quick", action="store_true", help="reduced steps — rides verify-all (<2 min)")
+    ap.add_argument("--quick", action="store_true", help="reduced steps - rides verify-all (<2 min)")
     ap.add_argument("--report-only", action="store_true", help="print metrics, always exit 0")
     args = ap.parse_args(argv)
 

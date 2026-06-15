@@ -1,11 +1,11 @@
-// Mineflayer data collector for the Blockdream world model — the "comma.ai for Minecraft" path.
+// Mineflayer data collector for the Blockdream world model - the "comma.ai for Minecraft" path.
 //
 // comma trains driving models on real fleet footage. The analogue here: drive a Mineflayer bot
 // through each MOVEMENT TYPE on a real Minecraft server, record the bot's first-person view (via
 // prismarine-viewer headless -> an mp4 per skill) alongside the per-tick ACTION (controls) and
 // PHYSICS telemetry (position, velocity, on-ground, in-water, ...). A Python importer
 // (ml/scripts/import_mineflayer.py) then aligns the mp4 frames with the action+physics logs into
-// the tagged on-disk pool format the trainer consumes — so the world model learns REAL per-skill
+// the tagged on-disk pool format the trainer consumes - so the world model learns REAL per-skill
 // dynamics instead of synthetic stand-ins.
 //
 // OPERATOR-GATED: needs a reachable Minecraft server + Node deps. Cannot run in the build sandbox.
@@ -19,7 +19,7 @@
 import { createBot } from "mineflayer";
 import * as THREE from "three";
 import { Worker } from "node:worker_threads";
-import viewerPkg from "prismarine-viewer/viewer/index.js"; // CJS — default import then destructure
+import viewerPkg from "prismarine-viewer/viewer/index.js"; // CJS - default import then destructure
 import canvasWebgl from "node-canvas-webgl";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -67,7 +67,7 @@ const SKILL_CONTROLS = {
   minecart: {}, // rolling in a minecart (setupSkill lays rails + mounts)
 };
 
-// The state that DEFINES a skill — used to VERIFY setup worked and to score each clip (skill_ok).
+// The state that DEFINES a skill - used to VERIFY setup worked and to score each clip (skill_ok).
 function inExpectedState (bot, skill) {
   const e = bot.entity;
   if (!e) return false;
@@ -90,7 +90,7 @@ async function give (bot, name, count = 1, nbt = undefined) {
   return item;
 }
 
-// Set up the world/bot so it GENUINELY performs the skill (pure mineflayer creative API — give /
+// Set up the world/bot so it GENUINELY performs the skill (pure mineflayer creative API - give /
 // placeBlock / mount / equip / flyTo). Each mount is VERIFIED (bot.vehicle) with retries; setup
 // returns once the bot is in the skill's defining state (or best-effort after retries).
 async function setupSkill (bot, skill) {
@@ -179,7 +179,7 @@ async function recordSkill(skill) {
   // Offscreen first-person renderer. We roll our own capture (not prismarine-viewer's headless(),
   // whose ffmpeg-stdin pipe finalised empty here): render each frame into a node-canvas-webgl canvas
   // and write PNGs, then assemble with ffmpeg. Camera is set DIRECTLY (setFirstPersonCamera tweens
-  // over 50ms — re-calling it per frame restarts the tween so the camera never reaches the bot).
+  // over 50ms - re-calling it per frame restarts the tween so the camera never reaches the bot).
   const canvas = createCanvas(SIZE, SIZE);
   const renderer = new THREE.WebGLRenderer({ canvas });
   const viewer = new Viewer(renderer);
@@ -196,7 +196,7 @@ async function recordSkill(skill) {
   // warm up the chunk-mesh workers so geometry exists before frame 0
   for (let i = 0; i < 150; i++) { aimCamera(); viewer.update(); renderer.render(viewer.scene, viewer.camera); await sleep(15); }
 
-  // telemetry logged PER FRAME — NOT physicsTick, which stops firing while the bot rides a vehicle
+  // telemetry logged PER FRAME - NOT physicsTick, which stops firing while the bot rides a vehicle
   // (boat/pig/minecart), which previously left those clips with 0 telemetry ticks.
   const log = [];
   const t0 = Date.now();
@@ -241,7 +241,7 @@ async function recordSkill(skill) {
   }
   for (const k of Object.keys(controls)) bot.setControlState(k, false);
 
-  // assemble PNG frames → mp4 (explicit args — reliable, unlike the headless stdin pipe)
+  // assemble PNG frames → mp4 (explicit args - reliable, unlike the headless stdin pipe)
   const mp4 = join(OUT, `${skill}.mp4`);
   execFileSync("ffmpeg", ["-y", "-framerate", String(FPS), "-i", join(frameDir, "f%05d.png"), "-pix_fmt", "yuv420p", mp4], { stdio: "ignore" });
   rmSync(frameDir, { recursive: true, force: true });
@@ -280,7 +280,7 @@ for (const r of results) {
 }
 const failures = results.filter((r) => r.status !== "ok");
 if (failures.length) {
-  console.error(`[collect] ${failures.length}/${results.length} skill(s) failed or scored skill_ok < ${SKILL_OK_MIN} — NOT a clean run.`);
+  console.error(`[collect] ${failures.length}/${results.length} skill(s) failed or scored skill_ok < ${SKILL_OK_MIN} - NOT a clean run.`);
 } else {
   console.log("[collect] all skills ok. Import with ml/scripts/import_mineflayer.py");
 }

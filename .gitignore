@@ -31,18 +31,18 @@ out/
 *.litematic
 map_*.dat
 
-# Minecraft block textures — extracted locally from the official client jar, NOT redistributed
+# Minecraft block textures - extracted locally from the official client jar, NOT redistributed
 apps/web/public/blocks/
 apps/web/scripts/.cache/
 
-# exported diffusion ONNX — generated artifact (ml/scripts/goal020_diffusion.sh), local-only
+# exported diffusion ONNX - generated artifact (ml/scripts/goal020_diffusion.sh), local-only
 apps/web/public/onnx/
 
-# gradle outputs (incl. Mojang-derived loom-cache jars — must NEVER be committed)
+# gradle outputs (incl. Mojang-derived loom-cache jars - must NEVER be committed)
 mods/java-fabric/.gradle/
 mods/java-fabric/build/
 
-# local vanilla server sandbox (scripts/vanilla-server.sh) — Mojang-licensed server jar
+# local vanilla server sandbox (scripts/vanilla-server.sh) - Mojang-licensed server jar
 # + world data, downloaded by the USER from Mojang; must never be committed (repo is public)
 .vanilla-server/
 
@@ -52,11 +52,11 @@ mods/java-fabric/build/
 # per-developer workflow state (like .claude-workspace/)
 tasks/
 
-# collector telemetry JSON is small + irreplaceable source data — carve it out of the global out/ rule
+# collector telemetry JSON is small + irreplaceable source data - carve it out of the global out/ rule
 # (mp4s stay ignored; backup expectation documented in tools/mineflayer-collector/README.md)
 !tools/mineflayer-collector/out/
 tools/mineflayer-collector/out/*
 !tools/mineflayer-collector/out/*.json
 
-# internal planning scratch — never publish
+# internal planning scratch - never publish
 PLAN.md

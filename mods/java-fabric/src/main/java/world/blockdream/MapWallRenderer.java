@@ -39,7 +39,7 @@ public class MapWallRenderer {
                     .resolve("blockdream");
             Path framesPath = worldDir.resolve("frames.bin");
             if (!Files.exists(framesPath)) {
-                BlockdreamMod.LOGGER.info("[blockdream] no frames.bin found at {} — static renderer idle", framesPath);
+                BlockdreamMod.LOGGER.info("[blockdream] no frames.bin found at {} - static renderer idle", framesPath);
                 return;
             }
             this.pool = FramePool.read(framesPath);
@@ -89,7 +89,7 @@ public class MapWallRenderer {
     private MapState[] resolveTileStates(ServerWorld world, Path worldDir, int expectedCount) throws Exception {
         Path mapsTxt = worldDir.resolve("maps.txt");
         if (!Files.exists(mapsTxt)) {
-            BlockdreamMod.LOGGER.warn("[blockdream] maps.txt missing — cannot bind maps to the wall");
+            BlockdreamMod.LOGGER.warn("[blockdream] maps.txt missing - cannot bind maps to the wall");
             return null;
         }
         String[] ids = Files.readString(mapsTxt).trim().split("\\s+");
@@ -102,7 +102,7 @@ public class MapWallRenderer {
             int mapId = Integer.parseInt(ids[i]);
             MapState state = world.getMapState(new net.minecraft.component.type.MapIdComponent(mapId));
             if (state == null) {
-                BlockdreamMod.LOGGER.warn("[blockdream] map id {} has no MapState yet — create/hold it once first", mapId);
+                BlockdreamMod.LOGGER.warn("[blockdream] map id {} has no MapState yet - create/hold it once first", mapId);
                 return null;
             }
             states[i] = state;

@@ -30,7 +30,7 @@ class DecoderWrapper(nn.Module):
 
 
 def export(config: str | None, out_dir: str, checkpoint: str | None = None) -> list[Path]:
-    # A checkpoint gives REAL trained weights (the whole point — without one the browser engine would
+    # A checkpoint gives REAL trained weights (the whole point - without one the browser engine would
     # run random noise). Its saved config defines the architecture; fall back to a config file otherwise.
     ckpt = None
     if checkpoint:

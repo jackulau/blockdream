@@ -33,7 +33,7 @@ export interface BlockArtEls {
 }
 
 export interface BlockArtOpts {
-  onRender?: (q: QuantizedFrame) => void; // fired after each (re)quantize — e.g. enable export / rebuild 3D
+  onRender?: (q: QuantizedFrame) => void; // fired after each (re)quantize - e.g. enable export / rebuild 3D
 }
 
 export function createBlockArt(
@@ -43,7 +43,7 @@ export function createBlockArt(
   loadUrl: (url: string) => void;
   loadFile: (file: File) => Promise<void>;
   getFrame: () => QuantizedFrame | null;
-  /** Current SOURCE image as RGB at ≤maxW — lets the 3D builder re-quantize the original
+  /** Current SOURCE image as RGB at ≤maxW - lets the 3D builder re-quantize the original
    *  colors in its own palette instead of inheriting this path's dithered map-palette ids. */
   getSourceRgb: (maxW: number) => RgbImage | null;
 } {

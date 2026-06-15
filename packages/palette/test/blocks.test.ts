@@ -29,7 +29,7 @@ describe("java block palette", () => {
   });
 
   it("offers the 16 solid concrete colors, all biome-independent and support-free", () => {
-    // solid concrete only — concrete_powder is gravity-affected (support-required)
+    // solid concrete only - concrete_powder is gravity-affected (support-required)
     const concrete = bp.bases
       .flatMap((b) => b.blocks)
       .filter((blk) => blk.id.endsWith("_concrete"));

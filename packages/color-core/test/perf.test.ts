@@ -56,7 +56,7 @@ describe("LUT matcher (efficiency)", () => {
   it("LUT is far faster than brute force (kills the video lag)", () => {
     const img = pseudoRandomImage(256, 256);
     // Best-of-N timings: the minimum is the least noisy estimate, so this stays robust under
-    // a busy machine/CI (absolute throughput is environment-dependent and must not gate CI —
+    // a busy machine/CI (absolute throughput is environment-dependent and must not gate CI -
     // we only assert the algorithmic win: the LUT path is faster). Locally ~19× / ~45 Mpx/s.
     const best = (run: () => void): number => {
       let m = Infinity;

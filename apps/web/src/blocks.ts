@@ -83,7 +83,7 @@ export async function loadTextureManifest(): Promise<boolean> {
 }
 
 /** Per-face texture URL for a block (grass top vs side, log end-grain), or null if the block has no
- *  distinct face texture — the caller then falls back to the single localTextureUrl. Only returns a
+ *  distinct face texture - the caller then falls back to the single localTextureUrl. Only returns a
  *  URL the manifest verified exists, so it never 404s. */
 export function faceTextureUrl(id: string, face: "top" | "side" | "bottom"): string | null {
   const f = FACES[id];

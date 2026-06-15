@@ -8,7 +8,7 @@
   </style>
   <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#3a4150"/></marker></defs>
 
-  <text x="24" y="34" class="acc" font-size="15" font-weight="700">Workstream A — block-art &amp; 3D</text>
+  <text x="24" y="34" class="acc" font-size="15" font-weight="700">Workstream A - block-art &amp; 3D</text>
   <rect class="box" x="24" y="48" width="120" height="48" rx="8"/><text x="36" y="70" class="t">image / GIF</text><text x="36" y="86" class="s">video frames</text>
   <rect class="box" x="178" y="48" width="130" height="48" rx="8"/><text x="190" y="70" class="t">OKLab quantize</text><text x="190" y="86" class="s">color-core</text>
   <rect class="box" x="342" y="22" width="150" height="44" rx="8"/><text x="354" y="48" class="t">imageToSolid (3D)</text><text x="354" y="62" class="s">isolate+inflate+center</text>
@@ -21,7 +21,7 @@
   <line class="arr" x1="678" y1="100" x2="712" y2="78"/>
 
   <line x1="24" y1="150" x2="836" y2="150" stroke="#232730"/>
-  <text x="24" y="186" class="acc" font-size="15" font-weight="700">Workstream B — neural world model</text>
+  <text x="24" y="186" class="acc" font-size="15" font-weight="700">Workstream B - neural world model</text>
   <rect class="box" x="24" y="200" width="150" height="60" rx="8"/><text x="36" y="222" class="t">data</text><text x="36" y="238" class="s">VPT · synthetic skills</text><text x="36" y="252" class="s">Mineflayer (real+physics)</text>
   <rect class="box" x="208" y="208" width="120" height="44" rx="8"/><text x="220" y="230" class="t">tokenizer</text><text x="220" y="244" class="s">VQ / continuous</text>
   <rect class="box" x="362" y="182" width="160" height="44" rx="8"/><text x="374" y="204" class="t">AR transition</text><text x="374" y="218" class="s">skill-conditioned, KV-cache</text>

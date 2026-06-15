@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cast.sh — one-command OFFLINE "cast the world model into Minecraft" (no Fabric, no mods).
+# cast.sh - one-command OFFLINE "cast the world model into Minecraft" (no Fabric, no mods).
 #
 # Rolls the skill-conditioned WM, encodes the dream, and emits a vanilla Java datapack .zip
 # that plays the animation on a block wall in-world. Wraps ml/scripts/cast_wm_to_datapack.py
@@ -37,9 +37,9 @@ while [ $# -gt 0 ]; do
 done
 
 fail=0
-[ -x "$PY" ] || { echo "✗ no venv python at $PY — run ml/scripts/setup_venv.sh first" >&2; fail=1; }
-command -v ffmpeg >/dev/null 2>&1 || { echo "✗ ffmpeg not on PATH — install it (macOS: brew install ffmpeg; Debian/Ubuntu: apt install ffmpeg)" >&2; fail=1; }
-[ -f "$CKPT" ] || { echo "✗ checkpoint missing: $CKPT — fetch it with scripts/fetch-checkpoint.sh, or pass --checkpoint <path>" >&2; fail=1; }
+[ -x "$PY" ] || { echo "✗ no venv python at $PY - run ml/scripts/setup_venv.sh first" >&2; fail=1; }
+command -v ffmpeg >/dev/null 2>&1 || { echo "✗ ffmpeg not on PATH - install it (macOS: brew install ffmpeg; Debian/Ubuntu: apt install ffmpeg)" >&2; fail=1; }
+[ -f "$CKPT" ] || { echo "✗ checkpoint missing: $CKPT - fetch it with scripts/fetch-checkpoint.sh, or pass --checkpoint <path>" >&2; fail=1; }
 [ "$fail" -eq 0 ] || exit 1
 
 echo "[cast] skill=$SKILL steps=$STEPS out=$OUT"
@@ -48,7 +48,7 @@ echo "[cast] checkpoint → $CKPT"
     --checkpoint "$CKPT" --skill "$SKILL" --steps "$STEPS" --out "$OUT" )
 
 ZIP="$(find "$OUT" -maxdepth 1 -name '*.zip' -print 2>/dev/null | head -n 1)"
-[ -n "$ZIP" ] || { echo "✗ no .zip produced in $OUT — see errors above" >&2; exit 1; }
+[ -n "$ZIP" ] || { echo "✗ no .zip produced in $OUT - see errors above" >&2; exit 1; }
 
 echo
 echo "[cast] done → $ZIP"

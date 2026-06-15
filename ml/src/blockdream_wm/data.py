@@ -6,7 +6,7 @@ action-labeled Minecraft data (VPT/MineRL) so the tokenizer, IDM, and transition
 models have genuine `S_t + A_t → S_{t+1}` dynamics to fit on CPU.
 
 The real pipeline swaps this for VPT contractor data + the IDM that labels
-unlabeled YouTube — same tensor contract (frames, buttons, camera).
+unlabeled YouTube - same tensor contract (frames, buttons, camera).
 """
 
 from __future__ import annotations

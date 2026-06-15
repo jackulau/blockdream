@@ -36,7 +36,7 @@ function applyFrame(f) {
       try {
         block.setPermutation(BlockPermutation.resolve(blockId));
       } catch {
-        /* unknown block id in this version — skip */
+        /* unknown block id in this version - skip */
       }
     }
   }

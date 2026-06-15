@@ -39,7 +39,7 @@ function frameFromIds(ids: number[][]): QuantizedFrame {
 const BLOCKS = ["minecraft:white_concrete", "minecraft:black_concrete", "minecraft:red_concrete", "minecraft:blue_concrete"];
 const resolve = (id: number) => BLOCKS[id % BLOCKS.length]!;
 
-describe("greedyBoxes — maximal box merge", () => {
+describe("greedyBoxes - maximal box merge", () => {
   it("collapses a solid 32×32 region into a single /fill (1024 cells → 1 command)", () => {
     const cells: PlacedCell[] = [];
     for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) cells.push({ x, y, z: 0, mapColorId: 0 });
@@ -91,7 +91,7 @@ describe("greedyBoxes — maximal box merge", () => {
     expect(xonly).toBeGreaterThan(greedy);
   });
 
-  it("checkerboard cannot merge — degrades to one command per cell (no worse than unoptimized)", () => {
+  it("checkerboard cannot merge - degrades to one command per cell (no worse than unoptimized)", () => {
     const cells: PlacedCell[] = [];
     for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) cells.push({ x, y, z: 0, mapColorId: (x + y) % 2 });
     const lines = greedyBoxes(cells, resolve);
@@ -100,7 +100,7 @@ describe("greedyBoxes — maximal box merge", () => {
   });
 });
 
-describe("generateJavaDatapack — optimized 2D output", () => {
+describe("generateJavaDatapack - optimized 2D output", () => {
   it("solid 32×32 keyframe is 1 command and reconstructs byte-identical", () => {
     const ids = Array.from({ length: 32 }, () => Array.from({ length: 32 }, () => 0));
     const pack = generateJavaDatapack([frameFromIds(ids)], resolve, { origin: { x: 0, y: 64, z: 0 } });

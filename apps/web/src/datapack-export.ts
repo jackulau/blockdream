@@ -1,6 +1,6 @@
 // Package a generated datapack (a files Map<path,string> from @blockdream/emit-commands)
-// into a real, droppable Minecraft datapack .zip in the browser — store-only (datapacks
-// don't need compression) via fflate — and trigger a download.
+// into a real, droppable Minecraft datapack .zip in the browser - store-only (datapacks
+// don't need compression) via fflate - and trigger a download.
 
 import { zipSync, strToU8 } from "fflate";
 
@@ -10,9 +10,9 @@ export function loadInstructions(files: Map<string, string>): string {
   const setup = [...files.keys()].find((k) => /^data\/[^/]+\/function\/setup\.mcfunction$/.test(k));
   const ns = setup ? setup.split("/")[1]! : "blockdream";
   return [
-    "HOW TO LOAD THIS INTO MINECRAFT (Java Edition — any 1.21.x: 1.21 through 1.21.10)",
+    "HOW TO LOAD THIS INTO MINECRAFT (Java Edition - any 1.21.x: 1.21 through 1.21.10)",
     "================================================================================",
-    "(One pack works across the whole 1.21 line — it declares supported_formats, so",
+    "(One pack works across the whole 1.21 line - it declares supported_formats, so",
     " Minecraft loads it without the red 'incompatible pack' warning on any 1.21.x.)",
     "",
     "1. Find your world's datapacks folder:",
@@ -21,7 +21,7 @@ export function loadInstructions(files: Map<string, string>): string {
     "2. Drop this .zip into that datapacks/ folder. Do NOT unzip it.",
     "3. In game run:  /reload",
     "4. Build it:     /function " + ns + ":setup",
-    "     The build appears at the pack's FIXED origin (around x=0 y=64 z=0 — the",
+    "     The build appears at the pack's FIXED origin (around x=0 y=64 z=0 - the",
     "     coordinates inside the frame functions are absolute). setup first CLEARS",
     "     that whole box to air, so do NOT run it inside your base; teleport over",
     "     (/tp 0 80 0) to watch it build.",
@@ -41,12 +41,12 @@ export function zipDatapack(files: Map<string, string>): Uint8Array {
   const entries: Record<string, Uint8Array> = {};
   for (const [path, content] of files) entries[path] = strToU8(content);
   entries["HOW_TO_LOAD.txt"] = strToU8(loadInstructions(files));
-  return zipSync(entries, { level: 0 }); // store (no deflate) — fast, simple, valid
+  return zipSync(entries, { level: 0 }); // store (no deflate) - fast, simple, valid
 }
 
 /** Trigger a browser download of bytes under `name`. */
 export function downloadBytes(name: string, bytes: Uint8Array): void {
-  // copy into a fresh ArrayBuffer-backed view — BlobPart rejects ArrayBufferLike-typed views
+  // copy into a fresh ArrayBuffer-backed view - BlobPart rejects ArrayBufferLike-typed views
   const blob = new Blob([new Uint8Array(bytes)], { type: "application/zip" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

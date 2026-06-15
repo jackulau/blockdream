@@ -68,7 +68,7 @@ export async function createRollout(transitionUrl, decoderUrl, opts) {
       const next = await sampleNext(encodeAction(action));
       prev = next;
       const { image } = await decoder.run({ latent: new ort.Tensor("float32", next, [1, C, H, H]) });
-      return image; // [1,3,h,w] in [0,1] — host draws to canvas
+      return image; // [1,3,h,w] in [0,1] - host draws to canvas
     },
   };
 }

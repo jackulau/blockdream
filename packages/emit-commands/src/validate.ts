@@ -1,6 +1,6 @@
 /**
  * Pragmatic validator for the command forms blockdream emits. Not a full
- * Minecraft grammar — it accepts exactly the heads we generate and rejects
+ * Minecraft grammar - it accepts exactly the heads we generate and rejects
  * malformed lines, so a broken generator can't silently ship invalid commands.
  */
 
@@ -141,7 +141,7 @@ export function validatePack(files: Map<string, string>): ValidationResult {
 }
 
 /**
- * Pure reimplementation of the generated driver's scoreboard semantics — proves
+ * Pure reimplementation of the generated driver's scoreboard semantics - proves
  * the playback advances frames 0,1,…,N-1,0,1,… at the right cadence.
  */
 export function simulateDriver(count: number, speed: number, ticks: number): number[] {

@@ -2,7 +2,7 @@
 
 The served Minecraft model is autoregressive: a frame = n tokens decoded SEQUENTIALLY, so its
 fps falls ~1/n. The browser lineage is few-step latent diffusion: the whole frame's latent is
-denoised in K passes that are PARALLEL over space — fps barely depends on resolution. This
+denoised in K passes that are PARALLEL over space - fps barely depends on resolution. This
 script measures both at served-ish scale (and AR at a coarser token grid) so the >=30 fps path
 is concrete, not asserted.
 
@@ -85,7 +85,7 @@ def main() -> int:
     fast = [r[0] for r in rows if 1000.0 / r[2] >= 30]
     print(f"\n  >=30 fps path(s): {', '.join(fast) if fast else 'NONE at this scale'}")
     print("  recommendation: serve via few-step diffusion (parallel over space; fps ~independent of")
-    print("  resolution) — or coarsen the AR token grid. Browser WebGPU/ONNX is faster than this CPU floor.")
+    print("  resolution) - or coarsen the AR token grid. Browser WebGPU/ONNX is faster than this CPU floor.")
     return 0 if fast else 1
 
 

@@ -8,7 +8,7 @@ function solidCube(n: number, id = 7) {
   return v;
 }
 
-describe("greedyQuads — face culling", () => {
+describe("greedyQuads - face culling", () => {
   it("a single voxel emits exactly 6 faces", () => {
     const v = createVolume(3, 3, 3);
     setVoxel(v, 1, 1, 1, 5);
@@ -55,7 +55,7 @@ describe("greedyQuads — face culling", () => {
   });
 });
 
-describe("greedyQuads — geometry correctness", () => {
+describe("greedyQuads - geometry correctness", () => {
   it("each quad's normal matches its face direction", () => {
     const q = greedyQuads(solidCube(2));
     for (const Q of q) {

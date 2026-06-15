@@ -1,6 +1,6 @@
 """Extract REAL, action-labeled per-skill pools from the VPT pool (pool_m4) for the movement types
 that ARE present in human walking-gameplay footage: sprint, jump, walk. VPT logs the exact keyboard
-state per frame (sprint=idx6, jump=idx4, forward=idx0), so these are genuine human footage — no
+state per frame (sprint=idx6, jump=idx4, forward=idx0), so these are genuine human footage - no
 synthetic stand-in needed. (boat/elytra/pig/swim/minecart aren't button-distinguishable in VPT and
 come from the mineflayer collector instead.)
 

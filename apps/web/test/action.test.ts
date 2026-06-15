@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { actionFromKeys, N_BUTTONS } from "../src/action";
 
-// canonical list — mirrors ml/src/blockdream_wm/movement.py MOVEMENT_TYPES (same order)
+// canonical list - mirrors ml/src/blockdream_wm/movement.py MOVEMENT_TYPES (same order)
 const MOVEMENT_TYPES = [
   "general", "walk", "sprint", "jump", "swim", "boat", "elytra", "pig", "minecart",
 ];

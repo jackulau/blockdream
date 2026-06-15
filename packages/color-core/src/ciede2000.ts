@@ -1,5 +1,5 @@
 /**
- * CIEDE2000 — the gold-standard perceptual color-difference metric.
+ * CIEDE2000 - the gold-standard perceptual color-difference metric.
  *
  * Per the research (docs/color-theory.md) it is NOT used in the matching loop
  * (it's calibrated only for SMALL differences and has mathematical

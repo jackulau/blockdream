@@ -1,7 +1,7 @@
 """The five blockdream demos.
 
 Each demo conditions the world model two ways:
-  1. an ACTION SUBSET — only the buttons that skill uses are exposed
+  1. an ACTION SUBSET - only the buttons that skill uses are exposed
      (boat = steering only; elytra = jump + look; world/gameplay = everything)
   2. a learned SKILL embedding added to every action (a per-skill bias token)
 
@@ -37,7 +37,7 @@ class DemoSpec:
 
 
 DEMOS: dict[str, DemoSpec] = {
-    "walking": DemoSpec("walking", 0, [0, 1, 2, 3, 4, 5, 6], "diffusion", "ground locomotion; simplest dynamics — ships first"),
+    "walking": DemoSpec("walking", 0, [0, 1, 2, 3, 4, 5, 6], "diffusion", "ground locomotion; simplest dynamics - ships first"),
     "boat": DemoSpec("boat", 1, [0, 1, 2, 3], "diffusion", "boat steering on water"),
     "elytra": DemoSpec("elytra", 2, [0, 4], "diffusion", "elytra glide; camera-dominant, high speed"),
     "world": DemoSpec("world", 3, list(range(9)), "ar", "general open-world model, full action space"),

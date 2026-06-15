@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[movement-verify] mean pairwise |Δframe| = {mean_pair:.4f} · {distinct}/{len(pairs)} pairs distinct (>{eps:.3f})")
 
     ok = mean_pair >= args.thresh and distinct >= int(0.8 * len(pairs))
-    print(f"[movement-verify] verdict: {'DISTINCT — every movement type steers the world differently' if ok else 'TOO SIMILAR — needs more training'}")
+    print(f"[movement-verify] verdict: {'DISTINCT - every movement type steers the world differently' if ok else 'TOO SIMILAR - needs more training'}")
     return 0 if ok else 1
 
 

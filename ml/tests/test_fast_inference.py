@@ -1,7 +1,7 @@
 """Fast-inference for >=30 fps: the few-step diffusion path (parallel over space) is the
 real-time path, and it's faster than the sequential 256-token AR path that bottlenecks the
 served Minecraft model. Verified at tiny scale here; the trend (AR ~1/n_tokens, diffusion
-~independent of resolution) holds up — and a server GPU / browser WebGPU is faster still."""
+~independent of resolution) holds up - and a server GPU / browser WebGPU is faster still."""
 
 import sys
 from pathlib import Path

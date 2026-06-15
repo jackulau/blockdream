@@ -1,5 +1,5 @@
 // Variable-rate frame-playback clock. Maps elapsed wall-clock time to a frame index
-// using per-frame durations — so an animated GIF plays at its REAL speed (each frame can
+// using per-frame durations - so an animated GIF plays at its REAL speed (each frame can
 // have its own delay) instead of a single hardcoded fps. Pure + DOM-free, so it is unit-
 // tested without a browser (jsdom can't run ImageDecoder/WebGL, but this is just math).
 
@@ -27,7 +27,7 @@ export function buildSchedule(durationsMs: Array<number | undefined | null>, fal
   return { cumulative, total: acc, count: durationsMs.length };
 }
 
-/** Uniform schedule at a fixed fps — the fallback when there are no per-frame durations. */
+/** Uniform schedule at a fixed fps - the fallback when there are no per-frame durations. */
 export function uniformSchedule(count: number, fps: number): FrameSchedule {
   return buildSchedule(new Array(count).fill(1000 / Math.max(1, fps)));
 }

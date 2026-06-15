@@ -8,16 +8,16 @@ system. Code lives in `packages/voxel` (engine) + `apps/web/src` (viewer).
 `packages/voxel/src/depth.ts` → `imageToSolid(frame, opts)`.
 
 The old approach (`relief` mode in `voxelize.ts`) faked depth from pixel **brightness** extruded
-from one face — so the background got extruded, the subject was never isolated, and it read as a
+from one face - so the background got extruded, the subject was never isolated, and it read as a
 flat card when spun edge-on. `imageToSolid` fixes all three:
 
-1. **Subject isolation** — `detectBackgroundMask` flood-fills the border-connected dominant colour
+1. **Subject isolation** - `detectBackgroundMask` flood-fills the border-connected dominant colour
    and removes it, so the object floats in air.
-2. **Depth from shape** — with no external depth map, a 2D chamfer distance transform
+2. **Depth from shape** - with no external depth map, a 2D chamfer distance transform
    (`silhouetteDistance`) "inflates" the silhouette: pixels deep inside bulge out, pixels near the
-   outline taper thin (a rounded dome). A real per-pixel depth map (`depthOf`) — from a Blender
-   depth pass or a monocular depth model — overrides the heuristic.
-3. **Centered + double-sided** — thickness is distributed symmetrically about the mid-plane, so the
+   outline taper thin (a rounded dome). A real per-pixel depth map (`depthOf`) - from a Blender
+   depth pass or a monocular depth model - overrides the heuristic.
+3. **Centered + double-sided** - thickness is distributed symmetrically about the mid-plane, so the
    front *and* back carry the image and the side silhouette shows the depth profile.
 
 **Accuracy guarantees** (`packages/voxel/test/depth-accuracy.test.ts`): the front-view projection
@@ -31,7 +31,7 @@ writes front/side projection PNGs; the live WebGL render is checked in a real br
 `apps/web/src/mesh3d.ts` → `greedyQuads` + `meshByMaterial`. The viewer no longer draws one cube
 per voxel. It:
 
-- **culls** any face that borders a solid neighbour (interior/occluded faces vanish) — a solid N³
+- **culls** any face that borders a solid neighbour (interior/occluded faces vanish) - a solid N³
   build drops from 6·N³ faces to ~6·N² shell faces;
 - **greedy-merges** coplanar same-block faces into big UV-tiled quads (a solid cube → exactly 6
   quads);
@@ -44,10 +44,10 @@ per voxel. It:
 
 `packages/voxel/src/animate.ts`. Two tiers:
 
-- **Transform animations** — a pure `(seconds, size) → pose` applied to the whole object each frame
+- **Transform animations** - a pure `(seconds, size) → pose` applied to the whole object each frame
   as an *absolute* pose (refresh-rate independent). Built-ins: `spin`, `bob`, `rock`, `tumble`,
   `pulse`, `orbit`. These replace the old baked 24-frame turntable (which aliased on rotation).
-- **Volume-sequence generators** — produce a list of `VoxelVolume` frames where the content moves:
+- **Volume-sequence generators** - produce a list of `VoxelVolume` frames where the content moves:
   `explodeAssemble`, `wave`, `buildUp`. These play through the frame scheduler and export straight
   to an animated datapack.
 

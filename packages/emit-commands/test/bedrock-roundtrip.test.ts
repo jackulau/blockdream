@@ -1,6 +1,6 @@
 // Round-trip for BOTH Bedrock animation paths:
-//  (a) vanilla behavior pack — simulate the emitted functions (dispatch tree → frame funcs).
-//  (b) Script-API addon — simulate the POOL delta cells the runtime applies.
+//  (a) vanilla behavior pack - simulate the emitted functions (dispatch tree → frame funcs).
+//  (b) Script-API addon - simulate the POOL delta cells the runtime applies.
 // Each must reconstruct every source frame exactly (Bedrock Y-flip + origin).
 
 import { describe, it, expect } from "vitest";

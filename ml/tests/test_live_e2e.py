@@ -64,7 +64,7 @@ def test_live_drive_streams_and_responds_to_input():
     frames = asyncio.run(_drive())
     assert len(frames) >= 9  # reset + 8 steps streamed
     # frames must actually change over the rollout (streaming works)
-    assert len(set(frames)) > 1, "all frames identical — no live generation"
+    assert len(set(frames)) > 1, "all frames identical - no live generation"
     # 'move right' should push the generated dot rightward over the run
     xs = [centroid_x(f) for f in frames]
     assert xs[-1] > xs[0] + 0.5, f"dot did not move right under 'move right': {xs[0]:.1f} -> {xs[-1]:.1f}"

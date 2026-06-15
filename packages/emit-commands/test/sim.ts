@@ -1,5 +1,5 @@
 // Shared command-pack simulator for round-trip tests. Executes a generated datapack /
-// behavior-pack's frame functions — following `function` calls and applying setblock/fill —
+// behavior-pack's frame functions - following `function` calls and applying setblock/fill -
 // to RECONSTRUCT the in-world wall, then compares it to the source frames. This proves
 // animation is byte-correct across editions, not merely structurally valid. Also includes
 // a POOL simulator for the Bedrock Script addon (delta cells, no mcfunctions).
@@ -45,13 +45,13 @@ export function runFunction(
     const t = l.split(/\s+/);
     if (t[0] === "setblock" || t[0] === "fill") applyCmd(grid, t);
     else if (t[0] === "function") runFunction(files, t[1]!, edition, grid, depth + 1);
-    // execute / scoreboard / forceload / tickingarea — irrelevant to reconstructing geometry
+    // execute / scoreboard / forceload / tickingarea - irrelevant to reconstructing geometry
   }
 }
 
 /**
  * Play frames 0..n-1 in order (keyframe then cumulative deltas) and snapshot the wall after
- * each. `setupRef` (optional) runs first — e.g. the 3D box-clear; 2D walls need none because
+ * each. `setupRef` (optional) runs first - e.g. the 3D box-clear; 2D walls need none because
  * frame 0 is a full keyframe.
  */
 export function playFrames(

@@ -83,11 +83,11 @@ class DriveTransition(nn.Module):
         cheat with "next_tel ≈ prev_tel" (consecutive telemetry barely changes) and so it ignores
         control + drifts/collapses over a long rollout. Rolling its own predictions forward makes
         that shortcut accumulate error, forcing it to actually USE the control and stay on-trajectory
-        — the fix for the flat, control-independent speed/yaw. RGB tokens stay single-step (AR decode
+        - the fix for the flat, control-independent speed/yaw. RGB tokens stay single-step (AR decode
         is too expensive to roll in-loop and is not the unstable modality).
 
         With n_history > 0 the (control, telemetry) window SLIDES with the model's own predicted
-        telemetry — the same feedback inference sees. `history` is the initial window (zeros =
+        telemetry - the same feedback inference sees. `history` is the initial window (zeros =
         fresh-reset condition; most steps of a K-window build real history as they go).
 
         Shapes: tel0 (B,n_tel), lidar0 (B,n_lidar), controls (B,K,n_control),

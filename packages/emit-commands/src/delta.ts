@@ -18,7 +18,7 @@ export interface FrameDelta {
 /**
  * Delta-encode a sequence of equally-sized quantized frames.
  * Frame 0 is a full keyframe (every cell). Each later frame lists only the
- * cells whose block changed from the previous frame — this is what keeps the
+ * cells whose block changed from the previous frame - this is what keeps the
  * per-tick command count bounded for vanilla playback.
  */
 export function computeDeltas(frames: QuantizedFrame[]): FrameDelta[] {

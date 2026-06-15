@@ -1,4 +1,4 @@
-# Mineflayer collector — real per-movement-type data ("comma.ai for Minecraft")
+# Mineflayer collector - real per-movement-type data ("comma.ai for Minecraft")
 
 comma.ai trains driving models on real fleet footage. This collects the Minecraft analogue: a
 [Mineflayer](https://github.com/PrismarineJS/mineflayer) bot drives each **movement type** on a real
@@ -8,21 +8,21 @@ on-ground, in-water, speed). A Python importer turns that into the trainer's tag
 the world model learns *real* per-skill dynamics instead of the synthetic stand-ins used to prove
 the conditioning mechanism.
 
-## Status — WORKING end to end (verified 2026-06-08 on macOS arm64, M4)
+## Status - WORKING end to end (verified 2026-06-08 on macOS arm64, M4)
 
 Produces real textured first-person mp4s for every movement type.
 
 - **Server**: run a **1.16.5** server headless on **JDK 8** (creative / flat / offline). Version
-  matters — see the render gotcha below.
+  matters - see the render gotcha below.
 - **Bot**: mineflayer connects + spawns creative; per-skill setup is pure creative API
-  (`give` / `placeBlock` / `mount` / `equip` / `creative.flyTo`) — no op/commands needed (`setupSkill`).
+  (`give` / `placeBlock` / `mount` / `equip` / `creative.flyTo`) - no op/commands needed (`setupSkill`).
 - **Render**: `canvas` (3.x) + headless-gl (`gl` 8.x) + the `canvas-webgl-shim.js` bridge (THREE renders
   into a headless-gl context; we readPixels→blit→encode and patch `gl.texImage2D` for ImageData/Canvas
-  texture sources). `collect.mjs` rolls its own capture: render each frame to PNG (camera set DIRECTLY —
+  texture sources). `collect.mjs` rolls its own capture: render each frame to PNG (camera set DIRECTLY -
   `setFirstPersonCamera` tweens over 50ms, so re-calling it per frame strands the camera at the origin),
   then assemble with `ffmpeg`. (prismarine-viewer's built-in `headless()` mp4 path finalised empty here.)
 
-### Render gotcha — use a pre-1.18 version (1.16.5)
+### Render gotcha - use a pre-1.18 version (1.16.5)
 prismarine-viewer **1.33** `worldrenderer.addColumn` only marks sections `y = 0..255` dirty, so a
 **1.18+** world (superflat ground at **y≈-60**, a *negative-Y* section) is never meshed → blank sky
 (entities still render, which is the tell). A **pre-1.18** world (1.16.5: ground at y≈4, positive Y) is
@@ -38,7 +38,7 @@ The data contract (`ml/scripts/import_mineflayer.py`'s `ticks_to_arrays`) is uni
 
 ## 1. A server to play on
 
-A local **1.16.5** flat creative server (offline-mode) you control — pre-1.18 so terrain meshes (see
+A local **1.16.5** flat creative server (offline-mode) you control - pre-1.18 so terrain meshes (see
 the render gotcha above):
 
 ```bash
@@ -49,7 +49,7 @@ java -Xmx2G -jar server.jar --nogui        # 1.16.5 runs on JDK 8
 ```
 
 `setupSkill` in `collect.mjs` handles the per-skill world setup itself in creative (water column for
-swim/boat, spawn+saddle+mount a pig, lay rails + a minecart, equip elytra + gain altitude) — no manual
+swim/boat, spawn+saddle+mount a pig, lay rails + a minecart, equip elytra + gain altitude) - no manual
 server prep needed.
 
 ## 2. Collect
@@ -63,10 +63,10 @@ node collect.mjs --host localhost --port 25565 \
 # -> out/<skill>.mp4  +  out/<skill>.json   (frames + per-tick action & physics)
 ```
 
-> **Back up `out/` — it is irreplaceable SOURCE footage.** `out/*.mp4` + `out/*.json` are the raw
+> **Back up `out/` - it is irreplaceable SOURCE footage.** `out/*.mp4` + `out/*.json` are the raw
 > recordings everything downstream is derived from, and they are swallowed by the generic `out/`
 > gitignore (never committed). Copy them somewhere safe before deleting anything or re-running the
-> collector — a re-run **overwrites** existing `out/<skill>.mp4` / `out/<skill>.json` in place.
+> collector - a re-run **overwrites** existing `out/<skill>.mp4` / `out/<skill>.json` in place.
 
 ## 3. Import into the trainer's pool format
 
@@ -87,11 +87,11 @@ data/pool_real_boat,data/pool_real_elytra,data/pool_real_pig,data/pool_real_mine
 ```
 
 Now the served model both **looks like real Minecraft** and produces **distinct per-movement-type
-dynamics** — the photoreal-and-conditioned result that synthetic data alone can't give (and the
+dynamics** - the photoreal-and-conditioned result that synthetic data alone can't give (and the
 `physics.npy` telemetry is there to train a physics-conditioned, multimodal variant next, exactly
 like the driving model's RGB+LiDAR+telemetry stack).
 
-## bridge-e2e — headless proof of the NO-MOD live path
+## bridge-e2e - headless proof of the NO-MOD live path
 
 `bridge-e2e.mjs` proves the whole no-mod live Minecraft pipeline end to end in one command,
 with **no mods, no Microsoft account, no GPU**: it boots a throwaway STOCK vanilla 1.21.1
@@ -99,13 +99,13 @@ server (`scripts/vanilla-server.sh`, offline-mode + RCON, localhost-only), joins
 bot (`bridgebot`) as the "player", launches the rcon-bridge sidecar
 (`packages/cli/src/rcon-bridge-cli.ts --mock-wm`, so no checkpoint/WS server is needed),
 walks + turns the bot while the sidecar polls its pose and paints 6 generated frames as a
-64×64 block wall at `(10,-60,10)` — then asserts over RCON that sampled wall cells genuinely
+64×64 block wall at `(10,-60,10)` - then asserts over RCON that sampled wall cells genuinely
 changed from flat-world air to palette blocks. Exit 0 = painted; nonzero keeps the temp
 server dir and prints its path for debugging.
 
 ```bash
 node tools/mineflayer-collector/bridge-e2e.mjs
-# [bridge-e2e] PASS in ~13 s — no-mod live path proven end-to-end (temp dir removed)
+# [bridge-e2e] PASS in ~13 s - no-mod live path proven end-to-end (temp dir removed)
 ```
 
 Needs JDK 21 (`/usr/libexec/java_home -v 21`). The one-time ~50MB Mojang server-jar download

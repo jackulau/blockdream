@@ -48,7 +48,7 @@ def prepare_pool(segments: int, seconds: float, fps: int, size: int, out: str, i
             done.add(rel)
             manifest.write_text(json.dumps(sorted(done)))
             print(f"[pool] {i + 1}/{segments} {rel.split('/')[-1]}: {frames.shape[0]} frames @ {size}px (cached)")
-        except Exception as e:  # noqa: BLE001 — skip + mark so re-runs don't retry
+        except Exception as e:  # noqa: BLE001 - skip + mark so re-runs don't retry
             skip.write_text(str(e)[:200])
             failed += 1
             print(f"[pool] {i + 1}/{segments} SKIP {rel.split('/')[-1]}: {str(e)[:80]}")
@@ -66,7 +66,7 @@ def load_pool(out: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     out_dir = Path(out)
     segs = sorted(out_dir.glob("seg_*.npz"))
     if not segs:
-        raise FileNotFoundError(f"no segments in {out_dir} — run prepare_pool first")
+        raise FileNotFoundError(f"no segments in {out_dir} - run prepare_pool first")
     frames_list, actions_list, pairs = [], [], []
     offset = 0
     for s in segs:

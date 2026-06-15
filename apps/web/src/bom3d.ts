@@ -1,4 +1,4 @@
-// Pure, DOM-free bill-of-materials aggregation for a voxel volume — the 3D counterpart of
+// Pure, DOM-free bill-of-materials aggregation for a voxel volume - the 3D counterpart of
 // blockart-core's renderBom counts. Counts voxels per map-colour id (EMPTY excluded), sorted
 // by count descending; the caller resolves ids to display info + markup.
 
@@ -12,7 +12,7 @@ export interface Bom3dRow {
   pct: number;
 }
 
-/** Count solid voxels by id in one volume (the built solid — what `setup` places). */
+/** Count solid voxels by id in one volume (the built solid - what `setup` places). */
 export function volumeBom(v: VoxelVolume): Bom3dRow[] {
   const counts = new Map<number, number>();
   let total = 0;

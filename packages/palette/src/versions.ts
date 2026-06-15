@@ -1,5 +1,5 @@
 /**
- * Minecraft version registry — the single source of truth for the format stamps
+ * Minecraft version registry - the single source of truth for the format stamps
  * written into emitted artifacts (datapack pack_format, NBT DataVersion, Bedrock
  * block/engine versions) and for resolving a requested version to the palette
  * data file that actually carries those colors.
@@ -7,7 +7,7 @@
  * Numbers are from the Minecraft Wiki "Pack format" and "Data version" tables.
  * The 1.21.x line is what the pipeline supports end-to-end (singular `function/`
  * datapack layout since 1.21, function macros since 1.20.2, `#minecraft:tick`
- * forever) — so one datapack with a `supported_formats` range genuinely loads
+ * forever) - so one datapack with a `supported_formats` range genuinely loads
  * across the whole line. To support a newer patch, add one row here.
  */
 
@@ -37,10 +37,10 @@ export const MC_VERSIONS: readonly McVersion[] = [
 
 /**
  * Default target when no `--version` is given: the compatibility FLOOR of the
- * supported line. A floor pack_format + DataVersion is the most portable stamp —
+ * supported line. A floor pack_format + DataVersion is the most portable stamp -
  * the datapack's `supported_formats` range (below) opens it on newer patches, and
  * the game's DataFixerUpper upgrades floor-stamped NBT on load. (Older patches
- * cannot upgrade a *future* stamp, so the floor — not the latest — is the safe default.)
+ * cannot upgrade a *future* stamp, so the floor - not the latest - is the safe default.)
  */
 export const DEFAULT_MC_VERSION = "1.21";
 
@@ -58,7 +58,7 @@ export const JAVA_DATAPACK_SUPPORTED: { readonly min_inclusive: number; readonly
 /**
  * Bedrock manifest `min_engine_version`. This is a FLOOR: a pack declaring
  * [1,21,0] loads on 1.21.0 and every later Bedrock version. Keep it at the floor
- * for maximum forward compatibility — do NOT raise it per requested version.
+ * for maximum forward compatibility - do NOT raise it per requested version.
  */
 export const BEDROCK_MIN_ENGINE: readonly [number, number, number] = [1, 21, 0];
 

@@ -1,11 +1,11 @@
-# FPS budget — what runs at what frame rate, honestly
+# FPS budget - what runs at what frame rate, honestly
 
 "30 fps" means different things in different parts of blockdream. This page is the honest
 per-technique breakdown so nobody over-claims. Two separate worlds:
 
-- **Browser demo** — the canvas the visitor sees. Display is locked smooth; *content* freshness
+- **Browser demo** - the canvas the visitor sees. Display is locked smooth; *content* freshness
   depends on the model.
-- **In-world (real Minecraft)** — physically bounded by command/packet throughput. This is where
+- **In-world (real Minecraft)** - physically bounded by command/packet throughput. This is where
   "30 fps full-screen" is simply not a thing in vanilla.
 
 ## Browser demo (`apps/web`)
@@ -18,7 +18,7 @@ per-technique breakdown so nobody over-claims. Two separate worlds:
 
 **"Locked smooth 30 fps" = the display never drops below refresh**, guaranteed by the decoupled
 loop in `apps/web/src/viewer.ts` (asserted by `scripts/check-render-loop.mjs`, now wired into
-`pnpm test`). We deliberately do **not** cap the display down to 30 — free-running at the monitor's
+`pnpm test`). We deliberately do **not** cap the display down to 30 - free-running at the monitor's
 refresh is strictly smoother, and ≥30 is the floor, not the target. The HUD shows
 `display fps · gen fps · latency ms` so the two rates are never conflated.
 
@@ -32,7 +32,7 @@ refresh is strictly smoother, and ≥30 is the floor, not the target. The HUD sh
 
 **The map-wall's real constraint** isn't compute, it's map loading: Minecraft takes ~10 ticks to
 load a *new* map id, so naive per-frame map creation runs ~2 fps. The fix is to **pre-cache the
-whole frame pool** (all map ids loaded once) and then only swap colours on already-loaded maps —
+whole frame pool** (all map ids loaded once) and then only swap colours on already-loaded maps -
 that's what gets you to 10–20 fps. Bandwidth: a 4×4 wall @ 10 fps full-change ≈ 2.6 MB/s per
 tracking player.
 
@@ -53,10 +53,10 @@ gets both by joining the Java server through Geyser.
 
 - **Browser display:** yes, today (≥ refresh, decoupled).
 - **Browser Minecraft *content*:** the few-step **diffusion** path is the >=30 fps answer
-  (parallel over space, fps ~independent of resolution) — `ml/scripts/bench_inference.py` measures
+  (parallel over space, fps ~independent of resolution) - `ml/scripts/bench_inference.py` measures
   ~47 fps for it even on a CPU floor vs ~4 fps for sequential 256-token AR (the current served
   model). Operator step: train + serve/export a diffusion MC checkpoint (the AR path is what's
   trained today). Driving content already clears 30.
-- **In-world:** no, and not claimed — vanilla caps ~10 fps, the map-wall mod targets ~20 fps.
+- **In-world:** no, and not claimed - vanilla caps ~10 fps, the map-wall mod targets ~20 fps.
   30 fps full-screen in real Minecraft is not physically available; we render smooth in the
   browser and stream to the map wall at map-resend speed.

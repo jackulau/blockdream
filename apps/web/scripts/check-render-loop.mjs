@@ -22,7 +22,7 @@ if (!/onMessage[\s\S]*?this\.pump\(\)/.test(viewer)) fail("the generation pump i
 const loopStart = viewer.indexOf("private startRenderLoop");
 const loopEnd = viewer.indexOf("private tick");
 const loopBody = viewer.slice(loopStart, loopEnd > loopStart ? loopEnd : undefined);
-if (/\.send\(/.test(loopBody)) fail("render loop sends on the socket — display still coupled to generation");
+if (/\.send\(/.test(loopBody)) fail("render loop sends on the socket - display still coupled to generation");
 
 for (const [name, src] of [
   ["world-model.ts", wm],

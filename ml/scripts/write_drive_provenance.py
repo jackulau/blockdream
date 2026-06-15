@@ -1,4 +1,4 @@
-"""Stamp the served driving checkpoint's PROVENANCE.json — the single source of truth
+"""Stamp the served driving checkpoint's PROVENANCE.json - the single source of truth
 `no_synthetic_guard.py` reads to prove the served driving world model is 100% REAL (comma.ai
 commaVQ), not the deprecated physics sim. Reads the checkpoint's `real_source`, the pool's
 `source.txt`, and re-runs the controllability eval so the recorded metrics are real, not asserted.
@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     real_source = ck.get("real_source")
     if real_source != "commavq":
-        raise SystemExit(f"served checkpoint real_source={real_source!r} — refusing to stamp it REAL "
+        raise SystemExit(f"served checkpoint real_source={real_source!r} - refusing to stamp it REAL "
                          "(only a commaVQ-trained checkpoint is the real served model)")
 
     pool = (ML / args.pool) if not Path(args.pool).is_absolute() else Path(args.pool)
@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
         "pools": [args.pool],
         "modality": "camera-only (commaVQ VQ tokens, 128/frame, codebook 1024); NO LiDAR (commaVQ has none)",
         "control_derivation": "control + telemetry derived from comma's REAL logged ego motion "
-                              "(.pose.npy: forward velocity + yaw rate) — zero synthesis",
+                              "(.pose.npy: forward velocity + yaw rate) - zero synthesis",
         "n_rollouts": n_roll,
         "controllability": {
             "coast_speed_mps": round(coast, 3), "throttle_speed_mps": round(thr, 3),
@@ -69,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     if not controllable:
         raise SystemExit(f"served checkpoint is NOT controllable (coast={coast:.2f} thr={thr:.2f} "
-                         f"lyaw={lyaw:.3f} ryaw={ryaw:.3f}) — refusing to stamp it as a good served model")
+                         f"lyaw={lyaw:.3f} ryaw={ryaw:.3f}) - refusing to stamp it as a good served model")
     out = served / "PROVENANCE.json"
     out.write_text(json.dumps(prov, indent=2))
     print(f"[write_drive_provenance] wrote {out} (data_source={src!r}, controllable={controllable})")

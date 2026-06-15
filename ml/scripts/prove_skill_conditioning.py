@@ -1,9 +1,9 @@
-"""Prove the movement-type (skill) conditioning ACTUALLY changes the model's rollout —
+"""Prove the movement-type (skill) conditioning ACTUALLY changes the model's rollout -
 i.e. selecting "boat" vs "walk" produces measurably different generated frames, not the same
 output behind a never-trained embedding.
 
 To be fast + reliable (no flaky image-tokenizer training), this trains the REAL conditioning
-modules — SkillRealEncoder + ARTransition — on a tiny token-level task where each skill has a
+modules - SkillRealEncoder + ARTransition - on a tiny token-level task where each skill has a
 DISTINCT learnable dynamics (walk shifts tokens by +1/step, boat by +5/step). After a short
 train, it rolls out from the SAME seed with skill=walk vs skill=boat and checks the rollouts
 differ AND each matches its own skill's dynamics better than the other's. Prints DISTINCT/SAME.
@@ -80,7 +80,7 @@ def main() -> int:
     print(f"[skill-conditioning] walk→walk acc {acc_walk*100:.0f}% · boat→boat acc {acc_boat*100:.0f}% · boat→walk(cross) {cross*100:.0f}%")
     distinct = differ >= 0.5 and acc_walk >= 0.6 and acc_boat >= 0.6 and acc_boat > cross + 0.2
     verdict = "DISTINCT" if distinct else "SAME"
-    print(f"[skill-conditioning] verdict: {verdict} — selecting boat vs walk changes the rollout")
+    print(f"[skill-conditioning] verdict: {verdict} - selecting boat vs walk changes the rollout")
     return 0 if distinct else 1
 
 

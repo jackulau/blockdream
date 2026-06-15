@@ -3,7 +3,7 @@
 // the existing, mature 2D block-wall animation pipeline (emit-commands datapack).
 //
 // The emit paths key on `mapColorId` (resolveBlock / map.dat), so paletteIndex is set to
-// the map-colour id for type compatibility — it is not used for block resolution here.
+// the map-colour id for type compatibility - it is not used for block resolution here.
 
 import type { QuantizedFrame } from "@blockdream/color-core";
 import { EMPTY, getVoxel, type VoxelVolume } from "./volume";

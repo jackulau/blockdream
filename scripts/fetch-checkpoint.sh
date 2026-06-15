@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# fetch-checkpoint.sh — download the released world-model checkpoint into ml/runs/skills_real/.
+# fetch-checkpoint.sh - download the released world-model checkpoint into ml/runs/skills_real/.
 #
-# Checkpoints are NOT in the repo (gitignored — single-copy training artifacts). The served
+# Checkpoints are NOT in the repo (gitignored - single-copy training artifacts). The served
 # Minecraft world model (runs/skills_real, all 9 movement types DISTINCT on real footage) ships
 # as a GitHub release asset. This fetches it so a fresh clone can run the demo + cast paths.
 #
@@ -18,7 +18,7 @@ URL="https://github.com/$REPO/releases/download/$TAG/latest.pt"
 
 mkdir -p "$DEST"
 if [ -s "$DEST/latest.pt" ]; then
-  echo "[fetch-checkpoint] ✓ $DEST/latest.pt already present ($(du -h "$DEST/latest.pt" | cut -f1 | tr -d ' ')) — skipping download"
+  echo "[fetch-checkpoint] ✓ $DEST/latest.pt already present ($(du -h "$DEST/latest.pt" | cut -f1 | tr -d ' ')) - skipping download"
   exit 0
 fi
 
@@ -29,12 +29,12 @@ else
   curl -fL --retry 3 -o "$DEST/latest.pt" "$URL"
 fi
 
-[ -s "$DEST/latest.pt" ] || { echo "✗ download produced an empty file — check $URL" >&2; exit 1; }
+[ -s "$DEST/latest.pt" ] || { echo "✗ download produced an empty file - check $URL" >&2; exit 1; }
 BYTES=$(stat -f %z "$DEST/latest.pt" 2>/dev/null || stat -c %s "$DEST/latest.pt")
-[ "$BYTES" -gt 10000000 ] || { echo "✗ checkpoint suspiciously small ($BYTES bytes) — corrupt download? removing" >&2; rm -f "$DEST/latest.pt"; exit 1; }
+[ "$BYTES" -gt 10000000 ] || { echo "✗ checkpoint suspiciously small ($BYTES bytes) - corrupt download? removing" >&2; rm -f "$DEST/latest.pt"; exit 1; }
 
 # Stamp the REAL-data provenance sidecar (gitignored, so it does not travel in the clone or the
-# release asset). The released checkpoint IS the all-real served model — without this, a fresh-clone
+# release asset). The released checkpoint IS the all-real served model - without this, a fresh-clone
 # fetch would trip no_synthetic_guard.py's strict provenance check (present checkpoint, no sidecar).
 if [ ! -f "$DEST/PROVENANCE.json" ]; then
   cat > "$DEST/PROVENANCE.json" <<'JSON'
@@ -45,7 +45,7 @@ if [ ! -f "$DEST/PROVENANCE.json" ]; then
   "pools": ["pool_real_general64", "pool_real_walk64", "pool_real_sprint64", "pool_real_jump64",
             "pool_real_swim", "pool_real_boat", "pool_real_elytra", "pool_real_pig", "pool_real_minecart"],
   "data_detail": "walk/general/sprint/jump = real OpenAI VPT footage; swim/boat/elytra/pig/minecart = real mineflayer footage",
-  "note": "Stamped by fetch-checkpoint.sh — the released v0.1.0 asset is the all-real served model.",
+  "note": "Stamped by fetch-checkpoint.sh - the released v0.1.0 asset is the all-real served model.",
   "goal": "029-world-model-all-real-no-synthetic"
 }
 JSON

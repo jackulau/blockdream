@@ -1,9 +1,9 @@
 // Animation toolkit for the 3D viewer. Two kinds:
-//   1. TRANSFORM animations — a pure (time → {position, rotation, scale}) function applied to the
+//   1. TRANSFORM animations - a pure (time → {position, rotation, scale}) function applied to the
 //      whole object every frame. Cheap + perfectly smooth (no baked geometry), refresh-rate
 //      independent because the pose is an ABSOLUTE function of elapsed seconds, not an accumulator.
 //      These replace the old single hard-coded turntable: spin, bob, rock, tumble, pulse, orbit.
-//   2. VOLUME-SEQUENCE generators — produce a list of VoxelVolume frames where the CONTENT moves
+//   2. VOLUME-SEQUENCE generators - produce a list of VoxelVolume frames where the CONTENT moves
 //      (explode⇄assemble, travelling wave, build-up). These play back through the frame scheduler
 //      and also export straight to an animated datapack.
 // All pure + deterministic → unit-testable, and the easing curves are shared by both.

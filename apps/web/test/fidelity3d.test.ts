@@ -1,6 +1,6 @@
 // ΔE2000-bounded proof that the 3D voxel path's color fidelity matches the 2D pixel-art
 // standard. The 3D path quantizes in the PLACEABLE solid-block color space (~60 colors,
-// one per base) while 2D uses the 244-color map-item palette — so 3D's perceptual error is
+// one per base) while 2D uses the 244-color map-item palette - so 3D's perceptual error is
 // necessarily higher, but it must stay within a bounded factor of the 2D path on the same
 // source at the same resolution, and the volume's FRONT PROJECTION must carry exactly the
 // quantized ids (preview == export, no second lossy step).
@@ -63,7 +63,7 @@ describe("3D voxel path color fidelity vs the 2D pixel-art path", () => {
   it("3D perceptual error is bounded relative to the 2D standard (ΔE2000)", () => {
     // Per-pixel ΔE is method-sensitive (error diffusion trades per-pixel error for spatial
     // average), so compare like-for-like. Measured 2026-06-10: nearest e2d 5.72 / e3d 9.26;
-    // floyd-steinberg e2d 9.84 / e3d 14.71 — the ~60-color placeable palette stays within
+    // floyd-steinberg e2d 9.84 / e3d 14.71 - the ~60-color placeable palette stays within
     // ~1.6× of the 244-color map palette on a saturated out-of-gamut source. Bound at 2.0×
     // + absolute caps with headroom; a broken matcher or palette regression blows past both.
     const eNearest2d = meanDeltaE(src, quantizeFrame(src, pal2d, { method: "none" }), pal2d);

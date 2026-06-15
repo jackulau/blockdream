@@ -1,7 +1,7 @@
-"""Loader for commaVQ (`commaai/commavq`) — ~100k segments of REAL driving video,
+"""Loader for commaVQ (`commaai/commavq`) - ~100k segments of REAL driving video,
 pre-tokenized with comma's VQ-VAE (128 tokens/frame) + ego pose. The RGB latent
 stage is already done, so it's an ideal small testbed for the recursive AR
-transition (and the in-browser rollout) on real driving — no LiDAR.
+transition (and the in-browser rollout) on real driving - no LiDAR.
 
 Download a shard:
     huggingface-cli download commaai/commavq --repo-type dataset \
@@ -33,7 +33,7 @@ def load_segment(token_npy: str, pose_npy: str | None = None) -> tuple[np.ndarra
 def pseudo_control(pose: np.ndarray) -> np.ndarray:
     """Derive [steer, throttle, brake]-like control from ego pose deltas.
     pose columns are assumed [..., yaw, ...]; we use frame-to-frame deltas of
-    position magnitude (→ throttle/brake) and heading (→ steer). Approximate —
+    position magnitude (→ throttle/brake) and heading (→ steer). Approximate -
     use comma2k19 CAN for true steering if you need it."""
     p = np.asarray(pose, dtype=np.float64)
     n = p.shape[0]
@@ -57,7 +57,7 @@ def pseudo_control(pose: np.ndarray) -> np.ndarray:
 
 def _heading(pose: np.ndarray) -> np.ndarray:
     """Per-frame heading (rad) from REAL ego pose: an explicit yaw column if present, else atan2 of
-    the position-delta (direction of travel). All real — derived from comma's logged ego trajectory."""
+    the position-delta (direction of travel). All real - derived from comma's logged ego trajectory."""
     p = np.asarray(pose, dtype=np.float64)
     if p.shape[1] >= 4:                     # commaVQ pose often carries an orientation triple
         return np.asarray(p[:, 3], dtype=np.float64)
@@ -78,7 +78,7 @@ def _pack_control_telemetry(speed_raw: np.ndarray, yaw_rate_raw: np.ndarray,
 
     Control is the real driving DEMAND (steer = real yaw command, throttle = real forward-speed
     demand, brake = real deceleration); telemetry is the real resulting state. Both come from the
-    SAME real signal so the world model learns a clean, real control→state map — no fabricated
+    SAME real signal so the world model learns a clean, real control→state map - no fabricated
     correlations. Robust (95th-pct) per-segment normalisation → unit-free, the honest choice since
     commaVQ ships no SI scale (use comma2k19 CAN for true SI units)."""
     T = len(speed_raw)
@@ -109,12 +109,12 @@ def _pack_control_telemetry(speed_raw: np.ndarray, yaw_rate_raw: np.ndarray,
 
 
 def commavq_control_telemetry(pose: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Derive ALIGNED (control, telemetry) from a REAL commaVQ pose file — zero synthesis.
+    """Derive ALIGNED (control, telemetry) from a REAL commaVQ pose file - zero synthesis.
 
     commaVQ ships `<seg>.pose.npy` (T,6) = comma's logged frame-to-frame EGO MOTION, NOT position:
         [v_forward, v_lateral, v_up, ω_roll, ω_pitch, ω_yaw]   (velocity m/s + angular rate rad/s,
     verified empirically: col0 ranges 0..~35 m/s, col5 is the dominant rotational channel = yaw).
-    So forward speed and yaw rate are read DIRECTLY off the real log — no integration/proxy:
+    So forward speed and yaw rate are read DIRECTLY off the real log - no integration/proxy:
         speed_raw = pose[:,0]   (real forward velocity)
         yaw_rate  = pose[:,5]   (real yaw rate; sign = turn direction)
     heading = cumulative yaw (for the sin/cos telemetry channels). NaNs (commaVQ leaves ~0.1% of rows,
@@ -130,7 +130,7 @@ def commavq_control_telemetry(pose: np.ndarray) -> tuple[np.ndarray, np.ndarray]
 
 
 def real_control_and_telemetry(pose: np.ndarray, speed_units_per_mps: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
-    """Derive ALIGNED (control, telemetry) from a POSITION-format ego pose [x,y,(z,)yaw] — zero
+    """Derive ALIGNED (control, telemetry) from a POSITION-format ego pose [x,y,(z,)yaw] - zero
     synthesis. For the (rarer) case where the source logs absolute position/heading (e.g. comma2k19
     trajectories) rather than commaVQ's velocity+rate. Speed = position-delta magnitude, yaw rate =
     heading change. For native commaVQ `.pose.npy` use `commavq_control_telemetry` (that format is
@@ -162,7 +162,7 @@ def build_real_pool(segments: list[tuple[str, str | None]], out_dir: str,
     """Build a REAL driving token pool from commaVQ segments → roll_*.npz {tokens,control,telemetry}.
 
     `segments` = list of (token_npy, pose_npy) paths; `pose_format` picks the real derivation
-    ('commavq' velocity+rate, the native format — default). Writes one rollout per segment plus a
+    ('commavq' velocity+rate, the native format - default). Writes one rollout per segment plus a
     `source.txt` provenance marker ('commavq-real'). Returns the number of rollouts written.
     This is the driving analogue of import_mineflayer.py: REAL footage in, no synthetic stand-ins.
     Control needs the ego log, so a segment WITHOUT a pose file is refused (never fabricated)."""

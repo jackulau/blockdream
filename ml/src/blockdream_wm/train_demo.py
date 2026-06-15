@@ -1,5 +1,5 @@
 """Train one demo to be visibly action-responsive and save a checkpoint the
-WebSocket server loads. Toy/CPU scale on the deterministic MovingDot world — the
+WebSocket server loads. Toy/CPU scale on the deterministic MovingDot world - the
 served model genuinely moves the dot in the commanded direction.
 
     python -m blockdream_wm.train_demo --demo walking --kind ar --out checkpoints/walking.pt
@@ -29,7 +29,7 @@ def centroid(frame: torch.Tensor) -> tuple[float, float]:
 def build_pairs(size: int, n_buttons: int, n_pos: int, step: float, seed: int):
     """Dense, step-aligned coverage so the free-running rollout never leaves the
     trained distribution (avoids autoregressive drift). The agent lives on a grid
-    of positions spaced `step` apart and is clamped to a padded interior — so it
+    of positions spaced `step` apart and is clamped to a padded interior - so it
     slides to a wall and stays there (a trained, stable state) instead of drifting.
     """
     env = demo_env(size=size, n_buttons=n_buttons, step=step)

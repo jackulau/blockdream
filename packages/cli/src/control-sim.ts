@@ -47,7 +47,7 @@ function wrapDeg(d: number): number {
 
 /**
  * Derive a world-model action from two consecutive server-observed poses. This is exactly
- * what InputCapture.java does on the server thread — so a player joins with a STOCK vanilla
+ * what InputCapture.java does on the server thread - so a player joins with a STOCK vanilla
  * client and simply walks/looks to drive the model. No keyboard hook, no client mixin.
  */
 export function deriveAction(prev: Pose, cur: Pose, skill?: string): Action {

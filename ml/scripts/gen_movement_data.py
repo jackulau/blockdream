@@ -1,15 +1,15 @@
 """Synthetic per-movement-type data generator.
 
-⚠️  DEPRECATED — PROOF-ONLY, NOT USED BY ANY SERVED MODEL. ⚠️
+⚠️  DEPRECATED - PROOF-ONLY, NOT USED BY ANY SERVED MODEL. ⚠️
 The served Minecraft world model (runs/skills_real) is now trained on 100% REAL footage for all 9
-movement types — real human VPT (walk/general/sprint/jump) + real mineflayer gameplay
+movement types - real human VPT (walk/general/sprint/jump) + real mineflayer gameplay
 (swim/boat/elytra/pig/minecart). This generator exists ONLY as the historical conditioning proof
 that produced the superseded runs/skills checkpoint. It MUST NOT feed any served/live checkpoint;
 the no_synthetic_guard.py gate enforces that pool_synth_* never appears in a live training path.
 Kept for reproducibility of the original proof only.
 
 The VPT contractor data is walking/general only, so the boat/swim/elytra/pig/minecart skill
-embeddings never get a gradient — selecting "boat" in the tester does nothing. This generates
+embeddings never get a gradient - selecting "boat" in the tester does nothing. This generates
 per-skill pools with DISTINCT, learnable dynamics (different scroll speed + colour cast +
 bob), in the exact on-disk pool format the real trainer consumes (frames (N,H,W,3) uint8,
 actions (N,11) float32, skill.txt). It was a stand-in so conditioning was trainable + provable
@@ -57,7 +57,7 @@ def skill_dynamics(prev: np.ndarray, action: np.ndarray, skill: str, t: int) -> 
     if cam_x:
         nxt = np.roll(nxt, int(round(cam_x * 4)), axis=1)  # camera pans horizontally
     # blend STRONGLY toward the skill colour cast so each movement type has an unmistakable,
-    # fast-learnable regime — boat reads blue, walk green, pig pink within a couple of rollout steps,
+    # fast-learnable regime - boat reads blue, walk green, pig pink within a couple of rollout steps,
     # so per-skill divergence is large even at short rollouts (and learnable in far fewer steps).
     cast_arr = np.array(cast, dtype=np.float32) * 255.0
     nxt = (0.55 * nxt.astype(np.float32) + 0.45 * cast_arr).astype(np.uint8)
@@ -109,7 +109,7 @@ def main() -> None:
     args = ap.parse_args()
     for skill in [s.strip() for s in args.skills.split(",") if s.strip()]:
         if skill not in SKILL_PARAMS:
-            print(f"  ! unknown skill {skill!r} — skipping (known: {list(SKILL_PARAMS)})")
+            print(f"  ! unknown skill {skill!r} - skipping (known: {list(SKILL_PARAMS)})")
             continue
         path = write_pool(args.out, skill, args.segments, args.length, args.size)
         print(f"  ✓ {skill:9s} → {path} ({args.segments}×{args.length} frames @ {args.size}px)")

@@ -33,7 +33,7 @@ describe("gamut-mapped (hue-penalized) matching", () => {
     expect(gamut).toBeLessThan(naive * 0.8); // measured ~35–50% lower
   });
 
-  it("leaves near-neutral (low-chroma) inputs unchanged — no over-desaturation risk", () => {
+  it("leaves near-neutral (low-chroma) inputs unchanged - no over-desaturation risk", () => {
     for (const [r, g, b] of [[128, 128, 128], [60, 62, 64], [200, 198, 202]]) {
       const naive = nearestSrgb(r!, g!, b!, pal);
       const gamut = nearestSrgbHue(r!, g!, b!, pal, 0.8);

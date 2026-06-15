@@ -18,12 +18,12 @@ import java.nio.file.Path;
 /**
  * Entry point for the blockdream Map Wall mod. Two modes, auto-selected at server start:
  *
- *  1. STATIC playback — plays a precomputed block-art video on a wall of filled maps by
+ *  1. STATIC playback - plays a precomputed block-art video on a wall of filled maps by
  *     rewriting each map's 16384-byte color array every {@code speedTicks} (frames.bin).
  *
- *  2. LIVE world-model control — if {@code <world>/blockdream/live.json} exists, the mod
+ *  2. LIVE world-model control - if {@code <world>/blockdream/live.json} exists, the mod
  *     connects to the neural world-model server over WebSocket, derives a VPT-style action
- *     from the controlling player's per-tick movement (a STOCK vanilla client — no client
+ *     from the controlling player's per-tick movement (a STOCK vanilla client - no client
  *     mod needed), sends it, and paints each returned frame onto the map wall. The player
  *     literally walks around and the model's predicted world streams onto the wall in front
  *     of them. See WorldModelClient + InputCapture; the data pipeline is proven headless in

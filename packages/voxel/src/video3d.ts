@@ -1,10 +1,10 @@
 // Video (or GIF) → animated 3D blocks. Each frame becomes a real subject-isolated SOLID (via
 // imageToSolid), not the old flat depth-2 slab. Two stability measures keep the animation from
 // boiling frame-to-frame:
-//   • GLOBAL depth normalization — the silhouette-thickness of every frame is normalized by ONE
+//   • GLOBAL depth normalization - the silhouette-thickness of every frame is normalized by ONE
 //     shared maximum across the whole clip, so the build doesn't pop thicker/thinner as the subject
 //     grows or shrinks. (Per-frame normalization is the usual cause of depth flicker.)
-//   • optional temporal EMA — light exponential smoothing of the thickness field across frames.
+//   • optional temporal EMA - light exponential smoothing of the thickness field across frames.
 // A real per-pixel depth source (a monocular depth model, or a Blender depth-pass sidecar) can be
 // supplied via opts.depthForFrame to replace the silhouette heuristic on natural footage.
 

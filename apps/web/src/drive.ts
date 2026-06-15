@@ -1,4 +1,4 @@
-// Driving world-model tester — decoupled: smooth RGB render loop (Viewer) + LiDAR BEV
+// Driving world-model tester - decoupled: smooth RGB render loop (Viewer) + LiDAR BEV
 // and telemetry HUD updated per generated frame.
 
 import { Viewer } from "./viewer";

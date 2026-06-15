@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# fabric-install.sh — build the optional high-FPS Fabric mod (blockdream-mapwall).
+# fabric-install.sh - build the optional high-FPS Fabric mod (blockdream-mapwall).
 #
 # The project's primary paths need NO Fabric (see docs/play-without-fabric.md).
 # This is the optional upgrade: per-tick map-colour swaps instead of thousands of
-# setblocks per frame — cheap enough for real video on an item-frame map wall.
+# setblocks per frame - cheap enough for real video on an item-frame map wall.
 #
 # What it does:
 #   1. Preflight JDK 21 (Fabric Loom for MC 1.21.1 requires Gradle itself on Java 21)
 #   2. Build the mod jar with the pinned Gradle 8.10 wrapper
-#   3. Print the manual next steps (these touch YOUR Minecraft install — not automated)
+#   3. Print the manual next steps (these touch YOUR Minecraft install - not automated)
 #
 # Usage:
 #   bash scripts/fabric-install.sh                # build + print install steps
@@ -75,7 +75,7 @@ cat <<EOF
        <world>/blockdream/live.json
      with:
        { "url": "ws://127.0.0.1:8765", "cols": 4, "rows": 2, "skill": "walk" }
-     (static playback instead: render a frame pool to <world>/blockdream/frames.bin —
+     (static playback instead: render a frame pool to <world>/blockdream/frames.bin -
       see mods/java-fabric/README.md "Wiring a wall")
 
   5. Start the world-model server:

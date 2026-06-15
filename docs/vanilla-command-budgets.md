@@ -1,4 +1,4 @@
-# Vanilla command-block playback — budgets
+# Vanilla command-block playback - budgets
 
 The vanilla path places one solid block per pixel and animates via delta-encoded
 `.mcfunction` frames (see `@blockdream/emit-commands`). Two limits bound it:
@@ -31,12 +31,12 @@ Playback advances one frame every `speedTicks` ticks (20 tps):
 The **sustained** cost is the *delta* size per advanced frame, not the keyframe.
 A talking-head / low-motion clip at 64×64 changes a few hundred cells/frame →
 trivially runs at 10 fps. High-motion full-frame change at 128×128 (16k setblocks
-every advance) will hitch — prefer lower resolution, lower fps, or the modded
+every advance) will hitch - prefer lower resolution, lower fps, or the modded
 map-wall path (`@blockdream/emit-java`) for high-motion content.
 
 ## Rules of thumb
 - **Low motion, hero quality** → vanilla blocks, 64–128 wide, 5–10 fps.
 - **High motion / video** → map-item wall (modded/server path), which swaps a
   16384-byte array per map instead of thousands of block updates.
-- Always `forceload` (Java) / `tickingarea` (Bedrock) the build area — included
+- Always `forceload` (Java) / `tickingarea` (Bedrock) the build area - included
   in generated `setup`.

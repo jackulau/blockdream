@@ -1,9 +1,9 @@
-# The Blockdream guide — image/GIF/video → blocks in vanilla Minecraft
+# The Blockdream guide - image/GIF/video → blocks in vanilla Minecraft
 
 Zero to an animated block wall in your own world, end to end. Everything on this page is
-**100% vanilla** — no mods, no external tools; the deeper docs are linked where you might
+**100% vanilla** - no mods, no external tools; the deeper docs are linked where you might
 want them. (Want the *neural world model* in Minecraft instead of your own media? Same
-import flow — see [Cast the world model](#cast-the-world-model-instead-of-a-clip) below.)
+import flow - see [Cast the world model](#cast-the-world-model-instead-of-a-clip) below.)
 
 ## Install
 
@@ -14,7 +14,7 @@ pnpm -r --filter "./packages/**" build
 alias blockdream='npx tsx packages/cli/src/index.ts'   # how this guide invokes the CLI
 ```
 
-That's the whole renderer — Node only. (`ffmpeg` on PATH is needed to decode
+That's the whole renderer - Node only. (`ffmpeg` on PATH is needed to decode
 images/GIFs/video: `brew install ffmpeg` / `apt install ffmpeg`.) The ML world-model side
 is optional and has its own [quickstart](../README.md#quickstart-fresh-clone).
 
@@ -39,7 +39,7 @@ side-by-side source | block-art PNG.
 
 | Target | You get | Plays in | Best for |
 |---|---|---|---|
-| `datapack` *(default)* | `blockdream.zip` | **Vanilla Java** | 2D image/video wall of real blocks — the standard choice |
+| `datapack` *(default)* | `blockdream.zip` | **Vanilla Java** | 2D image/video wall of real blocks - the standard choice |
 | `voxel3d` | `blockdream_3d.zip` | **Vanilla Java** | real 3D builds + 3D animation from an image/video ([how it works](./3d-and-animation.md)) |
 | `behaviorpack` | `blockdream.mcpack` | **Vanilla Bedrock** | the same block wall on phones/consoles/Win10 |
 | `bedrock-script` | `blockdream-script.mcpack` | Bedrock + “Beta APIs” toggle | smoother Bedrock playback (Script API) |
@@ -58,7 +58,7 @@ Usually you don't have to: Java datapacks declare `supported_formats`, so the sa
 “incompatible pack” warning, and Bedrock packs use a forward-compatible **1.21.0 floor**.
 `--version 1.21.5` pins an exact `pack_format`/`DataVersion` if you want the stamp to
 match one release; an unsupported version fails fast and prints the supported list.
-Details: [README — version support](../README.md#minecraft-version-support).
+Details: [README - version support](../README.md#minecraft-version-support).
 
 ## Import into Java (vanilla)
 
@@ -67,10 +67,10 @@ Details: [README — version support](../README.md#minecraft-version-support).
    - Server: `<server>/world/`
 2. Copy **`blockdream.zip`** into `…/<World>/datapacks/`.
 3. In game: `/reload` (or rejoin the world).
-4. `/function blockdream:setup` — one-time: scoreboards, force-loads the area, paints frame 0.
-5. `/function blockdream:start` — play. `/function blockdream:stop` — pause.
+4. `/function blockdream:setup` - one-time: scoreboards, force-loads the area, paints frame 0.
+5. `/function blockdream:start` - play. `/function blockdream:stop` - pause.
 
-The wall builds at the fixed origin **`0 64 0`** (on the `z=0` plane, facing +Z) — fly
+The wall builds at the fixed origin **`0 64 0`** (on the `z=0` plane, facing +Z) - fly
 there. For a `voxel3d` pack the namespace is `blockdream_3d`
 (`/function blockdream_3d:setup` … `:start`). No world handy?
 `bash scripts/vanilla-server.sh --datapack out/datapack/blockdream.zip` bootstraps a
@@ -78,7 +78,7 @@ throwaway localhost vanilla server with the pack pre-installed.
 
 ## Import into Bedrock (vanilla)
 
-1. Double-click **`blockdream.mcpack`** — Minecraft imports it.
+1. Double-click **`blockdream.mcpack`** - Minecraft imports it.
 2. World settings → **Behavior Packs** → activate “blockdream block-art video”.
 3. In game: `/function blockdream/setup` then `/function blockdream/start`
    (note Bedrock uses `/` in function paths, not `:`).
@@ -90,7 +90,7 @@ inside each pack): [load into Minecraft](./load-into-minecraft.md).
 
 ## Cast the world model (instead of a clip)
 
-The neural world model feeds the **same import flow** — roll it offline into a datapack,
+The neural world model feeds the **same import flow** - roll it offline into a datapack,
 or paint it live over RCON while your movement steers it:
 
 ```bash
@@ -102,42 +102,42 @@ Live, mod-free control (~2 fps, three terminals) and the optional high-FPS Fabri
 
 ## Troubleshooting
 
-**“Unknown function blockdream:setup”** — the pack isn't loaded:
-- The zip must sit in `…/<World>/datapacks/` (per-world — not `.minecraft/datapacks/`), then `/reload`.
+**“Unknown function blockdream:setup”** - the pack isn't loaded:
+- The zip must sit in `…/<World>/datapacks/` (per-world - not `.minecraft/datapacks/`), then `/reload`.
 - `/datapack list` must show `[file/blockdream.zip]` under the enabled packs. Listed as
   disabled? `/datapack enable "file/blockdream.zip"`.
 - If you unzipped and re-zipped it, make sure `pack.mcmeta` is at the **archive root**
   (no extra folder layer). Easiest: use the emitted zip or the emitted folder as-is.
 
-**Can't run `/function` at all** — you need command permission: singleplayer requires
+**Can't run `/function` at all** - you need command permission: singleplayer requires
 cheats (world setting, or *Open to LAN → Cheats ON* for an existing world); on a server,
 run it as an op or from the server console.
 
-**Red “incompatible pack” warning** — shouldn't happen on Java 1.21.x (the pack declares
+**Red “incompatible pack” warning** - shouldn't happen on Java 1.21.x (the pack declares
 `supported_formats`). On older snapshots/releases (< 1.21) the macro-based driver isn't
 supported; on a newer line, regenerate with the matching `--version`.
 
-**Pack loads, but no blocks appear** — did you run `…:setup`? It paints frame 0 even in
-unloaded chunks (it force-loads the strip). The wall is at `0 64 0`, `z=0` plane — it
+**Pack loads, but no blocks appear** - did you run `…:setup`? It paints frame 0 even in
+unloaded chunks (it force-loads the strip). The wall is at `0 64 0`, `z=0` plane - it
 builds *in the air* there; fly to it. Coordinates occupied by your builds? The wall
-overwrites the plane it paints — generate in a fresh world or relocate your build.
+overwrites the plane it paints - generate in a fresh world or relocate your build.
 
-**Animation doesn't advance** — `setup` only paints frame 0; run
+**Animation doesn't advance** - `setup` only paints frame 0; run
 `/function blockdream:start`. Single images have one frame (nothing to animate). If chat
 spams command feedback, `/gamerule sendCommandFeedback false`.
 
-**It's slow / the server lags** — shrink the wall (`--grid 48x36`), slow the clock
+**It's slow / the server lags** - shrink the wall (`--grid 48x36`), slow the clock
 (`--speed 4` = 5 fps), or cap frames (`--max-frames 100`). The defaults (64×64 @ 10 fps,
 delta-encoded + `/fill`-batched) are tuned to stay well inside vanilla's per-tick budget:
 [vanilla command budgets](./vanilla-command-budgets.md).
 
-**Bedrock import does nothing** — import the `.mcpack` again (Minecraft shows an “Import
+**Bedrock import does nothing** - import the `.mcpack` again (Minecraft shows an “Import
 successful” toast), activate it under **Behavior Packs** *on that world*, and remember
 Bedrock function paths use `/function blockdream/setup` (slash, not colon).
 
 ## Is this actually proven?
 
-Yes — beyond unit tests, a live gate renders a clip through this exact CLI, installs the
+Yes - beyond unit tests, a live gate renders a clip through this exact CLI, installs the
 zip into a **stock vanilla 1.21.1 server**, and asserts over RCON that the pack loads
 (boot + `/reload`), `setup` paints the keyframe **cell-exactly**, and `start` really
 animates: `BLOCKDREAM_E2E=1 bash scripts/verify-all.sh` (or run

@@ -10,7 +10,7 @@ const BLOCKS = join(HERE, "..", "public", "blocks");
 const MANIFEST = join(BLOCKS, "manifest.json");
 const THRESHOLD = 0.98; // ≥98% of palette blocks must resolve to a real texture
 const ALLOWED_UNMAPPED = new Set([
-  "minecraft:pointed_dripstone", // non-cube spike — no flat top-face texture; swatch is correct
+  "minecraft:pointed_dripstone", // non-cube spike - no flat top-face texture; swatch is correct
 ]);
 
 const fail = (m) => {
@@ -19,7 +19,7 @@ const fail = (m) => {
 };
 
 if (!existsSync(MANIFEST)) {
-  fail(`no manifest at ${MANIFEST} — run: python3 apps/web/scripts/fetch-block-textures.py`);
+  fail(`no manifest at ${MANIFEST} - run: python3 apps/web/scripts/fetch-block-textures.py`);
 }
 const m = JSON.parse(readFileSync(MANIFEST, "utf8"));
 const total = m.block_count ?? 0;

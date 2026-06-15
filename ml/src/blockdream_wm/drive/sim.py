@@ -1,9 +1,9 @@
-"""DEPRECATED — SYNTHETIC, NOT SERVED. A physics SIMULATOR that synthesizes driving observations;
+"""DEPRECATED - SYNTHETIC, NOT SERVED. A physics SIMULATOR that synthesizes driving observations;
 the served driving world model is now trained on 100% REAL comma.ai commaVQ footage (see
 `drive.commavq`). Kept for research/repro only.
 
 Driving environment: an oval track (walls), raycast LiDAR, ego-centric top-down
-RGB render, and telemetry — the multimodal observation (RGB + LiDAR + telemetry)
+RGB render, and telemetry - the multimodal observation (RGB + LiDAR + telemetry)
 the world model learns to predict, driven by (steer, throttle, brake)."""
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def _walls_from_centerline(cl: np.ndarray, width: float) -> np.ndarray:
     return np.asarray(segs, dtype=np.float64)
 
 
-# track shapes — all closed, non-self-intersecting, so the offset corridor is well-defined.
+# track shapes - all closed, non-self-intersecting, so the offset corridor is well-defined.
 TRACK_KINDS = ("oval", "circle", "wavy", "peanut")
 
 
@@ -74,7 +74,7 @@ class DriveConfig:
     img_size: int = 64
     view_range: float = 45.0   # meters shown around the car (half-extent)
     dt: float = 1.0 / 15.0
-    track: str = "oval"        # track shape (see TRACK_KINDS) — vary across rollouts for richer data
+    track: str = "oval"        # track shape (see TRACK_KINDS) - vary across rollouts for richer data
 
 
 class DriveSim:

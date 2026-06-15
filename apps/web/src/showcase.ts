@@ -92,7 +92,7 @@ const drHeld = heldFor(drRgb);
 let drTel: number[] = [];
 
 // Defensive telemetry guard: the drive server sanitizes its emit (drive D1), but never let a
-// NaN/Inf or off-physical value reach the HUD — map non-finite → 0 and clamp to physical ranges.
+// NaN/Inf or off-physical value reach the HUD - map non-finite → 0 and clamp to physical ranges.
 const finiteClamp = (x: number, lo: number, hi: number): number =>
   Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : 0;
 
@@ -265,7 +265,7 @@ async function setup3dViewer(): Promise<void> {
   const bomEl = $<HTMLUListElement>("v3-bom");
   await loadTextureManifest();
 
-  // bill-of-materials for the built volume — same markup contract as blockart-core's renderBom,
+  // bill-of-materials for the built volume - same markup contract as blockart-core's renderBom,
   // counted by the pure volumeBom helper and named by the SAFE block that is actually placed.
   function renderBom3d(vol: VoxelVolume): void {
     const useTex = hasLocalTextures();
@@ -382,7 +382,7 @@ async function setup3dViewer(): Promise<void> {
   img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
   img.src = "/test-assets/pixelart.png";
 
-  // "build 3D from image" re-quantizes the SOURCE colors in the 3D palette — not a nearest
+  // "build 3D from image" re-quantizes the SOURCE colors in the 3D palette - not a nearest
   // subsample of the already-dithered 2D map-palette frame (which compounds two quantizers)
   $<HTMLButtonElement>("v3-rebuild").addEventListener("click", () => {
     const rgb = ba.getSourceRgb(40);

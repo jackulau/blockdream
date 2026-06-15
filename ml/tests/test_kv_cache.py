@@ -1,5 +1,5 @@
 """KV-cached ARTransition.generate must reproduce the un-cached greedy rollout
-(same tokens) while being much faster — the speed win behind 30fps serving."""
+(same tokens) while being much faster - the speed win behind 30fps serving."""
 
 from __future__ import annotations
 

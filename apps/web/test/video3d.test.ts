@@ -41,7 +41,7 @@ describe("framesToAnimated3d", () => {
     }
   });
 
-  it("keeps a stable grid size across all frames (temporal stability — no per-frame rescale)", () => {
+  it("keeps a stable grid size across all frames (temporal stability - no per-frame rescale)", () => {
     const frames = [squareFrame(20, 4, 2, 2), squareFrame(20, 10, 5, 5), squareFrame(20, 6, 12, 12)];
     const vols = framesToAnimated3d(frames, { maxDepth: 12 });
     expect(vols.every((v) => v.sx === 20 && v.sy === 20 && v.sz === 12)).toBe(true);

@@ -1,6 +1,6 @@
 // The "spin" engine: rotate a volume about an axis into an animation. Nearest-neighbour
 // inverse sampling keeps the output the same dimensions and avoids holes. spin() returns
-// a full turn split into nFrames — feed those to the 3D emitter or project them to 2D.
+// a full turn split into nFrames - feed those to the 3D emitter or project them to 2D.
 
 import { createVolume, getVoxel, setVoxel, EMPTY, type VoxelVolume } from "./volume";
 

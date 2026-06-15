@@ -20,7 +20,7 @@ def test_camera_bin_roundtrip_within_bin_width():
     cam = torch.linspace(-1, 1, 21).unsqueeze(1)  # (21, 1)
     idx = bin_camera(cam, bins)
     assert int(idx.min()) >= 0 and int(idx.max()) < bins
-    back = unbin_camera(idx, bins)  # (21, 1) — same shape, no broadcast
+    back = unbin_camera(idx, bins)  # (21, 1) - same shape, no broadcast
     half_bin = 1.0 / (bins - 1)
     assert torch.all((back - cam).abs() <= half_bin + 1e-6)
 

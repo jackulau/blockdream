@@ -1,4 +1,4 @@
-"""Unit tests for eval_drive_quality's pure helpers — no checkpoint, no model, fast."""
+"""Unit tests for eval_drive_quality's pure helpers - no checkpoint, no model, fast."""
 
 import importlib.util
 import math
@@ -79,7 +79,7 @@ def test_verdict_pass_and_fail():
 
 def test_thresholds_have_headroom_over_recorded_measurements():
     # The recorded measurements in the module docstring/comment must stay below the gate
-    # thresholds — guards against someone tightening a threshold under the known-good values.
+    # thresholds - guards against someone tightening a threshold under the known-good values.
     measured = {"tel_mse": 0.0021, "lidar_mse": 0.0058, "rgb_ce": 1.32,
                 "drift_speed_mae": 4.32, "drift_yaw_mae": 0.158}
     ok, _ = edq.verdict(measured, edq.THRESHOLDS)

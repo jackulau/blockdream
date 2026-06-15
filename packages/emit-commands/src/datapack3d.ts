@@ -1,4 +1,4 @@
-// 3D voxel datapack emitter — the command-block builder for 3D block builds and 3D
+// 3D voxel datapack emitter - the command-block builder for 3D block builds and 3D
 // animations (e.g. a spin). Same 100%-vanilla playback machinery as the 2D wall
 // (tick-driven scoreboard counter + macro dispatch), but each frame is a VoxelVolume
 // and cells carry a Z. The build region is cleared once with /fill, then keyframe 0
@@ -135,7 +135,7 @@ export function generateVoxelDatapack(
     ].join("\n"),
   );
 
-  // start re-acquires the forceload that stop releases — stop fully frees the chunks
+  // start re-acquires the forceload that stop releases - stop fully frees the chunks
   // (server-friendly: a paused animation keeps nothing loaded), start gets them back.
   files.set(
     `${fnDir}/start.mcfunction`,

@@ -1,6 +1,6 @@
 // Multi-core emission: spread the CPU-bound per-frame work (fill-batching) across real
 // OS threads (node worker_threads), then merge in frame order. Output is byte-identical
-// to the serial path — parallelism is an efficiency win, never a correctness change.
+// to the serial path - parallelism is an efficiency win, never a correctness change.
 // (The browser viewer uses vite-native Workers for the same effect in-page.)
 
 import { Worker } from "node:worker_threads";

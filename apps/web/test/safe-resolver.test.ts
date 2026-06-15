@@ -1,5 +1,5 @@
 // Regression contract for the web export resolver: NO map-colour id may ever resolve to a
-// block that's unsafe to place in a user's world — flowing water/lava, slime_block, or any
+// block that's unsafe to place in a user's world - flowing water/lava, slime_block, or any
 // palette entry flagged biome-dependent or support-required. This is the bug the old
 // blockForBase(id>>2) showcase resolver had (it returned the raw representative).
 import { describe, it, expect } from "vitest";

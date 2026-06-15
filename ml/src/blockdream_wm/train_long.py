@@ -32,7 +32,7 @@ from .device import pick_device, device_name
 def _atomic_save(obj, path: Path) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     torch.save(obj, tmp)
-    os.replace(tmp, path)  # atomic — a crash mid-write can't corrupt latest.pt
+    os.replace(tmp, path)  # atomic - a crash mid-write can't corrupt latest.pt
 
 
 def _log(out: Path, row: dict) -> None:
@@ -47,7 +47,7 @@ def _log(out: Path, row: dict) -> None:
 
 def _dump_sample(tok: Tokenizer, frames: torch.Tensor, val_idx: np.ndarray, out: Path, tag: str, dev) -> None:
     sel = val_idx[:4] if len(val_idx) >= 4 else np.arange(min(4, frames.shape[0]))
-    x = frames[sel].to(dev).float().div(255)  # frames stored uint8 — cast at use
+    x = frames[sel].to(dev).float().div(255)  # frames stored uint8 - cast at use
     with torch.no_grad():
         recon = tok(x).recon.clamp(0, 1)
     def row(t):
@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     # data (one or more movement-type-tagged pools)
     dirs = args.pools.split(",") if args.pools else [args.pool]
     frames_np, actions_np, pairs, skills_np = load_pools(dirs)
-    # Keep frames as uint8 on CPU and cast per-batch — float32 here would be ~4x the RAM
+    # Keep frames as uint8 on CPU and cast per-batch - float32 here would be ~4x the RAM
     # (e.g. ~16 GB for 79k 128px frames) and OOM a 24 GB unified-memory Mac mid-run.
     frames = torch.from_numpy(frames_np).permute(0, 3, 1, 2).contiguous()  # (N,3,H,W) uint8 on CPU
     buttons = torch.from_numpy(actions_np[:, :9]).float()
@@ -133,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     def save(tag: str, loss: float, val: float):
         _atomic_save(_state(), latest)
         # keep the BEST-by-val checkpoint too: AR val loss can rise late on small data (overfit),
-        # which collapses per-skill divergence — best.pt preserves the peak model to serve/export.
+        # which collapses per-skill divergence - best.pt preserves the peak model to serve/export.
         if val > 0 and val < best_val[0]:
             best_val[0] = val
             _atomic_save(_state(), best_path)
@@ -167,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if time_up():
         save(f"stop_{phase}", 0.0, 0.0)
-        print("[train_long] time budget reached — checkpoint saved, resume to continue")
+        print("[train_long] time budget reached - checkpoint saved, resume to continue")
         return 0
 
     # precompute tokens for the pool (cached)

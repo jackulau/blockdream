@@ -1,18 +1,18 @@
 # blockdream
 
-Neural world models of Minecraft that you can **play** — in the browser *and* inside
-**vanilla Minecraft itself** — plus a block-art renderer that turns images, GIFs and videos
+Neural world models of Minecraft that you can **play** - in the browser *and* inside
+**vanilla Minecraft itself** - plus a block-art renderer that turns images, GIFs and videos
 into native Minecraft builds. An action-conditioned autoregressive world model (all 9 movement
 types trained on genuine real footage), a latent-diffusion track exported to ONNX for a
 server-free in-browser engine, and a separate driving world model share one ML core; the
 renderer colour-matches in OKLab and emits maps, structures, datapacks and behaviour packs
 for **both Java and Bedrock**, in 2D walls and real 3D voxel builds with animation.
 
-![Blockdream demo — the browser world-model viewers and block-art renders running side by side](./blockdream-demo-full.jpeg)
+![Blockdream demo - the browser world-model viewers and block-art renders running side by side](./blockdream-demo-full.jpeg)
 
 ## Play it in Minecraft
 
-You do **not** need Fabric — or any mod — to put the neural world model inside Minecraft.
+You do **not** need Fabric - or any mod - to put the neural world model inside Minecraft.
 Full guide, honest FPS numbers and security notes: [docs/play-without-fabric.md](./docs/play-without-fabric.md).
 
 **Offline cast (no mods, one command).** Roll the skill-conditioned world model and emit a
@@ -30,7 +30,7 @@ and tells you exactly what's missing.
 
 **Live RCON bridge (no mods, your movement drives the model).** A sidecar process polls a
 stock vanilla server over RCON and repaints a block wall with the model's predicted frames,
-steered by *your* in-game movement — three commands in three terminals:
+steered by *your* in-game movement - three commands in three terminals:
 
 ```bash
 bash scripts/vanilla-server.sh    # 1. throwaway vanilla server (localhost-only, prints the RCON password once)
@@ -39,11 +39,11 @@ npx tsx packages/cli/src/rcon-bridge-cli.ts --rcon-pass <pass>   # 3. the bridge
 ```
 
 Honest expectations: every command is an RCON round-trip, so the wall updates at roughly
-2 fps — genuinely live, genuinely mod-free. Details in
+2 fps - genuinely live, genuinely mod-free. Details in
 [docs/play-without-fabric.md](./docs/play-without-fabric.md).
 
 **Fabric mod (the high-FPS alternative).** Want smooth video instead? The optional
-[Fabric mod](./mods/java-fabric/README.md) swaps each map's colour array per tick — real
+[Fabric mod](./mods/java-fabric/README.md) swaps each map's colour array per tick - real
 video on an item-frame map wall (up to ~20 fps), with the same live world-model control:
 
 ```bash
@@ -58,7 +58,7 @@ pnpm install
 pnpm -r --filter "./packages/**" build   # block-art renderer + CLI work right away, no ML needed
 ```
 
-The trained ML checkpoints are **not in the repo** (gitignored, like all of `ml/runs/`) —
+The trained ML checkpoints are **not in the repo** (gitignored, like all of `ml/runs/`) -
 they ship as assets on the [v0.1.0 GitHub release](https://github.com/jackulau/blockdream/releases/tag/v0.1.0):
 
 ```bash
@@ -74,10 +74,10 @@ What each checkpoint is, how it was gated, and how to retrain it yourself:
 
 Two coupled workstreams (full map in [docs/architecture.md](./docs/architecture.md)):
 
-- **Workstream A — Block-art renderer.** Images / GIFs / videos → Minecraft blocks, colour-matched
+- **Workstream A - Block-art renderer.** Images / GIFs / videos → Minecraft blocks, colour-matched
   in OKLab, native on **both Java and Bedrock** (maps, structures, datapacks, behaviour packs). 2D
   walls *and* real 3D voxel builds, with animation + glTF/video import.
-- **Workstream B — Neural world model.** Action-conditioned interactive Minecraft world model: a
+- **Workstream B - Neural world model.** Action-conditioned interactive Minecraft world model: a
   served autoregressive (MineWorld-style) model + a latent-diffusion track exported to ONNX for a
   server-free, in-browser engine. Plus a separate driving world model.
 
@@ -97,19 +97,19 @@ apps/web/         # Vite single-page demo: three.js 3D viewer + both world-model
 mods/
   java-fabric/    # live map-wall render loop + world-model control bridge (Fabric 1.21.x)
   bedrock-addon/  # native render loop (behaviour pack)
-ml/               # Workstream B — world model (Python / PyTorch)
+ml/               # Workstream B - world model (Python / PyTorch)
 ```
 
 ## Documentation
 
-- **[The guide](./docs/guide.md) — start here**: image/GIF/video → blocks in vanilla Minecraft, end to end
+- **[The guide](./docs/guide.md) - start here**: image/GIF/video → blocks in vanilla Minecraft, end to end
   (install, generate, choose a target, import into Java/Bedrock, troubleshooting)
-- [Technical writeup & results](./docs/results.md) — architecture diagram, methods, graphics, measured numbers
-- [Architecture](./docs/architecture.md) — whole-system map, packages, data flow
-- [Play it in Minecraft without Fabric](./docs/play-without-fabric.md) — offline cast + live RCON bridge
-- [3D builds & animation](./docs/3d-and-animation.md) — image→3D, greedy meshing, animation system
-- [Importing animations](./docs/video-import.md) — glTF / .glb / .obj-sequence / video → blocks
-- [World models — full guide](./docs/world-models-guide.md) — models, train/serve/run, movement types, browser diffusion
+- [Technical writeup & results](./docs/results.md) - architecture diagram, methods, graphics, measured numbers
+- [Architecture](./docs/architecture.md) - whole-system map, packages, data flow
+- [Play it in Minecraft without Fabric](./docs/play-without-fabric.md) - offline cast + live RCON bridge
+- [3D builds & animation](./docs/3d-and-animation.md) - image→3D, greedy meshing, animation system
+- [Importing animations](./docs/video-import.md) - glTF / .glb / .obj-sequence / video → blocks
+- [World models - full guide](./docs/world-models-guide.md) - models, train/serve/run, movement types, browser diffusion
 - Also: [colour theory](./docs/color-theory.md), [command-block optimization](./docs/command-block-optimization.md),
   [real world models](./docs/real-world-models.md), [movement types](./docs/movement-types.md),
   [driving world model](./docs/driving-world-model.md), [live control](./docs/live-control.md),
@@ -122,12 +122,12 @@ Every exported artifact is version-stamped from one registry ([`packages/palette
 so it loads cleanly across the whole **Java 1.21.x line (1.21 → 1.21.10)** and on **Bedrock 1.21+**:
 
 - **Java datapacks** (2D + 3D voxel) declare `supported_formats`, so a single `.zip` loads without the
-  red "incompatible pack" warning on any 1.21.x — the function content (setblock/fill/scoreboard/macros/`#minecraft:tick`)
+  red "incompatible pack" warning on any 1.21.x - the function content (setblock/fill/scoreboard/macros/`#minecraft:tick`)
   is uniform across the line.
 - **`--version <ver>`** pins the exact `pack_format` / `DataVersion` for a specific release (e.g. `--version 1.21.5`
   → `pack_format 71`); an unsupported version fails fast with the list of supported ids instead of a cryptic crash.
 - **Maps** stamp the requested `DataVersion` (older stamps auto-upgrade via the game's DataFixerUpper).
-- **Bedrock** packs use a `1.21.0` `min_engine_version` floor and a 1.21.0 block version — both forward-compatible
+- **Bedrock** packs use a `1.21.0` `min_engine_version` floor and a 1.21.0 block version - both forward-compatible
   (Bedrock auto-upgrades block versions, and `min_engine_version` is a lower bound), so one pack runs on 1.21.0 → latest.
 
 Adding a newer patch is one row in the registry. The matrix is asserted in `packages/cli/test/version-matrix.test.ts`.
@@ -143,7 +143,7 @@ pnpm --filter web dev                     # the web demo on :5173
 cd ml && .venv/bin/python -m pytest       # world-model tests
 ```
 
-The canonical gate is **`bash scripts/verify-all.sh`** — it chains every suite above plus the
+The canonical gate is **`bash scripts/verify-all.sh`** - it chains every suite above plus the
 ML runtime gates (movement types DISTINCT, driving CONTROLLABLE, diffusion ONNX), the web build,
 the docs gate, and the Fabric mod build. Checks needing gitignored single-copy artifacts
 (textures, checkpoints, ONNX) or JDK 21 print `⏭ SKIP` with the regen command instead of failing;
@@ -152,14 +152,14 @@ any check that runs and fails exits nonzero. Checkpoint provenance lives in [`ml
 ## Colour foundation
 
 The renderer authors a filled map's `colors` byte array **directly**, so the game does **not**
-biome-tint it — all 244 Java map colours (61 bases × 4 shades, multipliers `[180, 220, 255, 135]`)
+biome-tint it - all 244 Java map colours (61 bases × 4 shades, multipliers `[180, 220, 255, 135]`)
 are usable verbatim and edition-stable. Matching is in **OKLab** (perceptually uniform);
 quantization error is diffused in **linear light**.
 
 ## Notes
 
 Block textures are extracted locally from the official Minecraft client jar
-(`apps/web/scripts/fetch-block-textures.py`) and are **gitignored** — never redistributed.
+(`apps/web/scripts/fetch-block-textures.py`) and are **gitignored** - never redistributed.
 World-model data / runs are local-only (gitignored); the trained checkpoints ship as GitHub
 release assets fetched by `scripts/fetch-checkpoint.sh`. Operator-only steps (multi-GPU
 training, live server/client deploy, JDK-21 Fabric build) are one-command runnable on real
@@ -168,7 +168,7 @@ hardware; verifies here run at synthetic/CPU scale.
 ## License
 
 [MIT](./LICENSE). The LICENSE file also carries the asset notices: this project does **not**
-include or redistribute any Minecraft or Mojang assets — textures and jars are downloaded by
+include or redistribute any Minecraft or Mojang assets - textures and jars are downloaded by
 the user directly from Mojang under their own license and EULA. "Minecraft" is a trademark of
 Mojang Synergies AB; this project is not affiliated with, endorsed by, or sponsored by Mojang
 or Microsoft.

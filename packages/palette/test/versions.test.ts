@@ -117,7 +117,7 @@ describe("palette version aliasing (the --version ENOENT fix)", () => {
   });
 
   it("still throws for a palette version with no canonical fallback file", () => {
-    // A bogus prefix path can't resolve — but a real loader with a known canonical never throws on patch ids.
+    // A bogus prefix path can't resolve - but a real loader with a known canonical never throws on patch ids.
     expect(() => getJavaMapPalette("1.21.7")).not.toThrow();
   });
 });

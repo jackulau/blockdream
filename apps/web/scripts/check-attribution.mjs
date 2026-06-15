@@ -1,6 +1,6 @@
 // Verify author attribution can't silently rot: every MPA page must credit Jack Lau and
 // carry a meta author tag, and the landing page must deep-link the actual repository
-// (github.com/jackulau/blockdream — not just the profile) including the corrected
+// (github.com/jackulau/blockdream - not just the profile) including the corrected
 // docs/load-into-minecraft.md blob link.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
