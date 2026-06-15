@@ -32,5 +32,21 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 "$PY" -m blockdream_wm.drive.train_real \
 
 if [ -f "$OUT/best.pt" ]; then cp "$OUT/best.pt" "$OUT/latest.pt"; echo "[train_drive_real] best.pt -> latest.pt"; fi
 echo "[train_drive_real] verifying controllability…"
-"$PY" scripts/eval_drive_control.py --checkpoint "$OUT/latest.pt" || true
+"$PY" scripts/eval_drive_control.py --checkpoint "$OUT/latest.pt"
+CONTROLLABLE=$?
+
+# Promote the REAL checkpoint to the SERVED path (runs/drive) only if it is controllable.
+# PROMOTE=1 to enable (the goal/operator sets this; plain training leaves the served model alone).
+SERVED="${SERVED:-runs/drive}"
+if [ "${PROMOTE:-0}" = "1" ] && [ "$CONTROLLABLE" = "0" ]; then
+  mkdir -p "$SERVED"
+  [ -f "$SERVED/latest.pt" ] && cp "$SERVED/latest.pt" "$SERVED/pre029_sim_backup.pt" && echo "[train_drive_real] backed up sim → $SERVED/pre029_sim_backup.pt"
+  cp "$OUT/latest.pt" "$SERVED/latest.pt"
+  [ -f "$OUT/best.pt" ] && cp "$OUT/best.pt" "$SERVED/best.pt"
+  "$PY" scripts/write_drive_provenance.py --served "$SERVED" --pool "$POOL"
+  echo "[train_drive_real] PROMOTED real commaVQ model → $SERVED (served path is now 100% real)"
+  "$PY" scripts/eval_drive_control.py --checkpoint "$SERVED/latest.pt" || true
+elif [ "$CONTROLLABLE" != "0" ]; then
+  echo "[train_drive_real] NOT promoting — checkpoint failed the controllability gate"
+fi
 echo "[train_drive_real] done → $OUT/latest.pt"
