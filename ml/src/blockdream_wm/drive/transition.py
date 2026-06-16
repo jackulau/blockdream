@@ -19,7 +19,8 @@ class DriveTransition(nn.Module):
     def __init__(self, cfg: DynamicsConfig, n_tokens: int, codebook_size: int,
                  n_lidar: int, n_telemetry: int, n_control: int = 3, cond_dim: int = 96,
                  n_history: int = 0, rgb_change_weight: float = 0.0,
-                 rgb_div_weight: float = 0.0, rgb_div_margin: float = 0.5):
+                 rgb_div_weight: float = 0.0, rgb_div_margin: float = 0.5,
+                 prev_corrupt: float = 0.0):
         super().__init__()
         self.n_lidar = n_lidar
         self.n_telemetry = n_telemetry
@@ -36,6 +37,13 @@ class DriveTransition(nn.Module):
         self.rgb_change_weight = float(rgb_change_weight)
         self.rgb_div_weight = float(rgb_div_weight)
         self.rgb_div_margin = float(rgb_div_margin)
+        # PREV-FRAME CORRUPTION (the strongest copy-previous fix, and control-safe). During training only,
+        # replace a fraction of the PREV-frame tokens fed to the AR with random codes. The model can no
+        # longer win by echoing prev (the copied positions are now wrong), so it must predict the next
+        # frame from the control + spatial context - which is what makes the free-run field actually flow
+        # at inference (clean prev). Unlike the control-divergence term it does NOT touch the shared cond,
+        # so the telemetry/steering controllability is preserved. 0 = off (default; backward-compatible).
+        self.prev_corrupt = float(prev_corrupt)
         # TEMPORAL CONTEXT: optionally condition on a window of the last n_history
         # (control, telemetry) frames so the dynamics see momentum/lag, not just the current
         # step (single-step telemetry prediction drifts over long rollouts). n_history=0 → the
@@ -82,7 +90,13 @@ class DriveTransition(nn.Module):
         """RGB-token loss with the optional copy-previous fix (see __init__). With both weights 0 this is
         exactly the legacy single-step CE (self.ar.loss). With rgb_change_weight>0 the CE is up-weighted on
         positions where next != prev (the changes the copy shortcut gets wrong). With rgb_div_weight>0 a
-        margin hinge requires the true control to out-predict a shuffled control, forcing control use."""
+        margin hinge requires the true control to out-predict a shuffled control, forcing control use.
+        With prev_corrupt>0 a fraction of the prev-frame tokens are randomized (training only) so the AR
+        cannot win by echoing prev - the strongest, control-safe copy fix."""
+        if self.prev_corrupt > 0 and torch.is_grad_enabled():  # training only; clean prev for val (no_grad)
+            m = torch.rand(prev_tokens.shape, device=prev_tokens.device) < self.prev_corrupt
+            rnd = torch.randint(0, self.ar.codebook_size, prev_tokens.shape, device=prev_tokens.device)
+            prev_tokens = torch.where(m, rnd, prev_tokens)
         cw, dw = self.rgb_change_weight, self.rgb_div_weight
         if cw <= 0 and dw <= 0:
             return self.ar.loss(prev_tokens, next_tokens, c)

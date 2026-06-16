@@ -27,8 +27,12 @@ if ! ls "$POOL"/roll_*.npz >/dev/null 2>&1; then
 fi
 
 echo "[train_drive_real] pool=$POOL → $OUT (real commaVQ, camera-only, MPS)"
+# RGB dynamics loss (goal 035, the copy-previous fix): default 0 = legacy single-step CE. Set
+# RGB_CHANGE_WEIGHT / RGB_DIV_WEIGHT to break the echo-the-previous-frame shortcut.
 PYTORCH_ENABLE_MPS_FALLBACK=1 "$PY" -m blockdream_wm.drive.train_real \
-  --pool "$POOL" --out "$OUT" --ar-steps "$AR_STEPS" --max-minutes "$MAX_MIN" --device "$DEVICE"
+  --pool "$POOL" --out "$OUT" --ar-steps "$AR_STEPS" --max-minutes "$MAX_MIN" --device "$DEVICE" \
+  --rgb-change-weight "${RGB_CHANGE_WEIGHT:-0}" --rgb-div-weight "${RGB_DIV_WEIGHT:-0}" \
+  --rgb-div-margin "${RGB_DIV_MARGIN:-0.5}" --prev-corrupt "${PREV_CORRUPT:-0}"
 
 if [ -f "$OUT/best.pt" ]; then cp "$OUT/best.pt" "$OUT/latest.pt"; echo "[train_drive_real] best.pt -> latest.pt"; fi
 echo "[train_drive_real] verifying controllability…"

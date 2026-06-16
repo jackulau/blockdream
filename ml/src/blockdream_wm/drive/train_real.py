@@ -52,10 +52,14 @@ def _log(out: Path, row: dict) -> None:
         w.writerow(row)
 
 
-def build(dev, n_history: int = 0) -> tuple[DynamicsConfig, DriveTransition]:
+def build(dev, n_history: int = 0, rgb_change_weight: float = 0.0,
+          rgb_div_weight: float = 0.0, rgb_div_margin: float = 0.5,
+          prev_corrupt: float = 0.0) -> tuple[DynamicsConfig, DriveTransition]:
     dcfg = DynamicsConfig(kind="ar", dim=128, depth=3, heads=4)
     trans = DriveTransition(dcfg, n_tokens=TOKENS_PER_FRAME, codebook_size=COMMAVQ_CODEBOOK,
-                            n_lidar=N_LIDAR, n_telemetry=N_TEL, n_history=n_history).to(dev)
+                            n_lidar=N_LIDAR, n_telemetry=N_TEL, n_history=n_history,
+                            rgb_change_weight=rgb_change_weight, rgb_div_weight=rgb_div_weight,
+                            rgb_div_margin=rgb_div_margin, prev_corrupt=prev_corrupt).to(dev)
     return dcfg, trans
 
 
@@ -70,6 +74,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-minutes", type=float, default=0.0)
     ap.add_argument("--roll-k", type=int, default=12, help="recursive rollout horizon for the telemetry loss (0 disables)")
     ap.add_argument("--roll-weight", type=float, default=1.0)
+    # RGB dynamics loss (the copy-previous fix — see DriveTransition). Default 0 = legacy single-step CE.
+    ap.add_argument("--rgb-change-weight", type=float, default=0.0,
+                    help="up-weight the RGB CE on changed tokens (next != prev) so the model can't win by copying prev")
+    ap.add_argument("--rgb-div-weight", type=float, default=0.0,
+                    help="control-divergence weight: true control must out-predict a shuffled control by --rgb-div-margin")
+    ap.add_argument("--rgb-div-margin", type=float, default=0.5)
+    ap.add_argument("--prev-corrupt", type=float, default=0.0,
+                    help="fraction of prev-frame tokens randomized in training so the AR can't echo prev (copy fix)")
     ap.add_argument("--val-frac", type=float, default=0.05)
     ap.add_argument("--device", default="auto")
     ap.add_argument("--seed", type=int, default=0)
@@ -94,7 +106,9 @@ def main(argv: list[str] | None = None) -> int:
     n_val = max(1, int(len(pairs) * args.val_frac))
     val_pairs, train_pairs = pairs[perm[:n_val]], pairs[perm[n_val:]]
 
-    dcfg, trans = build(dev)
+    dcfg, trans = build(dev, rgb_change_weight=args.rgb_change_weight,
+                        rgb_div_weight=args.rgb_div_weight, rgb_div_margin=args.rgb_div_margin,
+                        prev_corrupt=args.prev_corrupt)
     opt = torch.optim.Adam(trans.parameters(), lr=args.lr)
 
     ar_step = 0
@@ -120,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
             "dynamics_cfg": vars(dcfg),
             "n_lidar": N_LIDAR, "n_telemetry": N_TEL, "n_tokens": TOKENS_PER_FRAME,
             "codebook": COMMAVQ_CODEBOOK, "token_grid": [8, 16], "n_history": 0,
+            "rgb_change_weight": args.rgb_change_weight, "rgb_div_weight": args.rgb_div_weight,
+            "prev_corrupt": args.prev_corrupt,
             "transition": trans.state_dict(), "opt": opt.state_dict(),
             "init_tokens": tokens[0].cpu(), "init_lidar": lidar0[0].cpu(), "init_telemetry": tel[0].cpu(),
         }

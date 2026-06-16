@@ -173,6 +173,9 @@ REAL_THRESHOLDS = {
     "rgb_ce": 4.0,         # one-step next-token CE on a REAL commaVQ holdout (random = ln(1024) = 6.93)
     "tel_mse": 0.010,      # one-step telemetry MSE on the real holdout (normalized units)
 }
+# Free-run token change-rate floor: below this the world model is frozen (copy-previous collapse). A
+# near-frozen rollout sits at ~0.004/step; a healthy field that flows as you drive changes far more.
+CHANGE_FLOOR = 0.05
 
 
 def _real_holdout_pool():
@@ -224,6 +227,18 @@ def real_quality(session, args, t0: float) -> int:
         measured.update(rgb_ce=rgb_ce, tel_mse=tel_mse)
         print(f"[drive-quality] REAL holdout ({n} pairs): rgb_ce={rgb_ce:.3f} nats/token "
               f"(random={float(np.log(COMMAVQ_CODEBOOK)):.2f}), tel_mse={tel_mse:.5f}")
+        # COPY-PREVIOUS GUARD (the dynamics gate). A model that just echoes the previous frame gets a
+        # deceptively low CE because consecutive commaVQ token fields are ~40% identical. Compare the
+        # model's argmax next-token accuracy against the PERSISTENCE baseline (predict next = prev): the
+        # model must predict the TRUE next better than copying does, and must not merely echo the input.
+        pred = session.trans.ar.forward(tk[i0], tk[i1], c).argmax(-1)  # (n, n_tokens)
+        model_acc = (pred == tk[i1]).float().mean().item()            # model -> true next
+        persist_acc = (tk[i0] == tk[i1]).float().mean().item()        # copy-prev -> true next (the bar)
+        echo_rate = (pred == tk[i0]).float().mean().item()            # how much the model copies prev
+        measured.update(model_acc=model_acc, persist_acc=persist_acc, echo_rate=echo_rate)
+        print(f"[drive-quality] dynamics: model next-token acc={model_acc:.3f} vs persistence "
+              f"(copy-prev)={persist_acc:.3f}, echo-rate={echo_rate:.3f} "
+              f"({'BEATS copy' if model_acc > persist_acc else 'WORSE than copy - learned to echo'})")
 
     # controllability (same checks as eval_drive_control)
     coast, _ = _settled(session, [0.0, 0.0, 0.0]); thr, _ = _settled(session, [0.0, 1.0, 0.0])
@@ -232,19 +247,33 @@ def real_quality(session, args, t0: float) -> int:
     print(f"[drive-quality] controllability: coast={coast:.2f} throttle={thr:.2f} m/s, "
           f"yaw L={lyaw:+.3f} R={ryaw:+.3f} → controllable={controllable}")
 
-    # free-run stability: telemetry finite + tokens in codebook range over a recursive rollout
-    session.reset(); stable = True
+    # free-run stability: telemetry finite + tokens in codebook range over a recursive rollout.
+    # Also measure the token CHANGE-RATE per step: a copy-previous model is near-frozen (~0%/step);
+    # a healthy world model's field flows as you drive (real consecutive frames differ ~60%).
+    session.reset(); stable = True; changes = []
+    prev_tok = session.tokens.clone()
     for _ in range(40 if args.quick else 120):
         o = session.step([0.3, 0.6, 0.0])
+        changes.append((session.tokens != prev_tok).float().mean().item())
+        prev_tok = session.tokens.clone()
         if not np.all(np.isfinite(o["telemetry"].numpy())):
             stable = False; break
+    free_run_change = float(np.mean(changes)) if changes else 0.0
     tok_ok = bool(session.tokens.min().item() >= 0 and session.tokens.max().item() < COMMAVQ_CODEBOOK)
-    print(f"[drive-quality] free-run stability: telemetry_finite={stable} tokens_in_codebook={tok_ok}")
+    not_frozen = free_run_change >= CHANGE_FLOOR
+    print(f"[drive-quality] free-run stability: telemetry_finite={stable} tokens_in_codebook={tok_ok}, "
+          f"token-change-rate={free_run_change:.3f}/step ({'flows' if not_frozen else f'FROZEN <{CHANGE_FLOOR}'})")
 
     ok, lines = verdict(measured, REAL_THRESHOLDS) if pool is not None else (True, [])
     for line in lines:
         print(f"[drive-quality] {line}")
-    ok = ok and controllable and stable and tok_ok
+    # copy-previous guard: the model must beat the persistence baseline on the holdout AND not be frozen
+    beats_copy = (pool is None) or (measured["model_acc"] > measured["persist_acc"])
+    ok = ok and controllable and stable and tok_ok and beats_copy and not_frozen
+    if not beats_copy:
+        print("[drive-quality] FAIL: model does not beat copy-previous (it learned to echo the input)")
+    if not not_frozen:
+        print(f"[drive-quality] FAIL: free-run is frozen ({free_run_change:.3f}/step < {CHANGE_FLOOR})")
     print(f"[drive-quality] wall-clock {time.time() - t0:.1f}s")
     if args.report_only:
         print("REPORT_ONLY"); return 0

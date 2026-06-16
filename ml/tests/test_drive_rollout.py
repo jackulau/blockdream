@@ -81,3 +81,22 @@ def test_gradients_flow_through_dynamics_loss():
     c = m._fuse(control, lidar, tel)
     m.rgb_loss(prev, nxt, c, control, lidar, tel).backward()
     assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in m.parameters())
+
+
+def test_prev_corrupt_is_off_under_nograd_val():
+    # corruption is training-only (grad-gated) so the val CE stays clean/comparable run-to-run
+    m = _model(prev_corrupt=0.5).eval()
+    prev, nxt, control, lidar, tel = _batch()
+    c = m._fuse(control, lidar, tel)
+    with torch.no_grad():
+        assert torch.allclose(m.rgb_loss(prev, nxt, c, control, lidar, tel), m.ar.loss(prev, nxt, c))
+
+
+def test_prev_corrupt_randomizes_prev_in_training():
+    # under grad, fully corrupting prev changes the AR input -> a different loss than the clean CE
+    m = _model(prev_corrupt=1.0)
+    prev, nxt, control, lidar, tel = _batch()
+    c = m._fuse(control, lidar, tel)
+    torch.manual_seed(0)
+    corrupted = m.rgb_loss(prev, nxt, c, control, lidar, tel)  # grad enabled by default
+    assert not torch.allclose(corrupted, m.ar.loss(prev, nxt, c))
