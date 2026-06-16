@@ -90,6 +90,34 @@ Follow-up after a user reported the demo still gray. Two findings:
    or a skill-divergence loss), not more training - that is the documented next step. 128px gen is also
    ~1.5 fps vs 3.8 (rAF-decoupled display stays smooth). Served stays the 64px model.
 
+### Skill-divergence loss fixes the 128px collapse (goal-034)
+
+The goal-033 "documented next step" (a skill-conditioning strength fix) was built and **confirmed to work**.
+`train_long` gained a training-only **skill-divergence aux loss** (`--skill-div-weight`, `--skill-div-margin`):
+each step also predicts the next frame under a *wrong* (shuffled) skill id, and a margin hinge
+`relu(margin - (ce_wrong - ce_true))` penalizes the model unless the TRUE skill predicts the frame
+better than a wrong one by `margin`. It is backward-compatible (default weight 0 = off; architecture and
+all existing checkpoints unchanged) and turns on only for the 128px retrains.
+
+Result (hi128 preset, 128px/cb1024, MPS): the aux loss **broke the collapse** that goal-033 diagnosed -
+distinctness went from a flat **0/36** (goal-033's two 128px retrains) to **24/36 at ar~10k** while frames
+stayed sharp (resolution-fair fidelity **~0.91 vs the 64px served 0.69**). This confirms the goal-033
+diagnosis was correct: 128px collapse is a conditioning-STRENGTH problem, not AR size or undertraining.
+`promote_mc_fidelity.sh` gates on fidelity AND full 9/9 (36/36) distinctness, so it correctly **KEPT the
+64px served model** (the only verified-36/36-distinct, browser-recognizable Minecraft - re-verified this
+run: fidelity 0.688, mean |Δ| 0.0234, 36/36 DISTINCT).
+
+**A controlled weight sweep isolated the remaining ceiling to DATA, not the knob.** Two full hi128+SD
+retrains were run to completion (ar 36000): SKILL_DIV **1.5** (fidelity 0.909) and **3.0** (fidelity
+**1.003** - as sharp as real footage). BOTH landed **20/36 distinct** - doubling the conditioning force
+did not unstick a single frozen pair. The higher weight only made the *already-distinct* pairs sharper
+(mean pairwise |Δ| 0.16 -> 0.20); the ~16 stuck pairs are the mineflayer skills (swim/boat/elytra/pig/
+minecart), which are **upscaled real-64->128**, so their pixel content is near-identical and cannot
+diverge no matter how hard the skill embedding pushes. Conclusion: full 36/36 at 128px needs real
+**native-128px mineflayer footage** (operator-gated: Java 21 + live server), NOT more weight or training.
+The served model stays 64px; the skill-div trainer (`--skill-div-weight`, unit-tested) ships for when
+native-128px footage exists.
+
 ### Temporal-context retrain experiment (2026-06-10, goal 027 - NOT promoted; sim-era, superseded)
 
 `runs/drive_v3/` (`best.pt`, n_history=3, 58k AR steps / 38 min MPS) wired the proven temporal-context
