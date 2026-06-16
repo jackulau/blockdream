@@ -35,10 +35,14 @@ PRESETS = {
     # stays dim192/depth4 so the demo keeps its interactive fps (the tokenizer is not the rollout
     # bottleneck). 64px -> 256 tok. Goal 031 fidelity push.
     "hi64": (4, 64, 8, 1024, 192, 4, 6),
-    # hi128: 128px native (ds8 -> 256 tok) + strong tokenizer (cb1024), but the SMALL dim192/depth4 AR.
-    # Goal 033 found the m4 preset's BIG dim384 AR drowns the skill-conditioning signal -> the 9 movement
-    # types collapse (0/36 distinct) at 128px. The small AR is what achieves 36/36 distinct at 64px, so
-    # hi128 keeps that AR while gaining 128px sharpness. Recommended sharp+distinct path.
+    # hi128: 128px native (ds8 -> 256 tok) + strong tokenizer (cb1024) + the small dim192/depth4 AR.
+    # Goal 033 finding: at 128px the skill conditioning COLLAPSES (0/36 movement types distinct) with
+    # BOTH the big m4 AR (dim384) AND this small AR (dim192) -> it is NOT an AR-size problem; it's a
+    # skill-conditioning-STRENGTH problem at 128px/cb1024 (the skill embedding's influence is drowned by
+    # the larger token distribution). 128px is genuinely SHARPER (fidelity ~1.05 vs the 64px served 0.69)
+    # but not usable until the conditioning is strengthened (bigger/again-injected skill embed, or a
+    # skill-divergence loss). Until then the served model stays the 64px 'quick' (sharp-enough + 36/36
+    # distinct). hi128 is kept for that future conditioning work, NOT as a drop-in served preset.
     "hi128": (8, 64, 8, 1024, 192, 4, 6),
     "m4": (8, 64, 8, 1024, 384, 6, 8),       # 128px → 256 tok, fits 24GB MPS (~12M); big AR -> skill collapse (goal 033)
     "full": (4, 96, 8, 8192, 768, 12, 12),   # GPU, big (256px → 4096 tok, ~100M)
