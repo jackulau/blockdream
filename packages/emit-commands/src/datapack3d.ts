@@ -6,6 +6,7 @@
 
 import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
+import { fillLines } from "./fill";
 import type { DatapackOptions, GeneratedPack } from "./datapack";
 
 const RESERVED = new Set(["minecraft"]);
@@ -129,7 +130,7 @@ export function generateVoxelDatapack(
       `scoreboard players set #speed ma ${speed}`,
       `scoreboard players set #count ma ${volumes.length}`,
       `forceload add ${x0} ${z0} ${x1} ${z1}`,
-      `fill ${x0} ${y0} ${z0} ${x1} ${y1} ${z1} ${air} replace`, // clear the build box
+      ...fillLines(x0, y0, z0, x1, y1, z1, air, "replace"), // clear the build box (split at the 32768 /fill cap)
       `function ${ns}:frames/0`,
       "",
     ].join("\n"),

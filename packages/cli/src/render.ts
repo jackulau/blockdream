@@ -21,7 +21,7 @@ import { extractFrames } from "@blockdream/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
-import { framesToAnimated3d } from "@blockdream/voxel";
+import { framesToAnimated3d, countSolid, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -67,6 +67,17 @@ export interface RenderResult {
 function writeFile(path: string, data: Buffer | string): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, data);
+}
+
+/** Guard against a silent empty 3D build (degenerate input: a solid-colour / fully-transparent image
+ *  yields zero voxels). Throws a clear error rather than writing a valid-but-empty datapack. */
+function assertNonEmpty3d(volumes: VoxelVolume[]): void {
+  if (volumes.length === 0 || volumes.every((v) => countSolid(v) === 0)) {
+    throw new Error(
+      "no subject detected: the input produced an empty 3D build (try a clearer subject/background, " +
+        "a non-zero --depth, or check the image isn't a single flat colour)",
+    );
+  }
 }
 
 function quantizeAll(
@@ -167,6 +178,7 @@ export function render(opts: RenderOptions): RenderResult {
   if (opts.target === "voxel3d") {
     // video → temporally-stable animated 3D block build → vanilla datapack (delta-encoded, fill-batched)
     const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
+    assertNonEmpty3d(volumes);
     const pack = generateVoxelDatapack(volumes, resolveBlock, {
       namespace: "blockdream_3d",
       packFormat: mc.packFormat,
@@ -199,6 +211,7 @@ export function render(opts: RenderOptions): RenderResult {
     // image/video → temporally-stable 3D volumes (same pipeline as voxel3d) → a TRUE 3D Bedrock
     // .mcstructure per frame (depth = volume depth, not the 1-thick wall of `mcstructure`)
     const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
+    assertNonEmpty3d(volumes);
     volumes.forEach((vol, fi) => {
       const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
       const path = join(opts.out, volumes.length > 1 ? `frame_${fi}.mcstructure` : `model3d.mcstructure`);

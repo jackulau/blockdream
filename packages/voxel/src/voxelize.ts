@@ -4,7 +4,7 @@
 // the palette - the caller maps a map-colour id to a 0..1 height.
 
 import type { QuantizedFrame } from "@blockdream/color-core";
-import { createVolume, setVoxel, type VoxelVolume } from "./volume";
+import { createVolume, setVoxel, MAX_DIM, type VoxelVolume } from "./volume";
 
 export interface VoxelizeOptions {
   mode?: "flat" | "heightmap" | "relief";
@@ -18,7 +18,7 @@ export function imageToVolume(frame: QuantizedFrame, opts: VoxelizeOptions = {})
   const mode = opts.mode ?? "flat";
 
   if (mode === "flat") {
-    const depth = Math.max(1, Math.floor(opts.depth ?? 1));
+    const depth = Math.max(1, Math.min(MAX_DIM, Math.floor(opts.depth ?? 1)));
     const v = createVolume(width, height, depth);
     for (let iy = 0; iy < height; iy++) {
       for (let ix = 0; ix < width; ix++) {
@@ -35,7 +35,7 @@ export function imageToVolume(frame: QuantizedFrame, opts: VoxelizeOptions = {})
     // (z=0), and each pixel extrudes BACKWARD by its brightness so the surface has real depth.
     // Unlike a flat slab, this reads as 3D from every angle (a flat slab vanishes edge-on when
     // spun). heightOf maps a colour id → 0..1; default = full depth (≡ a flat slab).
-    const maxD = Math.max(1, Math.floor(opts.depth ?? 8));
+    const maxD = Math.max(1, Math.min(MAX_DIM, Math.floor(opts.depth ?? 8)));
     const heightOf = opts.heightOf ?? (() => 1);
     const v = createVolume(width, height, maxD);
     for (let iy = 0; iy < height; iy++) {
@@ -50,7 +50,7 @@ export function imageToVolume(frame: QuantizedFrame, opts: VoxelizeOptions = {})
   }
 
   // heightmap: image is a top-down field; brightness → column height. x=img x, z=img y, y=up.
-  const maxH = Math.max(1, Math.floor(opts.maxHeight ?? 16));
+  const maxH = Math.max(1, Math.min(MAX_DIM, Math.floor(opts.maxHeight ?? 16)));
   const heightOf = opts.heightOf ?? (() => 1);
   const v = createVolume(width, maxH, height);
   for (let iy = 0; iy < height; iy++) {
