@@ -100,3 +100,16 @@ def test_prev_corrupt_randomizes_prev_in_training():
     torch.manual_seed(0)
     corrupted = m.rgb_loss(prev, nxt, c, control, lidar, tel)  # grad enabled by default
     assert not torch.allclose(corrupted, m.ar.loss(prev, nxt, c))
+
+
+def test_rgb_rollout_loss_runs_and_backprops():
+    # scheduled-sampling RGB rollout: rolls K steps (generate, no_grad) + a teacher-forced CE per step
+    m = _model()
+    torch.manual_seed(0)
+    b, k, n = 4, 2, 8
+    frames = torch.randint(0, 16, (b, k + 1, n))
+    controls = torch.randn(b, k, 3)
+    loss, info = m.rgb_rollout_loss(frames, controls, torch.zeros(b, 0), torch.randn(b, 6))
+    assert torch.isfinite(loss) and "rgb_roll" in info
+    loss.backward()
+    assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in m.parameters())

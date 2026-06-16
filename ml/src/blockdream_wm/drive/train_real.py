@@ -82,6 +82,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--rgb-div-margin", type=float, default=0.5)
     ap.add_argument("--prev-corrupt", type=float, default=0.0,
                     help="fraction of prev-frame tokens randomized in training so the AR can't echo prev (copy fix)")
+    ap.add_argument("--rgb-roll-k", type=int, default=0,
+                    help="scheduled-sampling RGB rollout horizon (0=off): roll K steps feeding the model's own generated frame")
+    ap.add_argument("--rgb-roll-weight", type=float, default=0.5)
+    ap.add_argument("--rgb-roll-batch", type=int, default=8, help="batch for the (expensive) RGB rollout generates")
     ap.add_argument("--val-frac", type=float, default=0.05)
     ap.add_argument("--device", default="auto")
     ap.add_argument("--seed", type=int, default=0)
@@ -135,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
             "n_lidar": N_LIDAR, "n_telemetry": N_TEL, "n_tokens": TOKENS_PER_FRAME,
             "codebook": COMMAVQ_CODEBOOK, "token_grid": [8, 16], "n_history": 0,
             "rgb_change_weight": args.rgb_change_weight, "rgb_div_weight": args.rgb_div_weight,
-            "prev_corrupt": args.prev_corrupt,
+            "prev_corrupt": args.prev_corrupt, "rgb_roll_k": args.rgb_roll_k,
             "transition": trans.state_dict(), "opt": opt.state_dict(),
             "init_tokens": tokens[0].cpu(), "init_lidar": lidar0[0].cpu(), "init_telemetry": tel[0].cpu(),
         }
@@ -168,6 +172,11 @@ def main(argv: list[str] | None = None) -> int:
             t0_, l0_, cw, tt, _ = roll_batch()
             rloss, _ = trans.rollout_loss(t0_, l0_, cw, tt, None)
             loss = loss + args.roll_weight * rloss
+        if args.rgb_roll_k > 0 and windows is not None:
+            wr = torch.from_numpy(windows[np.random.randint(0, len(windows), args.rgb_roll_batch)]).to(dev)
+            kk = min(args.rgb_roll_k, wr.shape[1] - 1)
+            rgbroll, _ = trans.rgb_rollout_loss(tokens[wr[:, : kk + 1]], ctl[wr[:, :kk]], lidar0[wr[:, 0]], tel[wr[:, 0]])
+            loss = loss + args.rgb_roll_weight * rgbroll
         opt.zero_grad(); loss.backward(); opt.step()
         ar_step += 1
         if ar_step % 50 == 0 or (time.time() - last_ckpt) / 60 >= args.ckpt_every_min:

@@ -166,6 +166,26 @@ class DriveTransition(nn.Module):
                 lidar_loss = lidar_loss + F.mse_loss(lidar, lidar_targets[:, t])
         return (tel_loss + lidar_loss) / k, {"roll_tel": tel_loss.item() / k, "roll_lidar": lidar_loss.item() / k}
 
+    def rgb_rollout_loss(self, frames, controls, lidar0, tel0, history=None):
+        """Scheduled-sampling RGB rollout - the inter-frame copy fix. From real frame 0, roll K steps:
+        at each step predict the REAL next frame (teacher-forced CE, with gradient) but feed the model's
+        OWN generated frame (detached) as the next prev. Teacher forcing alone lets the AR echo the
+        previous frame (consecutive token fields are ~40% identical) and freeze at inference; rolling its
+        own predictions forward forces it to predict multi-step change from its own (possibly copied)
+        state, so copying accumulates error and stops being optimal. Telemetry rolls (detached) alongside
+        so the conditioning matches inference. frames: (B,K+1,n_tokens); controls: (B,K,n_control)."""
+        k = controls.shape[1]
+        prev = frames[:, 0]
+        tel, lidar = tel0, lidar0
+        loss = frames.new_zeros((), dtype=torch.float32)
+        for t in range(k):
+            c = self._fuse(controls[:, t], lidar, tel, history)
+            loss = loss + self.ar.loss(prev, frames[:, t + 1], c)   # gradient: predict real next
+            with torch.no_grad():                                   # roll the model's OWN frame forward
+                prev = self.ar.generate(prev, c)
+                tel = self.bound_tel(self.telemetry_head(c))
+        return loss / max(1, k), {"rgb_roll": (loss / max(1, k)).item()}
+
     @torch.no_grad()
     def step(self, prev_tokens, prev_lidar, prev_tel, control, history=None):
         """One recursive world-model step → (next_tokens, next_lidar, next_telemetry)."""
