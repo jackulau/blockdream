@@ -20,7 +20,6 @@ import numpy as np
 import torch
 from PIL import Image
 
-from .config import config_from_dict
 from .tokenizer import Tokenizer
 from .transition_ar import ARTransition
 from .train_real import make_config
@@ -72,6 +71,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-minutes", type=float, default=0.0)  # 0 = until step targets
     ap.add_argument("--val-frac", type=float, default=0.05)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--skill-div-weight", type=float, default=0.0,
+                    help="weight of the skill-divergence aux loss (0=off). Forces movement types to "
+                         "produce distinct predictions - the 128px skill-collapse fix (goal 034).")
+    ap.add_argument("--skill-div-margin", type=float, default=0.5,
+                    help="margin by which the true skill must out-predict a wrong skill (CE nats).")
     args = ap.parse_args(argv)
 
     out = Path(args.out)
@@ -183,22 +187,39 @@ def main(argv: list[str] | None = None) -> int:
         _atomic_save(tokens, tokens_path)
 
     # ---- PHASE 2: AR ----
+    sdw = float(getattr(args, "skill_div_weight", 0.0))   # 0 = off (backward-compatible)
+    sdm = float(getattr(args, "skill_div_margin", 0.5))
+
     def ar_batch(pair_arr):
         sel = pair_arr[np.random.randint(0, len(pair_arr), args.batch)]
         prev = tokens[sel[:, 0]].to(dev)
         nxt = tokens[sel[:, 1]].to(dev)
-        action = enc(buttons[sel[:, 0]].to(dev), camera[sel[:, 0]].to(dev), skill=skills[sel[:, 0]].to(dev))
-        return prev, nxt, action
+        b = buttons[sel[:, 0]].to(dev); c = camera[sel[:, 0]].to(dev); sk = skills[sel[:, 0]].to(dev)
+        return prev, nxt, b, c, sk
+
+    def ar_loss(prev, nxt, b, c, sk):
+        """CE under the TRUE skill, plus an optional skill-DIVERGENCE term: the true skill must predict
+        the next frame better than a WRONG (shuffled) skill by a margin -> forces the model to actually
+        USE the movement-type embedding instead of ignoring it (the 128px skill-collapse fix, goal 034).
+        Training-only; the architecture is unchanged so existing checkpoints serve identically."""
+        ce_true = ar.loss(prev, nxt, enc(b, c, skill=sk))
+        if sdw <= 0 or enc.n_skills < 2:
+            return ce_true, ce_true.detach()
+        off = torch.randint(1, enc.n_skills, sk.shape, device=sk.device)
+        sk_wrong = (sk + off) % enc.n_skills                       # guaranteed != sk
+        ce_wrong = ar.loss(prev, nxt, enc(b, c, skill=sk_wrong))
+        aux = torch.relu(sdm - (ce_wrong - ce_true))               # push ce_wrong > ce_true + margin
+        return ce_true + sdw * aux, ce_true.detach()
 
     while phase == "ar" and ar_step < args.ar_steps and not time_up():
-        prev, nxt, action = ar_batch(train_pairs)
-        loss = ar.loss(prev, nxt, action)
+        prev, nxt, b, c, sk = ar_batch(train_pairs)
+        loss, _ = ar_loss(prev, nxt, b, c, sk)
         ar_opt.zero_grad(); loss.backward(); ar_opt.step()
         ar_step += 1
         if ar_step % 50 == 0 or (time.time() - last_ckpt) / 60 >= args.ckpt_every_min:
             with torch.no_grad():
-                vp, vn, va = ar_batch(val_pairs)
-                val = ar.loss(vp, vn, va).item()
+                vp, vn, vb, vc, vsk = ar_batch(val_pairs)
+                val = ar.loss(vp, vn, enc(vb, vc, skill=vsk)).item()
             if val < best_val[0]:  # track the peak at every val eval (finer than the ckpt cadence)
                 best_val[0] = val
                 _atomic_save(_state(), best_path)

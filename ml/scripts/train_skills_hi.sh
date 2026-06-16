@@ -50,7 +50,8 @@ echo "[skills_hi] pools = $POOLS"
 PYTORCH_ENABLE_MPS_FALLBACK=1 "$PY" -m blockdream_wm.train_long \
   --pools "$POOLS" --out "$OUT" --preset "${PRESET:-quick}" \
   --tok-steps "${TOK_STEPS:-6000}" --ar-steps "$AR_STEPS" --device "$DEVICE" \
-  --ckpt-every-min 3 --batch 16 --max-minutes "$MAX_MIN"
+  --ckpt-every-min 3 --batch 16 --max-minutes "$MAX_MIN" \
+  --skill-div-weight "${SKILL_DIV:-0}"
 
 # 4. serve/verify the best-by-val checkpoint
 if [ -f "$OUT/best.pt" ]; then cp "$OUT/best.pt" "$OUT/latest.pt"; echo "[skills_hi] best.pt -> latest.pt"; fi
