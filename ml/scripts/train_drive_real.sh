@@ -39,11 +39,18 @@ if [ -f "$OUT/best.pt" ]; then cp "$OUT/best.pt" "$OUT/latest.pt"; echo "[train_
 echo "[train_drive_real] verifying controllability…"
 "$PY" scripts/eval_drive_control.py --checkpoint "$OUT/latest.pt"
 CONTROLLABLE=$?
+# Promote bar also requires beating copy-previous (not frozen) - a teacher-forced AR easily collapses to
+# echoing the prev frame, which the strict-dynamics gate rejects (goal 035). Only gate this on promote.
+DYNAMICS_OK=0
+if [ "${PROMOTE:-0}" = "1" ]; then
+  echo "[train_drive_real] verifying dynamics (strict: must beat copy-previous)…"
+  "$PY" scripts/eval_drive_quality.py --checkpoint "$OUT/latest.pt" --quick --strict-dynamics; DYNAMICS_OK=$?
+fi
 
-# Promote the REAL checkpoint to the SERVED path (runs/drive) only if it is controllable.
+# Promote the REAL checkpoint to the SERVED path (runs/drive) only if it is controllable AND beats copy.
 # PROMOTE=1 to enable (the goal/operator sets this; plain training leaves the served model alone).
 SERVED="${SERVED:-runs/drive}"
-if [ "${PROMOTE:-0}" = "1" ] && [ "$CONTROLLABLE" = "0" ]; then
+if [ "${PROMOTE:-0}" = "1" ] && [ "$CONTROLLABLE" = "0" ] && [ "$DYNAMICS_OK" = "0" ]; then
   mkdir -p "$SERVED"
   # Back up the currently-served checkpoint before overwriting (timestamp-free name; the served model
   # has been real commaVQ since goal 029, so do NOT mislabel the backup "sim").
@@ -53,7 +60,7 @@ if [ "${PROMOTE:-0}" = "1" ] && [ "$CONTROLLABLE" = "0" ]; then
   "$PY" scripts/write_drive_provenance.py --served "$SERVED" --pool "$POOL"
   echo "[train_drive_real] PROMOTED real commaVQ model → $SERVED (served path is now 100% real)"
   "$PY" scripts/eval_drive_control.py --checkpoint "$SERVED/latest.pt" || true
-elif [ "$CONTROLLABLE" != "0" ]; then
-  echo "[train_drive_real] NOT promoting - checkpoint failed the controllability gate"
+elif [ "${PROMOTE:-0}" = "1" ]; then
+  echo "[train_drive_real] NOT promoting - failed controllability ($CONTROLLABLE) or strict-dynamics ($DYNAMICS_OK)"
 fi
 echo "[train_drive_real] done → $OUT/latest.pt"

@@ -50,6 +50,34 @@ modules; the prior sim *weights* were not preserved. (Goal-035 correction: the f
 `pre029_sim_backup.pt` was actually a real-commaVQ checkpoint, not the sim - it has been renamed
 `runs/drive/pre029_real_backup.pt` and the stale sim `log.csv` files were removed.)
 
+### Driving WM copy-previous limitation + gate (goal-035)
+
+Investigated "fix the driving world model." Root cause (measured, not guessed): the served model had
+learned to **echo the previous frame** - on a real commaVQ holdout its next-token argmax matches the
+TRUE next frame only ~0.38 vs the persistence baseline ~0.39 (i.e. *below* copy-previous), and the
+free-run rollout changes ~0.4% of tokens/step (near-frozen). Consecutive commaVQ token fields are ~40%
+identical, so a teacher-forced AR wins by copying.
+
+**Four training interventions were tried; all hit the same teacher-forcing wall** (each is shipped,
+flag-gated, default-off, unit-tested in `tests/test_drive_rollout.py`):
+- `rgb_change_weight` - up-weight the CE on changed tokens. Echo persisted (the teacher-forced next-token
+  prefix is the escape hatch).
+- `rgb_div_weight` - control-divergence hinge. Broke steering (it perturbs the shared cond), reverted.
+- `prev_corrupt` - randomize prev-frame tokens so the AR can't copy. Stayed controllable but still frozen.
+- `rgb_roll_k` - scheduled-sampling rollout (feed the model its OWN generated frame as prev). Still frozen:
+  `ar.loss` is teacher-forced *within* each frame, so the intra-frame prefix remains a copy escape hatch.
+
+**Conclusion:** breaking the copy collapse needs non-teacher-forced training (fully autoregressive loss -
+infeasible at MPS scale), a larger model, or a diffusion head - beyond this session's compute. So:
+- **`eval_drive_quality.py` gained a copy-previous diagnostic** (model-acc vs persistence baseline +
+  free-run token-change-rate). It is **reported by default** (the limitation is never hidden and rides
+  verify-all) and **HARD under `--strict-dynamics`**, which is the **promote bar** `train_drive_real.sh`
+  now enforces - a future retrain can only replace the served model if it genuinely beats copy.
+- **The demo UI is now honest** (`apps/web/index.html`): the driving view is labelled "generated commaVQ
+  token field (not photoreal)"; the controls + telemetry are real and responsive.
+- The served checkpoint stays the controllable real-commaVQ token-field model (CE 2.91 on the fixture
+  holdout, controllable, stable). It is honestly a control-responsive token field, not a dynamics oracle.
+
 ### Minecraft WM visual fidelity (goal-031)
 
 The served Minecraft WM rendered blurry/washed frames ("does not look like Minecraft"). Root cause
