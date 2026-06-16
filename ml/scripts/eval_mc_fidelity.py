@@ -22,9 +22,15 @@ from __future__ import annotations
 import argparse
 import glob
 import sys
+from pathlib import Path
 
 import numpy as np
 import torch
+
+# Resolve data/ relative to the ml/ package root, NOT the CWD. detail_ratio = rollout_detail /
+# real_detail, so a baseline measured from the WRONG (or missing) data dir silently skews the headline
+# number - a CWD-relative glob that missed the pools once made the gate report 0.236 instead of 0.688.
+ML_ROOT = Path(__file__).resolve().parent.parent
 
 from blockdream_wm.serve import load_real_checkpoint
 from blockdream_wm.movement import MOVEMENT_TYPES, skill_id
@@ -56,9 +62,13 @@ def _sat(f: torch.Tensor) -> float:
 
 
 def _real_baseline(n_per_pool: int = 12) -> tuple[float, float]:
-    """Mean (detail, sat) over a real-footage holdout - the fidelity target."""
+    """Mean (detail, sat) over a real-footage holdout - the fidelity target (the detail_ratio
+    denominator). Data dir is resolved from ML_ROOT so the answer is CWD-independent. If the real
+    pools are genuinely absent, FAIL LOUD: a fidelity gate cannot honestly normalize against a
+    guessed baseline (a stale constant once made the ratio 3x wrong)."""
     det, sat = [], []
-    for p in sorted(glob.glob("data/pool_real_*")):
+    data_dir = ML_ROOT / "data"
+    for p in sorted(glob.glob(str(data_dir / "pool_real_*"))):
         segs = sorted(glob.glob(p + "/seg_*.npz"))
         if not segs:
             continue
@@ -68,7 +78,12 @@ def _real_baseline(n_per_pool: int = 12) -> tuple[float, float]:
             t = torch.from_numpy(f).permute(2, 0, 1)
             det.append(_detail(t)); sat.append(_sat(t))
     if not det:
-        return 0.0318, 0.1625  # fallback to the measured real baseline
+        raise FileNotFoundError(
+            f"no real-footage pools under {data_dir}/pool_real_* - the fidelity baseline "
+            "(detail_ratio denominator) cannot be measured, and guessing it from a constant would "
+            "silently skew the gate. Build the real pools first (scripts/prep_real_skill_pools.py "
+            "+ the VPT/mineflayer extractors), or run against a tree that has ml/data/."
+        )
     return float(np.mean(det)), float(np.mean(sat))
 
 
