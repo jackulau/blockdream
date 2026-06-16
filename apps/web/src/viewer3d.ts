@@ -175,12 +175,16 @@ export class Viewer3D {
     this.animName = frames.length <= 1 ? "spin" : "none";
     this.animStart = performance.now();
     this.playStart = performance.now();
-    // frame the camera to the volume
+    // frame the camera to the volume: fit the bounding SPHERE for the current FOV, and pull back further
+    // on a narrow canvas (aspect < 1) so a wide/flat volume doesn't overflow horizontally.
     const v = frames[0];
     if (v) {
-      const r = Math.max(v.sx, v.sy, v.sz);
-      this.maxDim = r;
-      this.camera.position.set(r * 1.4, r * 1.1, r * 1.7);
+      this.maxDim = Math.max(v.sx, v.sy, v.sz);
+      const radius = 0.5 * Math.hypot(v.sx, v.sy, v.sz);
+      const aspect = this.camera.aspect || 1;
+      const fitH = radius / Math.tan((this.camera.fov * Math.PI) / 360);
+      const dist = Math.max(fitH, fitH / Math.max(0.0001, aspect)) * 1.3;
+      this.camera.position.copy(new THREE.Vector3(0.6, 0.5, 0.8).normalize().multiplyScalar(dist));
       this.controls.target.set(0, 0, 0);
     }
     this.showFrame(0);
@@ -270,6 +274,7 @@ export class Viewer3D {
     for (const t of this.texCache.values()) t.dispose();
     this.matCache.clear();
     this.texCache.clear();
+    this.controls.dispose(); // OrbitControls owns pointer/wheel/contextmenu listeners - free them too
     this.renderer.dispose();
   }
 }

@@ -16,7 +16,7 @@
 //      The object stays coherent from every viewing angle.
 
 import type { QuantizedFrame } from "@blockdream/color-core";
-import { createVolume, setVoxel, type VoxelVolume } from "./volume";
+import { createVolume, setVoxel, MAX_DIM, type VoxelVolume } from "./volume";
 
 export interface SolidifyImageOptions {
   /** Max thickness of the solid, in voxels (the deepest part of the subject). Default 16. */
@@ -135,7 +135,8 @@ export function silhouetteDistance(mask: Uint8Array, width: number, height: numb
  */
 export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions = {}): VoxelVolume {
   const { width, height, mapColorId } = frame;
-  const maxDepth = Math.max(1, Math.floor(opts.maxDepth ?? 16));
+  if (width <= 0 || height <= 0) throw new Error(`imageToSolid: empty frame ${width}x${height}`);
+  const maxDepth = Math.max(1, Math.min(MAX_DIM, Math.floor(opts.maxDepth ?? 16)));  // clamp (no OOM)
   const curve = opts.curve ?? 0.5;
   const symmetric = opts.symmetric ?? true;
 
@@ -151,6 +152,13 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
     mask = new Uint8Array(width * height);
     for (let i = 0; i < mask.length; i++) mask[i] = bg[i] ? 0 : 1;
   }
+  // DEGENERATE-INPUT GUARD: if auto background-removal erased the whole image (e.g. a single solid
+  // colour, where the border colour == every pixel), there is no subject to inflate. Rather than
+  // silently emit an empty build, treat the whole frame as the subject (a flat-ish slab). A truly
+  // empty result still throws below.
+  let anySubject = 0;
+  for (let i = 0; i < mask.length; i++) anySubject |= mask[i]!;
+  if (!anySubject) mask.fill(1);
 
   // thickness field in [0,1]
   const thickness = new Float32Array(width * height);
@@ -158,7 +166,8 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
     for (let y = 0; y < height; y++)
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
-        thickness[i] = mask[i] ? Math.max(0, Math.min(1, opts.depthOf(x, y))) : 0;
+        const d = opts.depthOf(x, y);                              // sanitize NaN/Inf -> 0 (no silent drop)
+        thickness[i] = mask[i] ? Math.max(0, Math.min(1, Number.isFinite(d) ? d : 0)) : 0;
       }
   } else {
     const dist = silhouetteDistance(mask, width, height);
@@ -189,5 +198,8 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
       for (let z = zlo; z < zlo + d; z++) setVoxel(v, ix, wy, z, c);
     }
   }
+  // NOTE: an empty result is legitimate per-frame (framesToAnimated3d passes a 0 depth field for an
+  // all-background video frame), so the "no subject" guard lives at the CLI/aggregate level (render.ts),
+  // not here - throwing per-frame would reject valid empty frames in an animation.
   return v;
 }

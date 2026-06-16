@@ -25,6 +25,9 @@ export function volumeToFrame(v: VoxelVolume): QuantizedFrame {
         }
       }
       const p = iy * width + ix;
+      // 0 is the air/transparent sentinel (Minecraft map-colour "none"); the solid quantizer only
+      // emits canonical +2 shades, so 0 is unambiguous. The strict + web resolvers special-case it as
+      // air (emit-commands AIR_MAP_COLOR_ID) so a projected EMPTY column never becomes base 0's block.
       const id = c === EMPTY ? 0 : c;
       mapColorId[p] = id;
       paletteIndex[p] = id;

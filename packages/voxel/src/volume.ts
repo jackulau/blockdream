@@ -4,6 +4,13 @@
 
 export const EMPTY = 255;
 
+/** Per-axis size ceiling (voxels). Generous - a 512-deep build is already enormous for Minecraft -
+ *  but it stops an absurd `maxDepth`/`resolution` from being treated as legitimate. */
+export const MAX_DIM = 512;
+/** Total-volume ceiling (voxels = bytes). ~64 MB; bounds the single allocation so a huge input can't
+ *  OOM the process. A 400³ build (64 M) still fits; 1000³ (1 G) is rejected with a clear error. */
+export const MAX_VOXELS = 64_000_000;
+
 export interface VoxelVolume {
   sx: number;
   sy: number;
@@ -12,8 +19,16 @@ export interface VoxelVolume {
 }
 
 export function createVolume(sx: number, sy: number, sz: number): VoxelVolume {
-  if (sx <= 0 || sy <= 0 || sz <= 0) throw new Error(`bad volume dims ${sx}x${sy}x${sz}`);
-  const data = new Uint8Array(sx * sy * sz);
+  if (!Number.isInteger(sx) || !Number.isInteger(sy) || !Number.isInteger(sz) || sx <= 0 || sy <= 0 || sz <= 0) {
+    throw new Error(`bad volume dims ${sx}x${sy}x${sz}`);
+  }
+  const n = sx * sy * sz;
+  if (n > MAX_VOXELS) {
+    throw new Error(
+      `volume ${sx}x${sy}x${sz} = ${n} voxels exceeds the ${MAX_VOXELS}-voxel cap; reduce resolution/depth`,
+    );
+  }
+  const data = new Uint8Array(n);
   data.fill(EMPTY);
   return { sx, sy, sz, data };
 }

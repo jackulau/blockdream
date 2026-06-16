@@ -18,11 +18,32 @@ from ..transition_ar import ARTransition
 class DriveTransition(nn.Module):
     def __init__(self, cfg: DynamicsConfig, n_tokens: int, codebook_size: int,
                  n_lidar: int, n_telemetry: int, n_control: int = 3, cond_dim: int = 96,
-                 n_history: int = 0):
+                 n_history: int = 0, rgb_change_weight: float = 0.0,
+                 rgb_div_weight: float = 0.0, rgb_div_margin: float = 0.5,
+                 prev_corrupt: float = 0.0):
         super().__init__()
         self.n_lidar = n_lidar
         self.n_telemetry = n_telemetry
         self.n_control = n_control
+        # RGB DYNAMICS LOSS (the copy-previous fix). Single-step teacher-forced CE lets the AR cheat by
+        # echoing the previous frame (consecutive commaVQ token fields are ~40% identical), so the served
+        # model learned to copy prev and the free-run rollout is near-frozen. Two flag-gated terms break it
+        # (both default 0 = OFF, so existing checkpoints train/serve identically and the architecture is
+        # unchanged): rgb_change_weight up-weights the CE on positions where the frame actually CHANGES
+        # (next != prev) so copying is penalized exactly where it is wrong; rgb_div_weight requires the TRUE
+        # control to predict the next frame better than a shuffled WRONG control by rgb_div_margin, forcing
+        # control-dependent dynamics instead of a control-blind copy (the same divergence trick that broke
+        # the Minecraft WM's skill collapse).
+        self.rgb_change_weight = float(rgb_change_weight)
+        self.rgb_div_weight = float(rgb_div_weight)
+        self.rgb_div_margin = float(rgb_div_margin)
+        # PREV-FRAME CORRUPTION (the strongest copy-previous fix, and control-safe). During training only,
+        # replace a fraction of the PREV-frame tokens fed to the AR with random codes. The model can no
+        # longer win by echoing prev (the copied positions are now wrong), so it must predict the next
+        # frame from the control + spatial context - which is what makes the free-run field actually flow
+        # at inference (clean prev). Unlike the control-divergence term it does NOT touch the shared cond,
+        # so the telemetry/steering controllability is preserved. 0 = off (default; backward-compatible).
+        self.prev_corrupt = float(prev_corrupt)
         # TEMPORAL CONTEXT: optionally condition on a window of the last n_history
         # (control, telemetry) frames so the dynamics see momentum/lag, not just the current
         # step (single-step telemetry prediction drifts over long rollouts). n_history=0 → the
@@ -65,9 +86,39 @@ class DriveTransition(nn.Module):
         s = self.tel_scale.to(raw.dtype)
         return s * torch.tanh(raw / s)
 
+    def rgb_loss(self, prev_tokens, next_tokens, c, control=None, prev_lidar=None, prev_tel=None, history=None):
+        """RGB-token loss with the optional copy-previous fix (see __init__). With both weights 0 this is
+        exactly the legacy single-step CE (self.ar.loss). With rgb_change_weight>0 the CE is up-weighted on
+        positions where next != prev (the changes the copy shortcut gets wrong). With rgb_div_weight>0 a
+        margin hinge requires the true control to out-predict a shuffled control, forcing control use.
+        With prev_corrupt>0 a fraction of the prev-frame tokens are randomized (training only) so the AR
+        cannot win by echoing prev - the strongest, control-safe copy fix."""
+        if self.prev_corrupt > 0 and torch.is_grad_enabled():  # training only; clean prev for val (no_grad)
+            m = torch.rand(prev_tokens.shape, device=prev_tokens.device) < self.prev_corrupt
+            rnd = torch.randint(0, self.ar.codebook_size, prev_tokens.shape, device=prev_tokens.device)
+            prev_tokens = torch.where(m, rnd, prev_tokens)
+        cw, dw = self.rgb_change_weight, self.rgb_div_weight
+        if cw <= 0 and dw <= 0:
+            return self.ar.loss(prev_tokens, next_tokens, c)
+        logits = self.ar.forward(prev_tokens, next_tokens, c)  # (B, n, codebook)
+        ce_pos = F.cross_entropy(
+            logits.reshape(-1, logits.shape[-1]), next_tokens.reshape(-1), reduction="none"
+        ).view_as(next_tokens)  # (B, n)
+        if cw > 0:
+            w = 1.0 + cw * (next_tokens != prev_tokens).to(ce_pos.dtype)  # changed positions weigh (1+cw)x
+            rgb = (ce_pos * w).sum() / w.sum().clamp_min(1e-6)
+        else:
+            rgb = ce_pos.mean()
+        if dw > 0 and control is not None:
+            idx = torch.randperm(control.shape[0], device=control.device)  # shuffle controls across batch
+            c_wrong = self._fuse(control[idx], prev_lidar, prev_tel, history)
+            ce_wrong = self.ar.loss(prev_tokens, next_tokens, c_wrong)
+            rgb = rgb + dw * torch.relu(self.rgb_div_margin - (ce_wrong - ce_pos.mean()))
+        return rgb
+
     def loss(self, prev_tokens, next_tokens, prev_lidar, prev_tel, control, next_lidar, next_tel, history=None):
         c = self._fuse(control, prev_lidar, prev_tel, history)
-        rgb_loss = self.ar.loss(prev_tokens, next_tokens, c)
+        rgb_loss = self.rgb_loss(prev_tokens, next_tokens, c, control, prev_lidar, prev_tel, history)
         # n_lidar == 0 (e.g. the real commaVQ camera-only path) → no LiDAR modality. F.mse_loss over
         # empty (B,0) tensors returns NaN, so skip the term entirely rather than feed a fake channel.
         lidar_loss = c.new_zeros(()) if self.n_lidar == 0 else F.mse_loss(torch.sigmoid(self.lidar_head(c)), next_lidar)
@@ -114,6 +165,26 @@ class DriveTransition(nn.Module):
                 lidar = torch.sigmoid(self.lidar_head(c))
                 lidar_loss = lidar_loss + F.mse_loss(lidar, lidar_targets[:, t])
         return (tel_loss + lidar_loss) / k, {"roll_tel": tel_loss.item() / k, "roll_lidar": lidar_loss.item() / k}
+
+    def rgb_rollout_loss(self, frames, controls, lidar0, tel0, history=None):
+        """Scheduled-sampling RGB rollout - the inter-frame copy fix. From real frame 0, roll K steps:
+        at each step predict the REAL next frame (teacher-forced CE, with gradient) but feed the model's
+        OWN generated frame (detached) as the next prev. Teacher forcing alone lets the AR echo the
+        previous frame (consecutive token fields are ~40% identical) and freeze at inference; rolling its
+        own predictions forward forces it to predict multi-step change from its own (possibly copied)
+        state, so copying accumulates error and stops being optimal. Telemetry rolls (detached) alongside
+        so the conditioning matches inference. frames: (B,K+1,n_tokens); controls: (B,K,n_control)."""
+        k = controls.shape[1]
+        prev = frames[:, 0]
+        tel, lidar = tel0, lidar0
+        loss = frames.new_zeros((), dtype=torch.float32)
+        for t in range(k):
+            c = self._fuse(controls[:, t], lidar, tel, history)
+            loss = loss + self.ar.loss(prev, frames[:, t + 1], c)   # gradient: predict real next
+            with torch.no_grad():                                   # roll the model's OWN frame forward
+                prev = self.ar.generate(prev, c)
+                tel = self.bound_tel(self.telemetry_head(c))
+        return loss / max(1, k), {"rgb_roll": (loss / max(1, k)).item()}
 
     @torch.no_grad()
     def step(self, prev_tokens, prev_lidar, prev_tel, control, history=None):

@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   getJavaMapPalette,
@@ -13,6 +13,7 @@ import {
   quantizeFrame,
   quantizeVideo,
   buildRgbLut,
+  nearestSrgbHue,
   type DitherMethod,
   type QuantizedFrame,
   type PreparedPalette,
@@ -20,8 +21,8 @@ import {
 import { extractFrames } from "@blockdream/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
-import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack } from "@blockdream/emit-commands";
-import { framesToAnimated3d } from "@blockdream/voxel";
+import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
+import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -36,7 +37,8 @@ export type RenderTarget =
   | "behaviorpack"
   | "bedrock-script"
   | "mwframes"
-  | "voxel3d";
+  | "voxel3d"
+  | "model3d";
 export type Edition = "java" | "bedrock";
 
 export interface RenderOptions {
@@ -52,7 +54,11 @@ export interface RenderOptions {
   temporalThreshold?: number;
   speedTicks?: number;
   paletteVersion?: string;
-  depth?: number; // voxel3d: max build depth in blocks (default 8)
+  depth?: number; // voxel3d/model3d: max build depth / resolution in blocks (default 8)
+  smooth?: number; // 3D video: temporal depth smoothing 0..1 (default 0.35)
+  curve?: number; // 3D: thickness curve exponent (default 0.5)
+  symmetric?: boolean; // 3D: centered double-sided solid (default true); false = one-sided relief
+  gamutMap?: number; // quantizer hue-rigidity lambda for out-of-gamut colours (keeps source hue)
 }
 
 export interface RenderResult {
@@ -69,19 +75,47 @@ function writeFile(path: string, data: Buffer | string): void {
   writeFileSync(path, data);
 }
 
+/** Loader notes bundled into a 3D datapack zip (Minecraft ignores the .txt). Mirrors the web export,
+ *  including the force-clear warning the CLI zip previously lacked. */
+function howToLoad3d(namespace: string, sx: number, sy: number, sz: number): string {
+  return [
+    `blockdream 3D build — how to load`,
+    ``,
+    `1. Drop ${namespace}.zip into your world's  datapacks/  folder (or unzip it there).`,
+    `2. In game: /reload`,
+    `3. /function ${namespace}:setup    then    /function ${namespace}:start`,
+    ``,
+    `WARNING: setup force-CLEARS a ${sx}×${sy}×${sz} box at x=0 y=64 z=0 (fill ... air) before building.`,
+    `Run it somewhere safe (a flat/empty area), not on top of anything you want to keep.`,
+    `Stop with /function ${namespace}:stop (frees the force-loaded chunks).`,
+  ].join("\n") + "\n";
+}
+
+/** Guard against a silent empty 3D build (degenerate input: a solid-colour / fully-transparent image
+ *  yields zero voxels). Throws a clear error rather than writing a valid-but-empty datapack. */
+function assertNonEmpty3d(volumes: VoxelVolume[]): void {
+  if (volumes.length === 0 || volumes.every((v) => countSolid(v) === 0)) {
+    throw new Error(
+      "no subject detected: the input produced an empty 3D build (try a clearer subject/background, " +
+        "a non-zero --depth, or check the image isn't a single flat colour)",
+    );
+  }
+}
+
 function quantizeAll(
   frames: import("@blockdream/color-core").RgbImage[],
   pal: PreparedPalette,
   dither: DitherMethod,
   temporalThreshold: number | undefined,
+  gamutMap?: number,
 ): QuantizedFrame[] {
   if (frames.length <= 1) {
     // single still → exact OKLab match (best quality)
-    return frames.map((f) => quantizeFrame(f, pal, { method: dither }));
+    return frames.map((f) => quantizeFrame(f, pal, { method: dither, gamutMap }));
   }
   // video → prebuilt LUT for O(1)/pixel matching (≈20× faster, imperceptible penalty)
   const lut = buildRgbLut(pal);
-  return quantizeVideo(frames, pal, { method: dither, temporalThreshold, lut });
+  return quantizeVideo(frames, pal, { method: dither, temporalThreshold, lut, gamutMap });
 }
 
 /**
@@ -96,6 +130,59 @@ export function render(opts: RenderOptions): RenderResult {
   const mc = resolveMcVersion(opts.paletteVersion);
   const notes: string[] = [];
   const filesWritten: string[] = [];
+
+  // model3d: voxelize a real 3D MODEL (.obj/.gltf/.glb) into Minecraft blocks. Handled BEFORE
+  // extractFrames (which decodes images/video, not meshes). Per-triangle colour is matched to the
+  // solid palette via OKLab+hue (the model-import + colour path that was unreachable from the CLI).
+  if (opts.target === "model3d") {
+    const { palette } = getSolidBlockMapPalette(opts.paletteVersion);
+    const pal = preparePalette(palette);
+    const matchColor = (r: number, g: number, b: number) => nearestSrgbHue(r, g, b, pal).color.mapColorId;
+    const resolveBlock = makeBlockResolver(opts.paletteVersion);
+    const solidIds = solidBlockByMapColorId();
+    const resolveMcStructureBlock = (id: number) => {
+      const name = resolveSolidBlockId(solidIds, id);
+      return name ? { name, states: {} } : undefined;
+    };
+    const resolution = Math.max(2, opts.width); // width = cube grid resolution for models
+    const lower = opts.input.toLowerCase();
+    let volumes: VoxelVolume[];
+    if (lower.endsWith(".glb")) {
+      const buf = readFileSync(opts.input);
+      const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      volumes = glbToFrames(ab, { resolution, solid: true, matchColor });
+    } else if (lower.endsWith(".gltf")) {
+      volumes = gltfToFrames(readFileSync(opts.input, "utf8"), { resolution, solid: true, matchColor });
+    } else {
+      volumes = [objToVolume(readFileSync(opts.input, "utf8"), { resolution, solid: true, matchColor })];
+    }
+    assertNonEmpty3d(volumes);
+    if (edition === "bedrock") {
+      volumes.forEach((vol, fi) => {
+        const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
+        const path = join(opts.out, volumes.length > 1 ? `model_${fi}.mcstructure` : `model3d.mcstructure`);
+        writeFile(path, buf);
+        filesWritten.push(path);
+      });
+      const v0 = volumes[0]!;
+      notes.push(`3D model → Bedrock .mcstructure (${volumes.length} frame(s), ${v0.sx}×${v0.sy}×${v0.sz}); place with a structure block.`);
+    } else {
+      const pack = generateVoxelDatapack(volumes, resolveBlock, {
+        namespace: "blockdream_model", packFormat: mc.packFormat,
+        supportedFormats: JAVA_DATAPACK_SUPPORTED, optimize: (cells, r) => greedyBoxes(cells, r),
+      });
+      const mv = volumes[0]!;
+      pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, mv.sx, mv.sy, mv.sz));
+      writePack(pack, opts.out);
+      filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
+      const zip = join(opts.out, `${pack.namespace}.zip`);
+      writeFile(zip, Buffer.from(packageJavaDatapack(pack)));
+      filesWritten.push(zip);
+      notes.push(`3D model → vanilla datapack (${volumes.length} frame(s), ${pack.totalCommands ?? pack.totalSetblocks} cmds): drop ${pack.namespace}.zip into world/datapacks/, /function ${pack.namespace}:setup then :start.`);
+    }
+    const v0 = volumes[0]!;
+    return { target: opts.target, frameCount: volumes.length, width: v0.sx, height: v0.sy, filesWritten, notes };
+  }
 
   const frames = extractFrames(opts.input, {
     width: opts.width,
@@ -114,7 +201,7 @@ export function render(opts: RenderOptions): RenderResult {
         ? getBedrockMapPalette(opts.paletteVersion)
         : getJavaMapPalette(opts.paletteVersion);
     const pal = preparePalette(mapPal);
-    const q = quantizeAll(frames, pal, dither, opts.temporalThreshold);
+    const q = quantizeAll(frames, pal, dither, opts.temporalThreshold, opts.gamutMap);
     if (opts.width % MAP_DIM !== 0 || opts.height % MAP_DIM !== 0) {
       throw new Error(`map target requires grid sizes that are multiples of ${MAP_DIM} (got ${opts.width}×${opts.height})`);
     }
@@ -137,7 +224,7 @@ export function render(opts: RenderOptions): RenderResult {
         ? getBedrockMapPalette(opts.paletteVersion)
         : getJavaMapPalette(opts.paletteVersion);
     const pal = preparePalette(mapPal);
-    const q = quantizeAll(frames, pal, dither, opts.temporalThreshold);
+    const q = quantizeAll(frames, pal, dither, opts.temporalThreshold, opts.gamutMap);
     if (opts.width % MAP_DIM !== 0 || opts.height % MAP_DIM !== 0) {
       throw new Error(`mwframes target requires grid sizes that are multiples of ${MAP_DIM}`);
     }
@@ -151,21 +238,31 @@ export function render(opts: RenderOptions): RenderResult {
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
-  // block-based targets
-  const { palette, blockByMapColorId } = getSolidBlockMapPalette(opts.paletteVersion);
+  // block-based targets. Use the canonical shade-tolerant + air-aware resolver (block-resolver.ts) so
+  // the CLI can't drift from the library and a non-+2 shade (4-shade palette / model import) never
+  // silently drops to air. `solidIds` backs the mcstructure closures that need {name, states}.
+  const { palette } = getSolidBlockMapPalette(opts.paletteVersion);
   const pal = preparePalette(palette);
-  const q = quantizeAll(frames, pal, dither, opts.temporalThreshold);
-  const resolveBlock = (id: number) => blockByMapColorId.get(id)?.id;
+  const q = quantizeAll(frames, pal, dither, opts.temporalThreshold, opts.gamutMap);
+  const resolveBlock = makeBlockResolver(opts.paletteVersion);
+  const solidIds = solidBlockByMapColorId();
+  const resolveMcStructureBlock = (id: number) => {
+    const name = resolveSolidBlockId(solidIds, id);
+    return name ? { name, states: {} } : undefined;
+  };
 
   if (opts.target === "voxel3d") {
     // video → temporally-stable animated 3D block build → vanilla datapack (delta-encoded, fill-batched)
-    const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
+    const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric });
+    assertNonEmpty3d(volumes);
     const pack = generateVoxelDatapack(volumes, resolveBlock, {
       namespace: "blockdream_3d",
       packFormat: mc.packFormat,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
     });
+    const vv = volumes[0]!;
+    pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, vv.sx, vv.sy, vv.sz));
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const zip = join(opts.out, `${pack.namespace}.zip`);
@@ -179,10 +276,7 @@ export function render(opts: RenderOptions): RenderResult {
 
   if (opts.target === "mcstructure") {
     q.forEach((frame, fi) => {
-      const buf = buildMcStructure(frame, (id) => {
-        const b = blockByMapColorId.get(id);
-        return b ? { name: b.id, states: {} } : undefined;
-      }, { blockVersion: BEDROCK_BLOCK_VERSION });
+      const buf = buildMcStructure(frame, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
       const path = join(opts.out, q.length > 1 ? `frame_${fi}.mcstructure` : `art.mcstructure`);
       writeFile(path, buf);
       filesWritten.push(path);
@@ -194,12 +288,10 @@ export function render(opts: RenderOptions): RenderResult {
   if (opts.target === "mcstructure3d") {
     // image/video → temporally-stable 3D volumes (same pipeline as voxel3d) → a TRUE 3D Bedrock
     // .mcstructure per frame (depth = volume depth, not the 1-thick wall of `mcstructure`)
-    const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
+    const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric });
+    assertNonEmpty3d(volumes);
     volumes.forEach((vol, fi) => {
-      const buf = buildVoxelMcStructure(vol, (id) => {
-        const b = blockByMapColorId.get(id);
-        return b ? { name: b.id, states: {} } : undefined;
-      }, { blockVersion: BEDROCK_BLOCK_VERSION });
+      const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
       const path = join(opts.out, volumes.length > 1 ? `frame_${fi}.mcstructure` : `model3d.mcstructure`);
       writeFile(path, buf);
       filesWritten.push(path);

@@ -10,17 +10,24 @@ blockdream preview <input> --out preview.png   (side-by-side source | block-art 
 Convert a GIF/video into Minecraft block-art.
 
 Options:
-  --target <t>       map | mcstructure | mcstructure3d | datapack | behaviorpack | mwframes | voxel3d
+  --target <t>       map | mcstructure | mcstructure3d | datapack | behaviorpack | mwframes | voxel3d | model3d
                        (default: datapack; mwframes = Fabric map-wall mod pool;
-                        mcstructure3d = TRUE 3D Bedrock structure from the voxel pipeline)
-  --edition <e>      java | bedrock                                (map target only; default: java)
-  --grid <WxH>       block grid size      (default: 128x128 for map, 64x64 otherwise)
+                        mcstructure3d = TRUE 3D Bedrock structure from the voxel pipeline;
+                        model3d = voxelize a real 3D MODEL .obj/.gltf/.glb into blocks)
+  --edition <e>      java | bedrock                  (map + model3d targets; default: java)
+  --grid <WxH>       block grid size      (default: 128x128 for map, 64x64 otherwise;
+                       for model3d the WIDTH is the cube voxel resolution)
   --fps <n>          sample frame rate    (default: source rate)
   --max-frames <n>   cap number of frames
   --dither <d>       floyd-steinberg | bayer | none
                        (default: bayer for video, floyd-steinberg for stills)
   --temporal <n>     temporal-coherence threshold for video (e.g. 0.002)
+  --gamut <lambda>   hue-rigidity for out-of-gamut colours (e.g. 0.8; keeps source hue)
   --speed <ticks>    ticks/frame for datapack/behaviorpack playback (default: 2 = 10fps)
+  --depth <n>        3D build depth in blocks for voxel3d/mcstructure3d (default: 8)
+  --smooth <n>       3D video temporal depth smoothing 0..1 (default: 0.35)
+  --curve <n>        3D thickness curve exponent (<1 rounds the dome; default: 0.5)
+  --flat             3D one-sided relief instead of the centered double-sided solid
   --version <ver>    target Minecraft version: 1.21 .. 1.21.10 (default: 1.21).
                        Sets pack_format / DataVersion / block stamps. Java datapacks
                        also declare supported_formats so one pack loads across the
@@ -38,6 +45,7 @@ const TARGETS = new Set<RenderTarget>([
   "bedrock-script",
   "mwframes",
   "voxel3d",
+  "model3d",
 ]);
 const DITHERS = new Set<DitherMethod>(["floyd-steinberg", "bayer", "none"]);
 
@@ -55,6 +63,9 @@ export function runCli(argv: string[]): number {
       temporal: { type: "string" },
       speed: { type: "string" },
       depth: { type: "string" },
+      smooth: { type: "string" },
+      curve: { type: "string" },
+      flat: { type: "boolean" },
       version: { type: "string" },
       out: { type: "string" },
       palette: { type: "string" },
@@ -130,6 +141,10 @@ export function runCli(argv: string[]): number {
     temporalThreshold: values.temporal ? Number(values.temporal) : undefined,
     speedTicks: values.speed ? Number(values.speed) : undefined,
     depth: values.depth ? Number(values.depth) : undefined,
+    smooth: values.smooth ? Number(values.smooth) : undefined,
+    curve: values.curve ? Number(values.curve) : undefined,
+    symmetric: values.flat ? false : undefined,
+    gamutMap: values.gamut ? Number(values.gamut) : undefined,
     paletteVersion: values.version,
   };
 

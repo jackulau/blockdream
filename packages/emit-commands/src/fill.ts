@@ -31,6 +31,38 @@ export function fillBatchCount(cells: PlacedCell[], resolve: (mapColorId: number
   return fillBatch(cells, resolve).length;
 }
 
+/** Minecraft's hard `/fill` cap: a single fill may touch at most this many blocks, else the command
+ *  is rejected at runtime ("Too many blocks in the specified area") and that region never builds. */
+export const MAX_FILL_VOLUME = 32768;
+
+/**
+ * Emit one-or-more `fill` lines covering the box [x0..x1]×[y0..y1]×[z0..z1], each ≤ MAX_FILL_VOLUME
+ * blocks. A box within the cap is a single `/fill`; an oversized box is halved along its longest axis
+ * until every piece fits (a 64³ solid → 8 fills of 32768, not one rejected 262144 fill). The pieces
+ * tile the box exactly (no overlap, no gap), so the result is identical to one giant fill.
+ */
+export function fillLines(
+  x0: number, y0: number, z0: number, x1: number, y1: number, z1: number,
+  block: string, mode: "replace" | "destroy" | "keep" | "hollow" | "outline" = "replace",
+): string[] {
+  const lines: string[] = [];
+  const stack: [number, number, number, number, number, number][] = [[x0, y0, z0, x1, y1, z1]];
+  while (stack.length) {
+    const [ax, ay, az, bx, by, bz] = stack.pop()!;
+    const dx = bx - ax + 1, dy = by - ay + 1, dz = bz - az + 1;
+    if (dx * dy * dz <= MAX_FILL_VOLUME) {
+      lines.push(`fill ${ax} ${ay} ${az} ${bx} ${by} ${bz} ${block} ${mode}`);
+    } else if (dx >= dy && dx >= dz) {
+      const m = (ax + bx) >> 1; stack.push([m + 1, ay, az, bx, by, bz], [ax, ay, az, m, by, bz]);
+    } else if (dy >= dz) {
+      const m = (ay + by) >> 1; stack.push([ax, m + 1, az, bx, by, bz], [ax, ay, az, bx, m, bz]);
+    } else {
+      const m = (az + bz) >> 1; stack.push([ax, ay, m + 1, bx, by, bz], [ax, ay, az, bx, by, m]);
+    }
+  }
+  return lines;
+}
+
 const key3 = (x: number, y: number, z: number) => `${x}|${y}|${z}`;
 
 /**
@@ -99,7 +131,7 @@ export function greedyBoxes(cells: PlacedCell[], resolve: (mapColorId: number) =
     if (x0 === x1 && y0 === y1 && z0 === z1) {
       lines.push(`setblock ${x0} ${y0} ${z0} ${block} replace`);
     } else {
-      lines.push(`fill ${x0} ${y0} ${z0} ${x1} ${y1} ${z1} ${block} replace`);
+      lines.push(...fillLines(x0, y0, z0, x1, y1, z1, block, "replace")); // split at the 32768 /fill cap
     }
   }
   return lines;

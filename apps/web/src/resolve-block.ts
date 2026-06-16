@@ -5,7 +5,7 @@
 // solid-block resolver from @blockdream/emit-commands (the exact mapping the datapack /
 // behaviorpack emitters place), plus display info (name + rgb) for that SAFE block.
 
-import { solidBlockByMapColorId } from "@blockdream/emit-commands";
+import { solidBlockByMapColorId, AIR_MAP_COLOR_ID } from "@blockdream/emit-commands";
 import blockPalette from "@blockdream/palette/data/java-block-palette-1.21.json";
 
 export interface SafeBlockInfo {
@@ -38,17 +38,20 @@ function table(): Map<number, SafeBlockInfo> {
 }
 
 /** Display info (name, id, rgb) for the SAFE placeable block of a map-colour id, or
- *  undefined for unmapped ids (callers treat those as air). */
+ *  undefined for unmapped ids (callers treat those as air). The air sentinel (0) is air, NOT base 0:
+ *  `0 >> 2 == 0` would otherwise resolve a projected EMPTY column to base 0's block. */
 export function safeBlockInfo(mapColorId: number): SafeBlockInfo | undefined {
+  if (mapColorId === AIR_MAP_COLOR_ID) return undefined;
   return table().get(mapColorId >> 2);
 }
 
 /**
- * mapColorId → placeable block id (cross-edition-safe solid set; air for unmapped ids).
- * Unlike the strict emitter resolver (solidBlockByMapColorId keys full shades only,
- * baseId*4+2), this accepts ANY shade of a base - the web 3D path quantizes against the
- * full map palette, so its volumes carry all four shade ids of each base.
+ * mapColorId → placeable block id (cross-edition-safe solid set; air for the air sentinel and any
+ * unmapped id). The `>> 2` accepts ANY shade of a base (a 4-shade palette / staircase shading maps to
+ * the base's one safe block), but the air sentinel (0) must short-circuit to air first - `0 >> 2 == 0`
+ * would otherwise place base 0's block for every transparent / projected-EMPTY cell.
  */
 export function resolveBlock(mapColorId: number): string {
+  if (mapColorId === AIR_MAP_COLOR_ID) return "minecraft:air";
   return table().get(mapColorId >> 2)?.id ?? "minecraft:air";
 }

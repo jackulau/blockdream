@@ -19,6 +19,26 @@ const BLOCK_PALETTE = blockPaletteData as unknown as BlockPalette;
 /** Default block for an unmapped map-colour id (matches DatapackOptions.fallbackBlock). */
 export const FALLBACK_BLOCK = "minecraft:air";
 
+/**
+ * The transparent / air map-colour sentinel. Minecraft map-colour 0 is the "none" colour and the
+ * solid quantizer only ever emits canonical full shades (baseId*4 + 2), so 0 is never a real solid
+ * block - `volumeToFrame` (voxel/project.ts) uses it for an EMPTY voxel column. A resolver MUST map
+ * it to air BEFORE any shade folding, otherwise `(0 & ~3) | 2 == 2` would resurrect base 0's block.
+ */
+export const AIR_MAP_COLOR_ID = 0;
+
+/**
+ * Resolve a map-colour id to a solid block id - air-aware AND shade-tolerant. Returns `undefined` for
+ * the air sentinel (so callers place air) and for a base that genuinely has no placeable block. Folds a
+ * non-canonical shade (baseId*4 + {0,1,3}) to the base's canonical +2 block, so a 4-shade palette,
+ * staircase shading, or the 3D model importer can never silently drop a shaded voxel to air. This is the
+ * single source the strict emitter resolvers share so the CLI and the library can't drift.
+ */
+export function resolveSolidBlockId(byId: Map<number, string>, mapColorId: number): string | undefined {
+  if (mapColorId === AIR_MAP_COLOR_ID) return undefined;        // air BEFORE folding (0&~3|2 == 2)
+  return byId.get(mapColorId) ?? byId.get((mapColorId & ~3) | 2);
+}
+
 export interface BlockResolverOptions {
   /** Block returned for an unmapped map-colour id. Default {@link FALLBACK_BLOCK}. */
   fallbackBlock?: string;
@@ -64,5 +84,5 @@ export function makeBlockResolver(
   resolveMcVersion(paletteVersion); // validate / alias - data is canonical for the whole line
   const byId = solidBlockByMapColorId();
   const fallback = opts.fallbackBlock ?? FALLBACK_BLOCK;
-  return (mapColorId: number) => byId.get(mapColorId) ?? fallback;
+  return (mapColorId: number) => resolveSolidBlockId(byId, mapColorId) ?? fallback;
 }
