@@ -75,6 +75,22 @@ function writeFile(path: string, data: Buffer | string): void {
   writeFileSync(path, data);
 }
 
+/** Loader notes bundled into a 3D datapack zip (Minecraft ignores the .txt). Mirrors the web export,
+ *  including the force-clear warning the CLI zip previously lacked. */
+function howToLoad3d(namespace: string, sx: number, sy: number, sz: number): string {
+  return [
+    `blockdream 3D build — how to load`,
+    ``,
+    `1. Drop ${namespace}.zip into your world's  datapacks/  folder (or unzip it there).`,
+    `2. In game: /reload`,
+    `3. /function ${namespace}:setup    then    /function ${namespace}:start`,
+    ``,
+    `WARNING: setup force-CLEARS a ${sx}×${sy}×${sz} box at x=0 y=64 z=0 (fill ... air) before building.`,
+    `Run it somewhere safe (a flat/empty area), not on top of anything you want to keep.`,
+    `Stop with /function ${namespace}:stop (frees the force-loaded chunks).`,
+  ].join("\n") + "\n";
+}
+
 /** Guard against a silent empty 3D build (degenerate input: a solid-colour / fully-transparent image
  *  yields zero voxels). Throws a clear error rather than writing a valid-but-empty datapack. */
 function assertNonEmpty3d(volumes: VoxelVolume[]): void {
@@ -155,6 +171,8 @@ export function render(opts: RenderOptions): RenderResult {
         namespace: "blockdream_model", packFormat: mc.packFormat,
         supportedFormats: JAVA_DATAPACK_SUPPORTED, optimize: (cells, r) => greedyBoxes(cells, r),
       });
+      const mv = volumes[0]!;
+      pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, mv.sx, mv.sy, mv.sz));
       writePack(pack, opts.out);
       filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
       const zip = join(opts.out, `${pack.namespace}.zip`);
@@ -243,6 +261,8 @@ export function render(opts: RenderOptions): RenderResult {
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
     });
+    const vv = volumes[0]!;
+    pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, vv.sx, vv.sy, vv.sz));
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const zip = join(opts.out, `${pack.namespace}.zip`);
