@@ -78,10 +78,17 @@ Follow-up after a user reported the demo still gray. Two findings:
    128px VPT frames, downsampled to 64px. `prep_real_skill_pools.py` + `extract_real_from_vpt.py` gained
    a `--size 128` path; rebuilt walk/general (~12k frames each), jump (7k), sprint (1.1k) at native 128px;
    mineflayer skills (swim/boat/elytra/pig/minecart) upscaled real-64->128 (new in-game collection is
-   operator-gated: needs Java 21 + a live server). `train_skills_hi.sh POOLS` is overridable; a 128px
-   retrain (`PRESET=m4`, codebook 1024) on the 9 bigger pools is promote-only-if-better vs 0.735.
-   Tradeoff: 128px gen is slower (~1.5 fps vs 3.8) but the display is rAF-decoupled, so it stays smooth.
-   (Final promoted numbers recorded at promote time.)
+   operator-gated: needs Java 21 + a live server). `train_skills_hi.sh POOLS` is overridable.
+3. **128px is sharper but the skill conditioning COLLAPSES there - the key finding.** Two full 128px
+   retrains were run: `m4` (big dim384 AR) and `hi128` (small dim192 AR). Both reached genuinely sharp
+   frames (resolution-fair fidelity **~1.05 vs the 64px served 0.69** - hotbar/terrain legible) but BOTH
+   collapsed the 9 movement types to **0/36 distinct** (mean |Δ| 0.0005-0.003, stalled - not undertraining).
+   So it is NOT an AR-size problem: at 128px/cb1024 the skill-embedding signal is drowned by the larger
+   token distribution. `promote_mc_fidelity.sh` gates on fidelity AND distinctness, so it correctly KEPT
+   the working 64px (sharp-enough + 36/36 distinct, browser-verified recognizable Minecraft). A
+   sharp-AND-distinct 128px model needs a skill-conditioning STRENGTH fix (bigger/re-injected skill embed
+   or a skill-divergence loss), not more training - that is the documented next step. 128px gen is also
+   ~1.5 fps vs 3.8 (rAF-decoupled display stays smooth). Served stays the 64px model.
 
 ### Temporal-context retrain experiment (2026-06-10, goal 027 - NOT promoted; sim-era, superseded)
 
