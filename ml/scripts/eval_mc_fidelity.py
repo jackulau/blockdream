@@ -33,9 +33,18 @@ GRAY_STD_FLOOR = 0.06          # below this, the frame is a flat gray collapse
 DETAIL_FLOOR = 0.15            # detail_ratio below this = near-flat (broken)
 
 
+CANON = 128  # measure detail at a canonical resolution so 64px and 128px models compare fairly:
+# a native-128 frame (finer real detail) must not be penalized vs a 64px frame, and an upscaled-64
+# frame (blurry at 128) must not be flattered. Both are resized to CANON before the gradient.
+
+
 def _detail(f: torch.Tensor) -> float:
-    """Mean gradient magnitude (HF energy / sharpness) of a (3,H,W) frame in [0,1]."""
+    """Mean gradient magnitude (HF energy / sharpness) of a (3,H,W) frame in [0,1], measured at a
+    canonical CANON x CANON resolution so models of different native resolution are comparable."""
+    import torch.nn.functional as F
     f = torch.as_tensor(f).float()
+    if f.shape[-1] != CANON or f.shape[-2] != CANON:
+        f = F.interpolate(f.unsqueeze(0), size=(CANON, CANON), mode="bilinear", align_corners=False)[0]
     dx = (f[..., 1:, :] - f[..., :-1, :]).abs().mean()
     dy = (f[..., :, 1:] - f[..., :, :-1]).abs().mean()
     return float((dx + dy) / 2)

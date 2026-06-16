@@ -28,7 +28,7 @@ def _downsample2x(frames: np.ndarray) -> np.ndarray:
     return np.clip(f, 0, 255).astype(np.uint8)
 
 
-def _write_pool(segs: list[Path], out: Path, skill: str, frames_budget: int) -> int:
+def _write_pool(segs: list[Path], out: Path, skill: str, frames_budget: int, size: int = 64) -> int:
     out.mkdir(parents=True, exist_ok=True)
     (out / "skill.txt").write_text(skill)
     written = total = 0
@@ -37,12 +37,14 @@ def _write_pool(segs: list[Path], out: Path, skill: str, frames_budget: int) -> 
             break
         d = np.load(s)
         f, a = d["frames"], d["actions"]
-        if f.shape[1] != 64:  # downsample 128→64 if needed
+        if size == 64 and f.shape[1] != 64:   # downsample 128->64
             f = _downsample2x(f)
+        elif size == 128 and f.shape[1] != 128:
+            raise SystemExit(f"--size 128 needs 128px source frames; {s} is {f.shape[1]}px")
         np.savez_compressed(out / f"seg_{written:05d}.npz", frames=f, actions=a)
         written += 1
         total += f.shape[0]
-    print(f"[prep] {out.name}: {written} segments, {total} frames @64px (skill={skill})")
+    print(f"[prep] {out.name}: {written} segments, {total} frames @{size}px (skill={skill})")
     return total
 
 
@@ -51,16 +53,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--src", default="data/pool_m4", help="real VPT pool (128px segments)")
     ap.add_argument("--frames-per", type=int, default=2560, help="approx frames per output pool")
     ap.add_argument("--outdir", default="data")
+    ap.add_argument("--size", type=int, default=64, choices=[64, 128],
+                    help="output resolution: 64 (downsample, default) or 128 (native, more footage/fidelity)")
     args = ap.parse_args(argv)
 
     src = Path(args.src)
     segs = sorted(src.glob("seg_*.npz"))
     if not segs:
         raise SystemExit(f"no seg_*.npz in {src}")
+    sz = args.size
     half = len(segs) // 2
     # disjoint segment ranges → general and walk see different real footage (no overlap leakage)
-    n_g = _write_pool(segs[:half], Path(args.outdir) / "pool_real_general64", "general", args.frames_per)
-    n_w = _write_pool(segs[half:], Path(args.outdir) / "pool_real_walk64", "walk", args.frames_per)
+    n_g = _write_pool(segs[:half], Path(args.outdir) / f"pool_real_general{sz}", "general", args.frames_per, sz)
+    n_w = _write_pool(segs[half:], Path(args.outdir) / f"pool_real_walk{sz}", "walk", args.frames_per, sz)
     print(f"[prep] done: general={n_g} frames, walk={n_w} frames")
     return 0 if (n_g and n_w) else 1
 

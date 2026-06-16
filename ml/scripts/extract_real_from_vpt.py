@@ -51,7 +51,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--outdir", default="data")
     ap.add_argument("--min-run", type=int, default=12, help="min consecutive frames for a run (1.2s @10fps)")
     ap.add_argument("--budget", type=int, default=2560, help="approx frames per skill pool")
+    ap.add_argument("--size", type=int, default=64, choices=[64, 128],
+                    help="output resolution: 64 (downsample, default) or 128 (native)")
     args = ap.parse_args(argv)
+    sz = args.size
 
     segs = sorted(Path(args.src).glob("seg_*.npz"))
     if not segs:
@@ -66,7 +69,9 @@ def main(argv: list[str] | None = None) -> int:
 
     def jump_mask(a):    # forward held with jumping mixed in (bunny-hop / jump-move): widen taps by ±4 frames
         j = a[:, JUMP] > 0.5
-        wide = np.convolve(j.astype(np.float32), np.ones(9), "same") > 0.5
+        # np.convolve(..., "same") returns length max(len(j), 9), so a segment shorter than the window
+        # would mismatch a[:, FWD]; slice back to len(j) (such short segments yield no >=min_run run anyway).
+        wide = (np.convolve(j.astype(np.float32), np.ones(9), "same")[: len(j)] > 0.5)
         return (a[:, FWD] > 0.5) & wide
 
     skills = {"sprint": sprint_mask, "jump": jump_mask, "walk": walk_mask}
@@ -74,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     totals = {s: 0 for s in skills}
     out_dirs = {}
     for s in skills:
-        d = Path(args.outdir) / f"pool_real_{s}64"
+        d = Path(args.outdir) / f"pool_real_{s}{sz}"
         d.mkdir(parents=True, exist_ok=True)
         (d / "skill.txt").write_text(s)
         out_dirs[s] = d
@@ -91,13 +96,13 @@ def main(argv: list[str] | None = None) -> int:
             for a, b in _runs(mask, args.min_run):
                 if totals[s] >= args.budget:
                     break
-                fr = _downsample2x(frames[a:b])
+                fr = frames[a:b] if sz == 128 else _downsample2x(frames[a:b])
                 np.savez_compressed(out_dirs[s] / f"seg_{writers[s]:05d}.npz", frames=fr, actions=actions[a:b])
                 writers[s] += 1
                 totals[s] += fr.shape[0]
 
     for s in skills:
-        print(f"[extract] pool_real_{s}64: {writers[s]} runs, {totals[s]} real frames @64px")
+        print(f"[extract] pool_real_{s}{sz}: {writers[s]} runs, {totals[s]} real frames @{sz}px")
     return 0 if all(totals[s] > 0 for s in skills) else 1
 
 
