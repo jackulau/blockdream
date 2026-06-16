@@ -20,7 +20,7 @@ import {
 import { extractFrames } from "@blockdream/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
-import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack } from "@blockdream/emit-commands";
+import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
 import { framesToAnimated3d } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
@@ -151,11 +151,18 @@ export function render(opts: RenderOptions): RenderResult {
     return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
-  // block-based targets
-  const { palette, blockByMapColorId } = getSolidBlockMapPalette(opts.paletteVersion);
+  // block-based targets. Use the canonical shade-tolerant + air-aware resolver (block-resolver.ts) so
+  // the CLI can't drift from the library and a non-+2 shade (4-shade palette / model import) never
+  // silently drops to air. `solidIds` backs the mcstructure closures that need {name, states}.
+  const { palette } = getSolidBlockMapPalette(opts.paletteVersion);
   const pal = preparePalette(palette);
   const q = quantizeAll(frames, pal, dither, opts.temporalThreshold);
-  const resolveBlock = (id: number) => blockByMapColorId.get(id)?.id;
+  const resolveBlock = makeBlockResolver(opts.paletteVersion);
+  const solidIds = solidBlockByMapColorId();
+  const resolveMcStructureBlock = (id: number) => {
+    const name = resolveSolidBlockId(solidIds, id);
+    return name ? { name, states: {} } : undefined;
+  };
 
   if (opts.target === "voxel3d") {
     // video → temporally-stable animated 3D block build → vanilla datapack (delta-encoded, fill-batched)
@@ -179,10 +186,7 @@ export function render(opts: RenderOptions): RenderResult {
 
   if (opts.target === "mcstructure") {
     q.forEach((frame, fi) => {
-      const buf = buildMcStructure(frame, (id) => {
-        const b = blockByMapColorId.get(id);
-        return b ? { name: b.id, states: {} } : undefined;
-      }, { blockVersion: BEDROCK_BLOCK_VERSION });
+      const buf = buildMcStructure(frame, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
       const path = join(opts.out, q.length > 1 ? `frame_${fi}.mcstructure` : `art.mcstructure`);
       writeFile(path, buf);
       filesWritten.push(path);
@@ -196,10 +200,7 @@ export function render(opts: RenderOptions): RenderResult {
     // .mcstructure per frame (depth = volume depth, not the 1-thick wall of `mcstructure`)
     const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8 });
     volumes.forEach((vol, fi) => {
-      const buf = buildVoxelMcStructure(vol, (id) => {
-        const b = blockByMapColorId.get(id);
-        return b ? { name: b.id, states: {} } : undefined;
-      }, { blockVersion: BEDROCK_BLOCK_VERSION });
+      const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
       const path = join(opts.out, volumes.length > 1 ? `frame_${fi}.mcstructure` : `model3d.mcstructure`);
       writeFile(path, buf);
       filesWritten.push(path);
