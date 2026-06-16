@@ -56,6 +56,25 @@ def _dump_sample(tok: Tokenizer, frames: torch.Tensor, val_idx: np.ndarray, out:
     Image.fromarray(strip, "RGB").resize((strip.shape[1] * 3, strip.shape[0] * 3), Image.NEAREST).save(out / "samples" / f"{tag}.png")
 
 
+def skill_divergence_loss(ce_true, ce_wrong, weight: float, margin: float):
+    """Skill-divergence aux loss - the 128px skill-collapse fix (goal 034).
+
+    Total AR loss = next-frame CE under the TRUE skill, plus a margin hinge that penalizes the
+    model unless the true skill predicts the frame better than a WRONG (shuffled) skill by `margin`.
+    This forces the model to actually USE the movement-type embedding: at 128px the additive skill
+    bias is otherwise drowned by the larger token distribution and all 9 movement types collapse to
+    identical frames (verified: 0/36 distinct without this term, up to 24/36 with it). `weight<=0`
+    returns plain CE so the term is OFF by default and every existing checkpoint trains identically.
+
+    ce_true, ce_wrong: scalar tensors (mean next-token CE under the true / a wrong skill id).
+    Returns the scalar total-loss tensor to backprop.
+    """
+    if weight <= 0:
+        return ce_true
+    aux = torch.relu(margin - (ce_wrong - ce_true))   # 0 once ce_wrong exceeds ce_true by `margin`
+    return ce_true + weight * aux
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("blockdream_wm.train_long")
     ap.add_argument("--pool", default=None, help="single pool dir")
@@ -208,8 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         off = torch.randint(1, enc.n_skills, sk.shape, device=sk.device)
         sk_wrong = (sk + off) % enc.n_skills                       # guaranteed != sk
         ce_wrong = ar.loss(prev, nxt, enc(b, c, skill=sk_wrong))
-        aux = torch.relu(sdm - (ce_wrong - ce_true))               # push ce_wrong > ce_true + margin
-        return ce_true + sdw * aux, ce_true.detach()
+        return skill_divergence_loss(ce_true, ce_wrong, sdw, sdm), ce_true.detach()
 
     while phase == "ar" and ar_step < args.ar_steps and not time_up():
         prev, nxt, b, c, sk = ar_batch(train_pairs)
