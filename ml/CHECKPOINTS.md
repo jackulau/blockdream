@@ -103,12 +103,20 @@ Result (hi128 preset, 128px/cb1024, MPS): the aux loss **broke the collapse** th
 distinctness went from a flat **0/36** (goal-033's two 128px retrains) to **24/36 at ar~10k** while frames
 stayed sharp (resolution-fair fidelity **~0.91 vs the 64px served 0.69**). This confirms the goal-033
 diagnosis was correct: 128px collapse is a conditioning-STRENGTH problem, not AR size or undertraining.
-At weight 1.5 the run settled at 20-24/36 (the stuck ~14 pairs are the mineflayer skills, which are
-upscaled real-64->128, so their content is similar and resists divergence). `promote_mc_fidelity.sh`
-gates on fidelity AND full 9/9 (36/36) distinctness, so it correctly **KEPT the 64px served model** (the
-only verified-36/36-distinct, browser-recognizable Minecraft). A higher weight (SKILL_DIV=3.0) is the
-next push; full 36/36 at 128px likely also needs real native-128px mineflayer footage (operator-gated:
-Java 21 + live server) rather than the upscaled pools. The skill-div trainer ships either way.
+`promote_mc_fidelity.sh` gates on fidelity AND full 9/9 (36/36) distinctness, so it correctly **KEPT the
+64px served model** (the only verified-36/36-distinct, browser-recognizable Minecraft - re-verified this
+run: fidelity 0.688, mean |Δ| 0.0234, 36/36 DISTINCT).
+
+**A controlled weight sweep isolated the remaining ceiling to DATA, not the knob.** Two full hi128+SD
+retrains were run to completion (ar 36000): SKILL_DIV **1.5** (fidelity 0.909) and **3.0** (fidelity
+**1.003** - as sharp as real footage). BOTH landed **20/36 distinct** - doubling the conditioning force
+did not unstick a single frozen pair. The higher weight only made the *already-distinct* pairs sharper
+(mean pairwise |Δ| 0.16 -> 0.20); the ~16 stuck pairs are the mineflayer skills (swim/boat/elytra/pig/
+minecart), which are **upscaled real-64->128**, so their pixel content is near-identical and cannot
+diverge no matter how hard the skill embedding pushes. Conclusion: full 36/36 at 128px needs real
+**native-128px mineflayer footage** (operator-gated: Java 21 + live server), NOT more weight or training.
+The served model stays 64px; the skill-div trainer (`--skill-div-weight`, unit-tested) ships for when
+native-128px footage exists.
 
 ### Temporal-context retrain experiment (2026-06-10, goal 027 - NOT promoted; sim-era, superseded)
 
