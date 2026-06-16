@@ -32,7 +32,8 @@ echo "[train_drive_real] pool=$POOL → $OUT (real commaVQ, camera-only, MPS)"
 PYTORCH_ENABLE_MPS_FALLBACK=1 "$PY" -m blockdream_wm.drive.train_real \
   --pool "$POOL" --out "$OUT" --ar-steps "$AR_STEPS" --max-minutes "$MAX_MIN" --device "$DEVICE" \
   --rgb-change-weight "${RGB_CHANGE_WEIGHT:-0}" --rgb-div-weight "${RGB_DIV_WEIGHT:-0}" \
-  --rgb-div-margin "${RGB_DIV_MARGIN:-0.5}" --prev-corrupt "${PREV_CORRUPT:-0}"
+  --rgb-div-margin "${RGB_DIV_MARGIN:-0.5}" --prev-corrupt "${PREV_CORRUPT:-0}" \
+  --rgb-roll-k "${RGB_ROLL_K:-0}" --rgb-roll-weight "${RGB_ROLL_WEIGHT:-0.5}"
 
 if [ -f "$OUT/best.pt" ]; then cp "$OUT/best.pt" "$OUT/latest.pt"; echo "[train_drive_real] best.pt -> latest.pt"; fi
 echo "[train_drive_real] verifying controllability…"
@@ -44,7 +45,9 @@ CONTROLLABLE=$?
 SERVED="${SERVED:-runs/drive}"
 if [ "${PROMOTE:-0}" = "1" ] && [ "$CONTROLLABLE" = "0" ]; then
   mkdir -p "$SERVED"
-  [ -f "$SERVED/latest.pt" ] && cp "$SERVED/latest.pt" "$SERVED/pre029_sim_backup.pt" && echo "[train_drive_real] backed up sim → $SERVED/pre029_sim_backup.pt"
+  # Back up the currently-served checkpoint before overwriting (timestamp-free name; the served model
+  # has been real commaVQ since goal 029, so do NOT mislabel the backup "sim").
+  [ -f "$SERVED/latest.pt" ] && cp "$SERVED/latest.pt" "$SERVED/prev_served_backup.pt" && echo "[train_drive_real] backed up prior served → $SERVED/prev_served_backup.pt"
   cp "$OUT/latest.pt" "$SERVED/latest.pt"
   [ -f "$OUT/best.pt" ] && cp "$OUT/best.pt" "$SERVED/best.pt"
   "$PY" scripts/write_drive_provenance.py --served "$SERVED" --pool "$POOL"

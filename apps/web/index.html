@@ -156,9 +156,12 @@
 
           <div class="card">
             <h3>Driving world model <span id="dr-status" class="pill idle">connecting…</span></h3>
-            <p class="sub">real comma.ai commaVQ - camera + telemetry (camera-only) · arrows to drive</p>
+            <p class="sub">trained on real comma.ai commaVQ (camera-only) · the controls + telemetry are real · arrows to drive</p>
             <div class="stage">
-              <canvas id="dr-rgb" class="dr-rgb" width="64" height="64" tabindex="0"></canvas>
+              <figure>
+                <canvas id="dr-rgb" class="dr-rgb" width="64" height="64" tabindex="0"></canvas>
+                <figcaption>generated commaVQ token field (not photoreal pixels - needs comma's VQ decoder)</figcaption>
+              </figure>
               <figure>
                 <canvas id="dr-bev" class="dr-bev" width="96" height="96"></canvas>
                 <figcaption>LiDAR - n/a (camera-only)</figcaption>
