@@ -22,6 +22,7 @@ import {
   type VoxelVolume,
 } from "@blockdream/voxel";
 import { rgbFramesToAnimated3d } from "./video3d";
+import { isVideoFile, decodeVideo } from "./video";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
@@ -416,7 +417,8 @@ async function setup3dViewer(): Promise<void> {
   }
 
   // import a real animation → block animation: a Blender glTF/.glb (node-TRS animation sampled to
-  // frames), an .obj-per-frame sequence (select multiple), a single .obj model, or an animated .gif.
+  // frames), an .obj-per-frame sequence (select multiple), a single .obj model, an animated .gif,
+  // or a VIDEO file (.mp4/.webm/.mov — decoded natively in the browser, no ffmpeg).
   $<HTMLInputElement>("v3-import").addEventListener("change", async (ev) => {
     const files = Array.from((ev.target as HTMLInputElement).files ?? []);
     if (!files.length) return;
@@ -428,6 +430,7 @@ async function setup3dViewer(): Promise<void> {
       const glb = files.find((f) => /\.glb$/i.test(f.name));
       const gltf = files.find((f) => /\.gltf$/i.test(f.name));
       const gif = files.find((f) => /\.gif$/i.test(f.name) || f.type === "image/gif");
+      const video = files.find((f) => isVideoFile(f));
       if (glb) {
         showFrames(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glb ${glb.name}`);
       } else if (gltf) {
@@ -443,8 +446,15 @@ async function setup3dViewer(): Promise<void> {
         const rgb = canvases.map((c) => rgbImageFromCanvas(c, 40));
         const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
         showFrames(frames, `gif ${gif.name} · 3D`, durationsMs);
+      } else if (video) {
+        // VIDEO → frames decoded natively in the browser → same temporally-stable 3D block animation
+        const { canvases, durationsMs } = await decodeVideo(video, { fps: 12, maxFrames: 48 });
+        if (!canvases.length) throw new Error("no frames decoded from video");
+        const rgb = canvases.map((c) => rgbImageFromCanvas(c, 40));
+        const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
+        showFrames(frames, `video ${video.name} · 3D`, durationsMs);
       } else {
-        hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), or .gif";
+        hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), .gif, or a video (.mp4/.webm/.mov)";
       }
     } catch (err) {
       log.warn("3D import failed", err);
