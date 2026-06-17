@@ -108,7 +108,7 @@ ml/               # Workstream B - world model (Python / PyTorch)
 - [Architecture](./docs/architecture.md) - whole-system map, packages, data flow
 - [Play it in Minecraft without Fabric](./docs/play-without-fabric.md) - offline cast + live RCON bridge
 - [3D builds & animation](./docs/3d-and-animation.md) - image→3D, greedy meshing, animation system
-- [Importing animations](./docs/video-import.md) - glTF / .glb / .obj-sequence / video → blocks
+- [Importing animations](./docs/video-import.md) - glTF / .glb / .obj-sequence / GIF / video (.mp4/.webm) → blocks; `--animate explode|wave|buildup` for procedural block-motion
 - [World models - full guide](./docs/world-models-guide.md) - models, train/serve/run, movement types, browser diffusion
 - Also: [colour theory](./docs/color-theory.md), [command-block optimization](./docs/command-block-optimization.md),
   [real world models](./docs/real-world-models.md), [movement types](./docs/movement-types.md),

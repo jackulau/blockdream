@@ -20,7 +20,9 @@ A Blender animation exported as glTF carries real 3D geometry, so the blocks fol
 - **`objSequenceToFrames(objs[], opts)`** - the classic OBJ-per-frame export (`frame_001.obj`,
   `frame_002.obj`, …); each frame is voxelized into the shared box.
 
-In the web demo, the 3D section's import accepts `.gltf` / `.glb` / multiple `.obj` files. Tests:
+In the web demo, the 3D section's import accepts `.gltf` / `.glb` / multiple `.obj` files, animated `.gif`,
+and **video files** (`.mp4`, `.webm`, `.mov`) decoded natively by the browser's own video engine
+(no ffmpeg, no WASM). Tests:
 `packages/voxel/test/gltf.test.ts` builds a real animated glTF + glb fixture in-memory and asserts
 the model moves across frames.
 
@@ -33,11 +35,29 @@ A rendered video has no depth, so each frame is reconstructed with the same silh
   (not a flat slab), with **global** depth normalization (one shared max across the whole clip, so
   the build doesn't pop thicker/thinner) and an optional temporal EMA. `opts.depthForFrame` lets a
   monocular depth model or a Blender depth-pass sidecar drive natural footage.
-- **Web:** `apps/web/src/video3d.ts` decodes a GIF, quantizes each frame, and calls the above →
-  a real 3D block animation.
-- **CLI:** `blockdream render <video> --target voxel3d` extracts frames (ffmpeg), voxelizes them,
-  and writes an animated 3D datapack (delta-encoded + greedy-fill optimized). `--depth N` sets the
-  build thickness.
+- **Web:** the 3D viewer accepts `.gif` AND any browser-decodable **video** (`.mp4`/`.webm`/`.mov`
+  via `apps/web/src/video.ts`). Each decoded frame is quantized and passed to `framesToAnimated3d`.
+  `planFrameTimes` (unit-tested, pure) handles frame-rate sampling and clamping so the last seek
+  never hangs on an exact-duration timestamp.
+- **CLI:** `blockdream render <video> --target voxel3d` extracts frames via **ffmpeg** (required;
+  install with `brew install ffmpeg` or `apt-get install ffmpeg` — a missing binary is caught early
+  with a clear install hint instead of a raw ENOENT). Key flags:
+  - `--depth N` — build thickness in blocks (default 8)
+  - `--smooth 0..1` — temporal depth smoothing between frames (default 0.35)
+  - `--curve N` — thickness profile exponent (default 0.5; <1 rounds the dome)
+  - `--animate explode|wave|buildup` — **procedural block-motion** of the built solid. Animates a
+    still image or 3D model; for a clip, animates the first frame. `--animate-frames N` (default 24)
+    controls the length of the generated sequence.
 
-Tests: `apps/web/test/video3d.test.ts` (temporal stability, motion-following) and the CLI
-`voxel3d` target in `packages/cli/test/render.test.ts`.
+**Procedural block-motion (`--animate`):** the same `explode`, `wave`, and `buildup` generators
+available in the web demo's animation selector are now reachable from the CLI for any 3D target.
+Example — make a PNG image explode and reassemble as a 3D Minecraft build:
+
+```bash
+blockdream render my-image.png --target voxel3d --animate explode --animate-frames 24 --out ./explode-build
+```
+
+Tests: `apps/web/test/video3d.test.ts` (temporal stability, motion-following),
+`apps/web/test/video-decode.test.ts` (frame-time sampling, format detection),
+`packages/cli/test/video3d-e2e.test.ts` (volumes move between frames, full product assertion),
+and `packages/cli/test/animate-cli.test.ts` (explode/wave/buildup wired to voxel3d/mcstructure3d/model3d).
