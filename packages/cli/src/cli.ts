@@ -1,8 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { render, type RenderOptions, type RenderTarget, type Edition } from "./render";
+import { render, SEQUENCE_ANIMS, type RenderOptions, type RenderTarget, type Edition } from "./render";
 import { previewPng } from "./preview";
 import type { DitherMethod } from "@blockdream/color-core";
+import type { SequenceAnimName } from "@blockdream/voxel";
 
 const USAGE = `blockdream render <input> [options]
 blockdream preview <input> --out preview.png   (side-by-side source | block-art PNG)
@@ -28,6 +29,10 @@ Options:
   --smooth <n>       3D video temporal depth smoothing 0..1 (default: 0.35)
   --curve <n>        3D thickness curve exponent (<1 rounds the dome; default: 0.5)
   --flat             3D one-sided relief instead of the centered double-sided solid
+  --animate <a>      3D block-motion of the built solid: explode | wave | buildup
+                       (voxel3d/mcstructure3d/model3d; animates a STILL image or a 3D model.
+                        For a clip it animates the first frame.)
+  --animate-frames <n>  frame count for --animate (default: 24)
   --version <ver>    target Minecraft version: 1.21 .. 1.21.10 (default: 1.21).
                        Sets pack_format / DataVersion / block stamps. Java datapacks
                        also declare supported_formats so one pack loads across the
@@ -66,6 +71,8 @@ export function runCli(argv: string[]): number {
       smooth: { type: "string" },
       curve: { type: "string" },
       flat: { type: "boolean" },
+      animate: { type: "string" },
+      "animate-frames": { type: "string" },
       version: { type: "string" },
       out: { type: "string" },
       palette: { type: "string" },
@@ -128,6 +135,12 @@ export function runCli(argv: string[]): number {
     return 2;
   }
 
+  const animate = values.animate as SequenceAnimName | undefined;
+  if (animate && !(SEQUENCE_ANIMS as ReadonlyArray<string>).includes(animate)) {
+    process.stderr.write(`unknown --animate ${animate} (valid: ${SEQUENCE_ANIMS.join(" | ")})\n`);
+    return 2;
+  }
+
   const opts: RenderOptions = {
     input,
     out: values.out ?? `./out/${target}`,
@@ -146,6 +159,8 @@ export function runCli(argv: string[]): number {
     symmetric: values.flat ? false : undefined,
     gamutMap: values.gamut ? Number(values.gamut) : undefined,
     paletteVersion: values.version,
+    animate,
+    animateFrames: values["animate-frames"] ? Number(values["animate-frames"]) : undefined,
   };
 
   try {
