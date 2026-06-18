@@ -49,6 +49,22 @@ export function setVoxel(v: VoxelVolume, x: number, y: number, z: number, c: num
   if (inBounds(v, x, y, z)) v.data[voxelIndex(v, x, y, z)] = c;
 }
 
+/**
+ * Fast in-bounds fill of a strided run — the hot-loop counterpart to `setVoxel`. Writes `len`
+ * voxels starting at backing-array index `start`, stepping by `stride` (1 = +x, `sx` = +y,
+ * `sx*sy` = +z). The CALLER guarantees the whole run is in bounds (the public `setVoxel` does the
+ * per-voxel bounds check; this skips it because the fill loops feed provably-clamped indices). Used
+ * to extrude a column/row without paying an `inBounds` branch per voxel.
+ */
+export function fillRun(v: VoxelVolume, start: number, stride: number, len: number, c: number): void {
+  const data = v.data;
+  let idx = start;
+  for (let k = 0; k < len; k++) {
+    data[idx] = c;
+    idx += stride;
+  }
+}
+
 export function countSolid(v: VoxelVolume): number {
   let n = 0;
   for (let i = 0; i < v.data.length; i++) if (v.data[i] !== EMPTY) n++;

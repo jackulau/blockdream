@@ -16,7 +16,7 @@
 //      The object stays coherent from every viewing angle.
 
 import type { QuantizedFrame } from "@blockdream/color-core";
-import { createVolume, setVoxel, MAX_DIM, type VoxelVolume } from "./volume";
+import { createVolume, fillRun, MAX_DIM, type VoxelVolume } from "./volume";
 
 export interface SolidifyImageOptions {
   /** Max thickness of the solid, in voxels (the deepest part of the subject). Default 16. */
@@ -179,6 +179,7 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
 
   const v = createVolume(width, height, maxDepth);
   const center = (maxDepth - 1) / 2; // mid-plane the solid is centered on
+  const zStride = v.sx * v.sy; // backing-index step between consecutive Z layers
   for (let iy = 0; iy < height; iy++) {
     for (let ix = 0; ix < width; ix++) {
       const i = iy * width + ix;
@@ -195,7 +196,8 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
       } else {
         zlo = 0; // one-sided relief, flush at the front face
       }
-      for (let z = zlo; z < zlo + d; z++) setVoxel(v, ix, wy, z, c);
+      // (ix, wy, zlo..zlo+d) is provably in bounds (clamped above) → direct strided fill, no per-voxel branch
+      fillRun(v, ix + v.sx * wy + zStride * zlo, zStride, d, c);
     }
   }
   // NOTE: an empty result is legitimate per-frame (framesToAnimated3d passes a 0 depth field for an
