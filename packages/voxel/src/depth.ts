@@ -136,8 +136,12 @@ function edt1d(f: Float64Array, d: Float64Array, vtx: Int32Array, zb: Float64Arr
 
 /** EXACT Euclidean distance from each subject cell to the nearest background cell OR the image edge.
  *  Background/edge sit at distance 0; the subject's interior grows out — a filled disc's centre gets
- *  a distance equal to its radius and the iso-distance contours are TRUE circles (the old chamfer 3-4
- *  transform had octagonal contours → faceted, lumpy domes). Implemented as the separable
+ *  a distance equal to its radius and the iso-distance contours are TRUE circles, exactly isotropic
+ *  BY CONSTRUCTION. The chamfer 3-4 transform this replaces under-counts diagonal steps (4/3 ≈ 1.333
+ *  vs √2 ≈ 1.414, a ~6% bias) so its contours skew octagonal — a bias that grows with subject size.
+ *  Trade-off: as a standalone pass this exact transform is ~1.5-1.7x SLOWER than chamfer (more work
+ *  per line); we accept that for correctness (and imageToSolid stays net-faster than the original via
+ *  the D2 column-fill fast path + the all-background-line skip below). Implemented as the separable
  *  Felzenszwalb–Huttenlocher transform (two O(n) passes, columns then rows) over a 1px
  *  background-padded grid, so a subject touching the image border still tapers there (preserving the
  *  old edge-as-background behaviour). O(width·height). Returns Euclidean distance (0 for background). */
