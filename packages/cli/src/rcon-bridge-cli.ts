@@ -359,25 +359,41 @@ export async function main(argv: string[]): Promise<number> {
   let carry: WallCommands["remainder"] = [];
   let painted = 0;
   let lastPaintAt = 0;
+  // honest, separated rates: gen = model produces a frame; paint = RCON writes it in-world;
+  // effective = end-to-end frames/sec (includes the --fps cap sleep). Never conflate them.
+  let genMsTotal = 0;
+  let paintMsTotal = 0;
+  let effMsTotal = 0;
+  let effFrames = 0;
+  const fmtFps = (ms: number): string => (ms > 0 ? (1000 / ms).toFixed(1) : "inf");
 
-  const paint = async (rgb: RgbImage): Promise<void> => {
+  const paint = async (rgb: RgbImage, genMs: number): Promise<void> => {
     const frame: WallFrame = { width: rgb.width, height: rgb.height, pixels: rgb.data };
     const keyframe = !prevWall;
     const wall = frameToWallCommands(frame, origin, prevWall, { carry, maxCommands });
+    const paintT0 = Date.now();
     if (!dryRun) {
       // pooled concurrent sends; a throw leaves prevWall/carry untouched so the next
       // delta (old prevWall → new frame) repaints everything this batch missed
       await rcon!.sendBatch(wall.commands);
     }
+    const paintMs = Date.now() - paintT0;
     const now = Date.now();
-    const fpsStr = lastPaintAt ? (1000 / (now - lastPaintAt)).toFixed(2) : "-";
+    const effMs = lastPaintAt ? now - lastPaintAt : 0;
     lastPaintAt = now;
     prevWall = frame;
     carry = wall.remainder;
     painted++;
+    genMsTotal += genMs;
+    paintMsTotal += paintMs;
+    if (effMs > 0) {
+      effMsTotal += effMs;
+      effFrames++;
+    }
     log(
-      `frame ${painted}${keyframe ? " (keyframe)" : ""}: ${wall.commands.length} commands` +
-        `${dryRun ? " (dry-run, not sent)" : " sent"}, ${wall.remainder.length} cells carried, ${fpsStr} fps`,
+      `frame ${painted}${keyframe ? " (keyframe)" : ""}: ${wall.commands.length} cmds` +
+        `${dryRun ? " (dry-run)" : ""}, ${wall.remainder.length} carried - ` +
+        `gen ${fmtFps(genMs)} fps . paint ${fmtFps(paintMs)} fps . effective ${effMs ? fmtFps(effMs) : "-"} fps`,
     );
   };
 
@@ -423,14 +439,18 @@ export async function main(argv: string[]): Promise<number> {
       if (wm && !wm.isOpen()) {
         // the backoff ladder is reconnecting in the background - idle this cycle
       } else if (wm?.needsReset) {
+        const genT0 = Date.now();
         const png = await wm.request(JSON.stringify({ type: "reset", skill }));
+        const rgb = decodeFramePng(png, sizeW, sizeH);
+        const genMs = Date.now() - genT0;
         wm.needsReset = false;
         log(`world-model session reset (skill=${skill})`);
-        await paint(decodeFramePng(png, sizeW, sizeH));
+        await paint(rgb, genMs);
       } else if (mockWm && painted === 0) {
         // mock keyframe: paint the initial neutral frame (retried until the batch lands)
+        const genT0 = Date.now();
         mockPrev = mockWorldModel(null, neutral, sizeW);
-        await paint(mockPrev);
+        await paint(mockPrev, Date.now() - genT0);
       } else {
         let pose: RconPose | null = null;
         if (dryRun) {
@@ -447,10 +467,11 @@ export async function main(argv: string[]): Promise<number> {
         if (pose) {
           if (lastPose) {
             const action = poseToAction(lastPose, pose, t0 - lastPoseAt, skill);
+            const genT0 = Date.now();
             const rgb = wm
               ? decodeFramePng(await wm.request(actionMessage(action)), sizeW, sizeH)
               : (mockPrev = mockWorldModel(mockPrev, action, sizeW));
-            await paint(rgb);
+            await paint(rgb, Date.now() - genT0);
           }
           lastPose = pose;
           lastPoseAt = t0;
@@ -464,6 +485,16 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   log(`done: ${painted} frame(s) painted`);
+  if (painted > 0) {
+    const avgFps = (totalMs: number, n: number): string => (n > 0 && totalMs > 0 ? (1000 / (totalMs / n)).toFixed(1) : "-");
+    // gen is the honest mod-free content ceiling (the AR model is ~2 fps on CPU); paint is the
+    // RCON write cost the pool drove down; effective is what the player actually sees in-world.
+    log(
+      `fps summary - gen ${avgFps(genMsTotal, painted)} . paint ${avgFps(paintMsTotal, painted)} . ` +
+        `effective ${avgFps(effMsTotal, effFrames)} (mean over ${painted} frame(s)` +
+        `${dryRun ? "; dry-run paints nothing" : ""})`,
+    );
+  }
   wm?.close();
   await rcon?.stop();
   return 0;
