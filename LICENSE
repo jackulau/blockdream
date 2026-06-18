@@ -31,3 +31,14 @@ Additional notices
 
 2. "Minecraft" is a trademark of Mojang Synergies AB. This project is
    not affiliated with, endorsed by, or sponsored by Mojang or Microsoft.
+
+3. commaVQ. The driving world model's VQ decoder architecture
+   (ml/src/blockdream_wm/drive/commavq_decoder.py) is vendored from comma.ai's
+   commaVQ project (https://github.com/commaai/commavq, MIT License), which in
+   turn adapts CompVis/taming-transformers
+   (https://github.com/CompVis/taming-transformers, MIT License). The decoder
+   WEIGHTS (decoder_pytorch_model.bin, from commaai/commavq-gpt2m) are NOT
+   redistributed here - they are downloaded by the user directly from comma.ai's
+   HuggingFace repository under comma.ai's MIT License by
+   scripts/fetch-commavq-decoder.sh. The commaVQ dataset is likewise MIT-licensed.
+   This project is not affiliated with, endorsed by, or sponsored by comma.ai.

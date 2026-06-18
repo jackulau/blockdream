@@ -175,6 +175,7 @@ class DriveServer:
             "type": "frame",
             "step": self.session.step_idx,
             "rgb_png_b64": frame_to_png_b64(o["rgb"]),
+            "decoded": self.session.decoder is not None,  # real pixels vs token-field fallback
             "lidar": [_finite4(x) for x in o["lidar"].tolist()],
             "telemetry": [_finite4(x) for x in o["telemetry"].tolist()],
         }

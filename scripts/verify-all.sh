@@ -85,6 +85,12 @@ if [ -x "$PY" ] && [ -f "$ML/runs/drive/latest.pt" ]; then
 else
   skipped "drive quality - ml/runs/drive/latest.pt absent (gate: ml/scripts/eval_drive_quality.py --quick)"
 fi
+if [ -x "$PY" ] && [ -f "$ML/runs/drive/latest.pt" ] && [ -f "$ML/runs/drive/commavq_decoder.bin" ]; then
+  (cd "$ROOT" && "$PY" ml/scripts/prove_drive_pixels.py --steps 6 --out /tmp/blockdream_drive_proof >/dev/null)
+  ok "driving PHOTOREAL (commaVQ decoder → real dashcam pixels, control-responsive rollout)"
+else
+  skipped "drive photoreal - commaVQ decoder absent (fetch: bash scripts/fetch-commavq-decoder.sh, 171MB MIT)"
+fi
 if [ -x "$PY" ]; then
   (cd "$ML" && "$PY" scripts/no_synthetic_guard.py >/dev/null)
   ok "NO SYNTHETIC in any served/live world-model path (provenance sidecars + path refs + on-disk pools)"

@@ -79,7 +79,9 @@ Two coupled workstreams (full map in [docs/architecture.md](./docs/architecture.
   walls *and* real 3D voxel builds, with animation + glTF/video import.
 - **Workstream B - Neural world model.** Action-conditioned interactive Minecraft world model: a
   served autoregressive (MineWorld-style) model + a latent-diffusion track exported to ONNX for a
-  server-free, in-browser engine. Plus a separate driving world model.
+  server-free, in-browser engine. Plus a separate driving world model (real comma.ai commaVQ) whose
+  predicted tokens are decoded to **real dashcam footage** by comma's VQ decoder
+  ([driving world model](./docs/driving-world-model.md#photoreal-decode--live-rollout-real-driving-footage)).
 
 ## Layout
 
