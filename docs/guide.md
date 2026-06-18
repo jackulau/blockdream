@@ -28,6 +28,8 @@ blockdream render clip.gif  --speed 2          # GIF    → animated datapack (2
 blockdream render demo.mp4  --max-frames 200   # video  → animated datapack, capped frames
 blockdream render cat.png   --target voxel3d --depth 8     # image → real 3D voxel build
 blockdream render clip.gif  --target behaviorpack          # Bedrock .mcpack instead
+blockdream render cat.png   --target voxel3d --animate explode  # still → exploding block-motion animation
+blockdream render model.glb --target model3d  --animate buildup --animate-frames 12  # 3D model → reveal
 ```
 
 Useful knobs: `--grid WxH` (wall size, default `64x64`), `--fps n` (sample rate),
@@ -102,7 +104,12 @@ Live, mod-free control (~2 fps, three terminals) and the optional high-FPS Fabri
 
 ## Troubleshooting
 
-**“Unknown function blockdream:setup”** - the pack isn't loaded:
+**”ffmpeg not found” (or similar ENOENT)** - `blockdream render` uses ffmpeg to decode images
+and video. Install it: `brew install ffmpeg` (macOS), `sudo apt-get install ffmpeg` (Debian/Ubuntu),
+or download from [ffmpeg.org](https://ffmpeg.org/download.html). You can also point to an existing
+binary with `BLOCKDREAM_FFMPEG=/path/to/ffmpeg blockdream render …`.
+
+**”Unknown function blockdream:setup”** - the pack isn't loaded:
 - The zip must sit in `…/<World>/datapacks/` (per-world - not `.minecraft/datapacks/`), then `/reload`.
 - `/datapack list` must show `[file/blockdream.zip]` under the enabled packs. Listed as
   disabled? `/datapack enable "file/blockdream.zip"`.

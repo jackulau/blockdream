@@ -22,7 +22,7 @@ import { extractFrames } from "@blockdream/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
-import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, type VoxelVolume } from "@blockdream/voxel";
+import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateSequence, SEQUENCE_ANIMS, type SequenceAnimName, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -59,6 +59,18 @@ export interface RenderOptions {
   curve?: number; // 3D: thickness curve exponent (default 0.5)
   symmetric?: boolean; // 3D: centered double-sided solid (default true); false = one-sided relief
   gamutMap?: number; // quantizer hue-rigidity lambda for out-of-gamut colours (keeps source hue)
+  animate?: SequenceAnimName; // 3D: procedural block-motion (explode/wave/buildup) of the built solid
+  animateFrames?: number; // frames for the procedural animation (default 24)
+}
+
+export { SEQUENCE_ANIMS };
+
+/** When `--animate` is set, turn the FIRST built 3D solid into a procedural block-motion sequence
+ *  (explode/wave/buildup). Predictable everywhere: a still image, a static mesh, or the first frame
+ *  of a clip all become the SAME kind of animated build. No-op when --animate is absent. */
+function applyAnimate(volumes: VoxelVolume[], opts: RenderOptions): VoxelVolume[] {
+  if (!opts.animate || volumes.length === 0) return volumes;
+  return generateSequence(opts.animate, volumes[0]!, opts.animateFrames ?? 24);
 }
 
 export interface RenderResult {
@@ -157,6 +169,7 @@ export function render(opts: RenderOptions): RenderResult {
       volumes = [objToVolume(readFileSync(opts.input, "utf8"), { resolution, solid: true, matchColor })];
     }
     assertNonEmpty3d(volumes);
+    volumes = applyAnimate(volumes, opts); // --animate: procedural block-motion of the built model
     if (edition === "bedrock") {
       volumes.forEach((vol, fi) => {
         const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
@@ -253,7 +266,11 @@ export function render(opts: RenderOptions): RenderResult {
 
   if (opts.target === "voxel3d") {
     // video → temporally-stable animated 3D block build → vanilla datapack (delta-encoded, fill-batched)
-    const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric });
+    // --animate replaces the (video/still) sequence with procedural block-motion of the first solid.
+    const volumes = applyAnimate(
+      framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric }),
+      opts,
+    );
     assertNonEmpty3d(volumes);
     const pack = generateVoxelDatapack(volumes, resolveBlock, {
       namespace: "blockdream_3d",
@@ -271,7 +288,7 @@ export function render(opts: RenderOptions): RenderResult {
     notes.push(
       `3D voxel datapack (${volumes.length} frame(s), ${pack.totalCommands ?? pack.totalSetblocks} cmds): drop ${pack.namespace}.zip into world/datapacks/, /function ${pack.namespace}:setup then :start.`,
     );
-    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+    return { target: opts.target, frameCount: volumes.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
   if (opts.target === "mcstructure") {
@@ -288,7 +305,10 @@ export function render(opts: RenderOptions): RenderResult {
   if (opts.target === "mcstructure3d") {
     // image/video → temporally-stable 3D volumes (same pipeline as voxel3d) → a TRUE 3D Bedrock
     // .mcstructure per frame (depth = volume depth, not the 1-thick wall of `mcstructure`)
-    const volumes = framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric });
+    const volumes = applyAnimate(
+      framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric }),
+      opts,
+    );
     assertNonEmpty3d(volumes);
     volumes.forEach((vol, fi) => {
       const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
@@ -300,7 +320,7 @@ export function render(opts: RenderOptions): RenderResult {
     notes.push(
       `TRUE 3D Bedrock .mcstructure (${volumes.length} frame(s), ${v0.sx}×${v0.sy}×${v0.sz}); place with a structure block or import via a world tool.`,
     );
-    return { target: opts.target, frameCount: frames.length, width: opts.width, height: opts.height, filesWritten, notes };
+    return { target: opts.target, frameCount: volumes.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
   if (opts.target === "bedrock-script") {
