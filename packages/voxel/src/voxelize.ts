@@ -4,7 +4,7 @@
 // the palette - the caller maps a map-colour id to a 0..1 height.
 
 import type { QuantizedFrame } from "@blockdream/color-core";
-import { createVolume, setVoxel, MAX_DIM, type VoxelVolume } from "./volume";
+import { createVolume, fillRun, MAX_DIM, type VoxelVolume } from "./volume";
 
 export interface VoxelizeOptions {
   mode?: "flat" | "heightmap" | "relief";
@@ -20,11 +20,12 @@ export function imageToVolume(frame: QuantizedFrame, opts: VoxelizeOptions = {})
   if (mode === "flat") {
     const depth = Math.max(1, Math.min(MAX_DIM, Math.floor(opts.depth ?? 1)));
     const v = createVolume(width, height, depth);
+    const zStride = v.sx * v.sy;
     for (let iy = 0; iy < height; iy++) {
       for (let ix = 0; ix < width; ix++) {
         const c = frame.mapColorId[iy * width + ix]!;
         const wy = height - 1 - iy; // image row 0 at the top → highest Y
-        for (let z = 0; z < depth; z++) setVoxel(v, ix, wy, z, c);
+        fillRun(v, ix + v.sx * wy, zStride, depth, c); // (ix,wy,0..depth) in bounds → direct fill
       }
     }
     return v;
@@ -38,12 +39,13 @@ export function imageToVolume(frame: QuantizedFrame, opts: VoxelizeOptions = {})
     const maxD = Math.max(1, Math.min(MAX_DIM, Math.floor(opts.depth ?? 8)));
     const heightOf = opts.heightOf ?? (() => 1);
     const v = createVolume(width, height, maxD);
+    const zStride = v.sx * v.sy;
     for (let iy = 0; iy < height; iy++) {
       for (let ix = 0; ix < width; ix++) {
         const c = frame.mapColorId[iy * width + ix]!;
         const wy = height - 1 - iy;
         const d = Math.max(1, Math.min(maxD, Math.round(heightOf(c) * maxD)));
-        for (let z = 0; z < d; z++) setVoxel(v, ix, wy, z, c); // flush front at z=0, recedes in +z
+        fillRun(v, ix + v.sx * wy, zStride, d, c); // flush front at z=0, recedes in +z
       }
     }
     return v;
@@ -53,12 +55,13 @@ export function imageToVolume(frame: QuantizedFrame, opts: VoxelizeOptions = {})
   const maxH = Math.max(1, Math.min(MAX_DIM, Math.floor(opts.maxHeight ?? 16)));
   const heightOf = opts.heightOf ?? (() => 1);
   const v = createVolume(width, maxH, height);
+  const yStride = v.sx; // +y step; columns grow along Y here (heightmap is top-down)
   for (let iy = 0; iy < height; iy++) {
     for (let ix = 0; ix < width; ix++) {
       const c = frame.mapColorId[iy * width + ix]!;
       const h = Math.max(1, Math.min(maxH, Math.round(heightOf(c) * maxH)));
       const wz = height - 1 - iy;
-      for (let y = 0; y < h; y++) setVoxel(v, ix, y, wz, c);
+      fillRun(v, ix + v.sx * v.sy * wz, yStride, h, c); // (ix,0..h,wz) in bounds → direct fill
     }
   }
   return v;

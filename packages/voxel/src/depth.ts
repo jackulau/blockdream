@@ -16,7 +16,7 @@
 //      The object stays coherent from every viewing angle.
 
 import type { QuantizedFrame } from "@blockdream/color-core";
-import { createVolume, setVoxel, MAX_DIM, type VoxelVolume } from "./volume";
+import { createVolume, fillRun, MAX_DIM, type VoxelVolume } from "./volume";
 
 export interface SolidifyImageOptions {
   /** Max thickness of the solid, in voxels (the deepest part of the subject). Default 16. */
@@ -29,6 +29,16 @@ export interface SolidifyImageOptions {
   /** Real per-pixel depth in [0,1] (1 = thickest). Overrides the silhouette-inflation heuristic.
    *  This is the hook a depth MODEL or a Blender depth pass feeds. (x,y) are image coords. */
   depthOf?: (x: number, y: number) => number;
+  /** Shape-from-shading: per-pixel luminance/relief in [0,1] (1 = closest/brightest → bulges most).
+   *  Unlike depthOf this does NOT replace the silhouette envelope — it MODULATES it, so the subject
+   *  keeps its rounded outline + edge taper while internal structure (a nose, a hood) emerges from
+   *  the image's shading instead of every subject inflating into the same featureless dome. Ignored
+   *  when depthOf is supplied (a true depth map wins). (x,y) are image coords. */
+  shadingOf?: (x: number, y: number) => number;
+  /** Strength of the shadingOf modulation, 0..1 (default 0.5 when shadingOf is set). 0 = pure
+   *  envelope (old behaviour); 1 = thickness fully driven by shading within the envelope. A subject
+   *  pixel always keeps >=1 voxel regardless (no holes). */
+  shadingGain?: number;
   /** Thickness response curve exponent applied to the normalized heuristic distance.
    *  <1 rounds the dome (default 0.5 = sqrt, a fuller bulge); 1 = linear cone. */
   curve?: number;
@@ -95,37 +105,89 @@ export function detectBackgroundMask(frame: QuantizedFrame): Uint8Array {
   return mask;
 }
 
-/** Chamfer (3-4 style, Euclidean-ish) distance from each subject cell to the nearest background
- *  cell OR the image edge. Background/edge sit at distance 0; the subject's interior grows out.
- *  Two passes, O(width·height). Returns distances (0 for background cells). */
+/** 1D squared-distance transform (Felzenszwalb–Huttenlocher): lower envelope of the parabolas
+ *  rooted at each sample of `f`. Writes the transform of `f[0..n)` into `d[0..n)`. O(n). `f` may hold
+ *  +INF (non-seed) samples; the caller guarantees at least one finite sample per line so the
+ *  intersection math never divides by an all-INF pair. Scratch buffers `vtx`/`zb` are caller-owned. */
+function edt1d(f: Float64Array, d: Float64Array, vtx: Int32Array, zb: Float64Array, n: number): void {
+  const INF = 1e20;
+  let k = 0;
+  vtx[0] = 0;
+  zb[0] = -INF;
+  zb[1] = INF;
+  for (let q = 1; q < n; q++) {
+    let s = (f[q]! + q * q - (f[vtx[k]!]! + vtx[k]! * vtx[k]!)) / (2 * q - 2 * vtx[k]!);
+    while (s <= zb[k]!) {
+      k--;
+      s = (f[q]! + q * q - (f[vtx[k]!]! + vtx[k]! * vtx[k]!)) / (2 * q - 2 * vtx[k]!);
+    }
+    k++;
+    vtx[k] = q;
+    zb[k] = s;
+    zb[k + 1] = INF;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) {
+    while (zb[k + 1]! < q) k++;
+    const dx = q - vtx[k]!;
+    d[q] = dx * dx + f[vtx[k]!]!;
+  }
+}
+
+/** EXACT Euclidean distance from each subject cell to the nearest background cell OR the image edge.
+ *  Background/edge sit at distance 0; the subject's interior grows out — a filled disc's centre gets
+ *  a distance equal to its radius and the iso-distance contours are TRUE circles, exactly isotropic
+ *  BY CONSTRUCTION. The chamfer 3-4 transform this replaces under-counts diagonal steps (4/3 ≈ 1.333
+ *  vs √2 ≈ 1.414, a ~6% bias) so its contours skew octagonal — a bias that grows with subject size.
+ *  Trade-off: as a standalone pass this exact transform is ~1.5-1.7x SLOWER than chamfer (more work
+ *  per line); we accept that for correctness (and imageToSolid stays net-faster than the original via
+ *  the D2 column-fill fast path + the all-background-line skip below). Implemented as the separable
+ *  Felzenszwalb–Huttenlocher transform (two O(n) passes, columns then rows) over a 1px
+ *  background-padded grid, so a subject touching the image border still tapers there (preserving the
+ *  old edge-as-background behaviour). O(width·height). Returns Euclidean distance (0 for background). */
 export function silhouetteDistance(mask: Uint8Array, width: number, height: number): Float32Array {
-  const INF = 1e9;
-  const D1 = 1; // orthogonal step
-  const D2 = Math.SQRT2; // diagonal step
-  const dist = new Float32Array(width * height);
-  for (let i = 0; i < dist.length; i++) dist[i] = mask[i] ? INF : 0; // subject = INF, background = 0
-  const at = (x: number, y: number): number => (x < 0 || y < 0 || x >= width || y >= height ? 0 : dist[y * width + x]!);
-  // forward pass (top-left → bottom-right). OOB neighbours read as 0 → border tapers like an edge.
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = y * width + x;
-      if (!mask[i]) continue;
-      let d = dist[i]!;
-      d = Math.min(d, at(x - 1, y) + D1, at(x, y - 1) + D1, at(x - 1, y - 1) + D2, at(x + 1, y - 1) + D2);
-      dist[i] = d;
+  const INF = 1e20;
+  // pad by 1 with background on every side → the image edge is a distance-0 seed just outside, AND
+  // every padded column/row contains a seed (so pass 1 is always finite → no INF-INF in pass 2).
+  const W = width + 2;
+  const H = height + 2;
+  const g = new Float64Array(W * H); // squared distance; seed (bg/pad) = 0, subject = +INF
+  for (let y = 1; y <= height; y++)
+    for (let x = 1; x <= width; x++) if (mask[(y - 1) * width + (x - 1)]) g[y * W + x] = INF;
+
+  const m = Math.max(W, H);
+  const f = new Float64Array(m);
+  const d = new Float64Array(m);
+  const vtx = new Int32Array(m);
+  const zb = new Float64Array(m + 1);
+
+  for (let x = 0; x < W; x++) {
+    let any = false;
+    for (let y = 0; y < H; y++) {
+      const val = g[y * W + x]!;
+      f[y] = val;
+      if (val > 0) any = true;
     }
+    if (!any) continue; // all-background column → transform is identity (stays 0); skip the envelope
+    edt1d(f, d, vtx, zb, H);
+    for (let y = 0; y < H; y++) g[y * W + x] = d[y]!;
   }
-  // backward pass (bottom-right → top-left)
-  for (let y = height - 1; y >= 0; y--) {
-    for (let x = width - 1; x >= 0; x--) {
-      const i = y * width + x;
-      if (!mask[i]) continue;
-      let d = dist[i]!;
-      d = Math.min(d, at(x + 1, y) + D1, at(x, y + 1) + D1, at(x + 1, y + 1) + D2, at(x - 1, y + 1) + D2);
-      dist[i] = d;
+  for (let y = 0; y < H; y++) {
+    let any = false;
+    for (let x = 0; x < W; x++) {
+      const val = g[y * W + x]!;
+      f[x] = val;
+      if (val > 0) any = true;
     }
+    if (!any) continue; // all-background row → identity; skip
+    edt1d(f, d, vtx, zb, W);
+    for (let x = 0; x < W; x++) g[y * W + x] = d[x]!;
   }
-  return dist;
+
+  const out = new Float32Array(width * height);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) out[y * width + x] = Math.sqrt(g[(y + 1) * W + (x + 1)]!);
+  return out;
 }
 
 /**
@@ -174,11 +236,28 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
     let maxd = 0;
     for (let i = 0; i < dist.length; i++) if (dist[i]! > maxd) maxd = dist[i]!;
     const inv = maxd > 0 ? 1 / maxd : 0;
+    // envelope thickness from the silhouette (the rounded dome)...
     for (let i = 0; i < dist.length; i++) thickness[i] = mask[i] ? Math.pow(dist[i]! * inv, curve) : 0;
+    // ...then SHAPE-FROM-SHADING: modulate the envelope by per-pixel luminance so internal structure
+    // appears instead of a featureless dome. mix in [eps,1] keeps the subject floor (no holes even at
+    // gain=1, shade=0 → mix=eps → the >=1-voxel floor below still fills the column).
+    if (opts.shadingOf) {
+      const gain = Math.max(0, Math.min(1, opts.shadingGain ?? 0.5));
+      for (let y = 0; y < height; y++)
+        for (let x = 0; x < width; x++) {
+          const i = y * width + x;
+          if (!mask[i]) continue;
+          const s = opts.shadingOf(x, y);
+          const shade = Math.max(0, Math.min(1, Number.isFinite(s) ? s : 0));
+          const mix = Math.max(1e-3, 1 - gain + gain * shade);
+          thickness[i] = thickness[i]! * mix;
+        }
+    }
   }
 
   const v = createVolume(width, height, maxDepth);
   const center = (maxDepth - 1) / 2; // mid-plane the solid is centered on
+  const zStride = v.sx * v.sy; // backing-index step between consecutive Z layers
   for (let iy = 0; iy < height; iy++) {
     for (let ix = 0; ix < width; ix++) {
       const i = iy * width + ix;
@@ -195,7 +274,8 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
       } else {
         zlo = 0; // one-sided relief, flush at the front face
       }
-      for (let z = zlo; z < zlo + d; z++) setVoxel(v, ix, wy, z, c);
+      // (ix, wy, zlo..zlo+d) is provably in bounds (clamped above) → direct strided fill, no per-voxel branch
+      fillRun(v, ix + v.sx * wy + zStride * zlo, zStride, d, c);
     }
   }
   // NOTE: an empty result is legitimate per-frame (framesToAnimated3d passes a 0 depth field for an

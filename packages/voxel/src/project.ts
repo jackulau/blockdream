@@ -6,23 +6,28 @@
 // the map-colour id for type compatibility - it is not used for block resolution here.
 
 import type { QuantizedFrame } from "@blockdream/color-core";
-import { EMPTY, getVoxel, type VoxelVolume } from "./volume";
+import { EMPTY, type VoxelVolume } from "./volume";
 
 export function volumeToFrame(v: VoxelVolume): QuantizedFrame {
   const width = v.sx;
   const height = v.sy;
   const mapColorId = new Uint8Array(width * height);
   const paletteIndex = new Int32Array(width * height);
+  const data = v.data;
+  const zStride = v.sx * v.sy; // backing-index step between Z layers
   for (let iy = 0; iy < height; iy++) {
     const wy = height - 1 - iy; // image row 0 at top → highest Y
+    const colBase = v.sx * wy; // backing index of (0, wy, 0)
     for (let ix = 0; ix < width; ix++) {
       let c = EMPTY;
+      let idx = colBase + ix; // (ix, wy, 0); step +zStride per layer — all in bounds
       for (let z = 0; z < v.sz; z++) {
-        const s = getVoxel(v, ix, wy, z);
+        const s = data[idx]!;
         if (s !== EMPTY) {
           c = s;
           break;
         }
+        idx += zStride;
       }
       const p = iy * width + ix;
       // 0 is the air/transparent sentinel (Minecraft map-colour "none"); the solid quantizer only

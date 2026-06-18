@@ -4,7 +4,7 @@
 // (gltf.ts) and accepts SHARED bounds so a whole animation can be voxelized into one consistent
 // world box - the object then moves/deforms in place instead of being re-fit every frame.
 
-import { createVolume, getVoxel, setVoxel, EMPTY, type VoxelVolume } from "./volume";
+import { createVolume, setVoxel, EMPTY, type VoxelVolume } from "./volume";
 
 export interface ObjVoxelizeOptions {
   resolution?: number; // cube grid size (default 32)
@@ -153,13 +153,14 @@ export function objToVolume(obj: string, opts: ObjVoxelizeOptions = {}): VoxelVo
  */
 export function solidify(vol: VoxelVolume, color: number): void {
   const { sx, sy, sz } = vol;
+  const data = vol.data;
   const outside = new Uint8Array(sx * sy * sz);
-  const at = (x: number, y: number, z: number) => (z * sy + y) * sx + x;
+  const at = (x: number, y: number, z: number) => (z * sy + y) * sx + x; // == voxelIndex
   const stack: number[] = [];
   const pushIfOpen = (x: number, y: number, z: number) => {
     if (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) return;
     const i = at(x, y, z);
-    if (outside[i] || getVoxel(vol, x, y, z) !== EMPTY) return;
+    if (outside[i] || data[i] !== EMPTY) return; // in bounds here → read backing array directly
     outside[i] = 1;
     stack.push(x, y, z);
   };
@@ -174,8 +175,6 @@ export function solidify(vol: VoxelVolume, color: number): void {
     pushIfOpen(x, y + 1, z); pushIfOpen(x, y - 1, z);
     pushIfOpen(x, y, z + 1); pushIfOpen(x, y, z - 1);
   }
-  for (let z = 0; z < sz; z++)
-    for (let y = 0; y < sy; y++)
-      for (let x = 0; x < sx; x++)
-        if (getVoxel(vol, x, y, z) === EMPTY && !outside[at(x, y, z)]) setVoxel(vol, x, y, z, color);
+  // full-volume scan in x-fastest order → the linear index `i` IS at(x,y,z); read/write directly.
+  for (let i = 0; i < data.length; i++) if (data[i] === EMPTY && !outside[i]) data[i] = color;
 }

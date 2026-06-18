@@ -57,6 +57,7 @@ export interface RenderOptions {
   depth?: number; // voxel3d/model3d: max build depth / resolution in blocks (default 8)
   smooth?: number; // 3D video: temporal depth smoothing 0..1 (default 0.35)
   curve?: number; // 3D: thickness curve exponent (default 0.5)
+  shading?: number; // 3D: shape-from-shading gain 0..1 (luminance carves internal relief; default 0.5; 0 = off)
   symmetric?: boolean; // 3D: centered double-sided solid (default true); false = one-sided relief
   gamutMap?: number; // quantizer hue-rigidity lambda for out-of-gamut colours (keeps source hue)
   animate?: SequenceAnimName; // 3D: procedural block-motion (explode/wave/buildup) of the built solid
@@ -267,8 +268,22 @@ export function render(opts: RenderOptions): RenderResult {
   if (opts.target === "voxel3d") {
     // video → temporally-stable animated 3D block build → vanilla datapack (delta-encoded, fill-batched)
     // --animate replaces the (video/still) sequence with procedural block-motion of the first solid.
+    // shape-from-shading: per-pixel OKLab lightness of the quantized block carves internal relief into
+    // the silhouette dome (a bright region bulges, a dark one recedes). On by default (gain 0.5).
+    const shadingGain = opts.shading ?? 0.5;
+    const shadingForFrame =
+      shadingGain > 0
+        ? (f: number, x: number, y: number) => pal.entries[q[f]!.paletteIndex[y * q[f]!.width + x]!]!.lab.L
+        : undefined;
     const volumes = applyAnimate(
-      framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric }),
+      framesToAnimated3d(q, {
+        maxDepth: opts.depth ?? 8,
+        smooth: opts.smooth,
+        curve: opts.curve,
+        symmetric: opts.symmetric,
+        shadingForFrame,
+        shadingGain,
+      }),
       opts,
     );
     assertNonEmpty3d(volumes);
