@@ -15,6 +15,7 @@ import {
   computeDeltas,
   greedyBoxes,
   makeBlockResolver,
+  fillLines,
   DEFAULT_MAX_COMMANDS,
   type Cell,
   type PlacedCell,
@@ -296,4 +297,50 @@ export function frameToWallCommands(
         for (let x = d.b.x0; x <= d.b.x1; x++) remainder.push(pending.get(wkey(x, y, z))!);
   }
   return { commands: kept.map((k) => k.line), remainder, quantized: curQ };
+}
+
+// ---------------------------------------------------------------------------
+// 4. in-world wall setup (clear a viewing space in a RUNNING world, no datapack)
+// ---------------------------------------------------------------------------
+
+export interface WallSetupOptions {
+  /**
+   * Blocks of clearance carved on EACH ±Z side of the wall so it's visible from either
+   * approach (the wall slab itself is also cleared, since the keyframe repaints it). Default 3.
+   */
+  clearance?: number;
+  /** Block to clear the volume to. Default "minecraft:air". */
+  clearBlock?: string;
+}
+
+/**
+ * Vanilla `/fill … air` commands that carve a clean viewing space for the wall in a RUNNING
+ * world - no datapack, no `/reload`, no leaving the world. Clears the wall slab
+ * (W×H at z = origin.z) plus `clearance` blocks on each ±Z side, so a player sees the dream
+ * from either approach instead of finding it buried in terrain. Oversized boxes are split at
+ * the vanilla 32768-block `/fill` cap (reuses emit-commands' {@link fillLines}); a 64×64 wall
+ * with the default clearance is one fill. Pure data transform - the sidecar sends these over
+ * RCON once, before the first frame.
+ */
+export function buildSetupCommands(
+  origin: { x: number; y: number; z: number },
+  width: number,
+  height: number,
+  opts: WallSetupOptions = {},
+): string[] {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+    throw new Error(`wall size must be integers ≥ 1×1 (got ${width}×${height})`);
+  }
+  const clearance = Math.max(0, Math.floor(opts.clearance ?? 3));
+  const block = opts.clearBlock ?? "minecraft:air";
+  return fillLines(
+    origin.x,
+    origin.y,
+    origin.z - clearance,
+    origin.x + width - 1,
+    origin.y + height - 1,
+    origin.z + clearance,
+    block,
+    "replace",
+  );
 }

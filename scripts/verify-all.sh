@@ -125,6 +125,13 @@ bash -n scripts/fabric-install.sh
 ok "bash -n fabric-install.sh"
 npx tsx packages/cli/src/rcon-bridge-cli.ts --help >/dev/null
 ok "rcon-bridge-cli --help"
+bash -n scripts/cast-live.sh
+ok "bash -n cast-live.sh"
+# live cast, headless: --setup carves the wall in-world + paints against the mock model,
+# exercising the RCON-pool sendBatch path + gen/paint/effective instrumentation (no MC/venv/ffmpeg).
+# The fake-RCON-server pool throughput test runs in the JS suite above (rcon-pipeline.test.ts).
+bash scripts/cast-live.sh --dry-run >/dev/null
+ok "cast-live.sh --dry-run (in-world setup + paint, no datapack/reload)"
 node --check tools/mineflayer-collector/bridge-e2e.mjs
 ok "node --check bridge-e2e.mjs"
 node --check tools/mineflayer-collector/datapack-e2e.mjs

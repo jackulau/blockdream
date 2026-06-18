@@ -27,6 +27,7 @@ refresh is strictly smoother, and ≥30 is the floor, not the target. The HUD sh
 | Technique | Resolution × fps (realistic) | Status | How |
 |---|---|---|---|
 | **Vanilla datapack block-swap** | 64–128 wide, **5–10 fps low-motion** | ✅ shipped + tested | `/setblock`+`/fill`, delta-encoded, **greedy box-merged** (a flat 64² region → 1 `/fill`, see `fill.ts greedyBoxes`). High-motion video blows the per-tick delta budget → drops frames. |
+| **Live RCON sidecar** (no mod) | model-bound, **~2 fps** (AR checkpoint) | ✅ shipped + tested (headless) | The no-mod *live* path ([`live-cast.md`](./live-cast.md)): a pool of RCON connections (`--rcon-conns`, default 4) paints a frame's `setblock`/`fill` concurrently so the sidecar isn't the bottleneck - the rate is the model's gen rate, not client round-trips. The server still runs commands on its main thread, so this lifts the *client* ceiling. |
 | **Map-wall (Fabric mod)** | 128px/map tiled, **target 10 fps; 20 fps after pre-cache** | ⚙️ mod code-complete, operator-build | Swap each map's 16384-byte `MapState.colors` + `markDirty()` → server resends the map packet. One array swap per map beats thousands of block updates. |
 | **Display entities** | ≤64×64 @ 20 fps | ✋ designed, not built | `block_display` grid animated via `transformation` interpolation. Client-bound. |
 
