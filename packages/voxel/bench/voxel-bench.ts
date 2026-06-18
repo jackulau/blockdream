@@ -11,7 +11,7 @@
 // Run:  pnpm exec tsx packages/voxel/bench/voxel-bench.ts
 // The first run writes bench/baseline.json + bench/BASELINE.md; later runs print a delta vs it.
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { QuantizedFrame } from "@blockdream/color-core";
@@ -19,7 +19,7 @@ import { imageToSolid } from "../src/depth";
 import { imageToVolume } from "../src/voxelize";
 import { volumeToFrame } from "../src/project";
 import { solidify } from "../src/obj";
-import { createVolume, setVoxel, forEachSolid, countSolid, type VoxelVolume } from "../src/volume";
+import { createVolume, setVoxel, getVoxel, fillRun, EMPTY, forEachSolid, countSolid, type VoxelVolume } from "../src/volume";
 
 // ---- deterministic PRNG (no Math.random → reproducible inputs) ----
 function mulberry32(seed: number): () => number {
@@ -184,6 +184,127 @@ export function runBench(cfg: BenchConfig = {}): BenchStage[] {
   return stages;
 }
 
+// ---- Rigorous in-run A/B: optimized vs a bounds-checked reference -------------------------------
+// WHY: the old "vs baseline.json" print compared a current run against a SINGLE STORED SNAPSHOT
+// captured once at whatever machine load existed then — an adversarial audit correctly flagged that
+// as not a valid A/B (its absolute numbers can be several-x off a fresh run under different load, so
+// the headline % was unreliable). These stages instead time the OPTIMIZED path against a
+// BOUNDS-CHECKED reference doing the SAME work, INTERLEAVED in the same run, so the ratio is a true
+// same-machine measure of exactly what D2 changed (dropping the per-voxel inBounds branch). It is
+// also honest about WHERE the win is: large on full-volume scans, marginal where an early-exit
+// already skips most voxels (projection of a solid-front volume).
+export interface ABStage {
+  name: string;
+  optMs: number;
+  refMs: number;
+  speedup: number; // refMs / optMs  (>1 = optimized faster)
+}
+
+// alternate opt/ref each rep so CPU-load drift hits both equally; reset hooks run OUTSIDE timing.
+function timeAB(
+  opt: () => void,
+  ref: () => void,
+  iters: number,
+  warmup: number,
+  resetOpt: () => void = () => {},
+  resetRef: () => void = () => {},
+): { optMs: number; refMs: number } {
+  for (let i = 0; i < warmup; i++) {
+    resetOpt(); opt();
+    resetRef(); ref();
+  }
+  const o: number[] = [];
+  const r: number[] = [];
+  for (let i = 0; i < iters; i++) {
+    resetOpt();
+    let t = performance.now();
+    opt();
+    o.push(performance.now() - t);
+    resetRef();
+    t = performance.now();
+    ref();
+    r.push(performance.now() - t);
+  }
+  return { optMs: median(o), refMs: median(r) };
+}
+
+export function runAB(cfg: BenchConfig = {}): ABStage[] {
+  const size = cfg.imgSize ?? 256;
+  const depth = cfg.flatDepth ?? 16;
+  const iters = cfg.iters ?? 9;
+  const warmup = cfg.warmup ?? 3;
+  const out: ABStage[] = [];
+
+  // 1. column fill — fillRun (opt) vs a bounds-checked setVoxel loop (the pre-D2 way). Overwrites
+  //    each rep, so no reset needed. This is the imageToSolid/imageToVolume inner-loop change.
+  {
+    const v = createVolume(size, size, depth);
+    const zStride = v.sx * v.sy;
+    const color = (x: number, y: number) => ((x + y) & 0xfe) + 2;
+    const opt = () => {
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) fillRun(v, x + v.sx * y, zStride, depth, color(x, y));
+    };
+    const ref = () => {
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) for (let z = 0; z < depth; z++) setVoxel(v, x, y, z, color(x, y));
+    };
+    const { optMs, refMs } = timeAB(opt, ref, iters, warmup);
+    out.push({ name: "column-fill", optMs, refMs, speedup: refMs / optMs });
+  }
+
+  // 2. full-volume scan-fill (solidify's final loop) — linear data[] (opt) vs getVoxel/setVoxel
+  //    triple loop (ref). Both reset to all-EMPTY before each timed rep so each fills the same work.
+  {
+    const vOpt = createVolume(size >> 1, size >> 1, depth * 4);
+    const vRef = createVolume(size >> 1, size >> 1, depth * 4);
+    const outside = new Uint8Array(vOpt.data.length); // all-zero → every cell is "interior" → filled
+    const opt = () => {
+      const d = vOpt.data;
+      for (let i = 0; i < d.length; i++) if (d[i] === EMPTY && !outside[i]) d[i] = 7;
+    };
+    const ref = () => {
+      let i = 0;
+      for (let z = 0; z < vRef.sz; z++)
+        for (let y = 0; y < vRef.sy; y++)
+          for (let x = 0; x < vRef.sx; x++) {
+            if (getVoxel(vRef, x, y, z) === EMPTY && !outside[i]) setVoxel(vRef, x, y, z, 7);
+            i++;
+          }
+    };
+    const { optMs, refMs } = timeAB(opt, ref, iters, warmup, () => vOpt.data.fill(EMPTY), () => vRef.data.fill(EMPTY));
+    out.push({ name: "full-scan-fill", optMs, refMs, speedup: refMs / optMs });
+  }
+
+  // 3. projection column scan — direct-index (opt) vs getVoxel (ref), read-only, early-exit on the
+  //    first solid voxel. On a solid-front volume the early-exit already skips most cells, so the
+  //    bounds-check removal saves little here — this stage exists to show that honestly.
+  {
+    const v = imageToSolid(discFrame(size), { maxDepth: depth * 2 });
+    const zStride = v.sx * v.sy;
+    const data = v.data;
+    const opt = () => {
+      for (let y = 0; y < v.sy; y++) {
+        const base = v.sx * y;
+        for (let x = 0; x < v.sx; x++) {
+          let idx = base + x;
+          for (let z = 0; z < v.sz; z++) {
+            if (data[idx] !== EMPTY) break;
+            idx += zStride;
+          }
+        }
+      }
+    };
+    const ref = () => {
+      for (let y = 0; y < v.sy; y++)
+        for (let x = 0; x < v.sx; x++)
+          for (let z = 0; z < v.sz; z++) if (getVoxel(v, x, y, z) !== EMPTY) break;
+    };
+    const { optMs, refMs } = timeAB(opt, ref, iters, warmup);
+    out.push({ name: "project-scan", optMs, refMs, speedup: refMs / optMs });
+  }
+
+  return out;
+}
+
 // ---- CLI: print table, manage baseline ----
 function fmt(stages: BenchStage[]): string {
   const rows = stages.map((s) => {
@@ -197,35 +318,42 @@ function fmt(stages: BenchStage[]): string {
   ].join("\n");
 }
 
+function fmtAB(stages: ABStage[]): string {
+  const rows = stages.map(
+    (s) => `| ${s.name.padEnd(16)} | ${s.refMs.toFixed(3).padStart(9)} | ${s.optMs.toFixed(3).padStart(9)} | ${s.speedup.toFixed(2).padStart(7)}x |`,
+  );
+  return [
+    "| stage            | ref (ms) | opt (ms) | speedup |",
+    "| ---------------- | -------: | -------: | ------: |",
+    ...rows,
+  ].join("\n");
+}
+
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   const here = dirname(fileURLToPath(import.meta.url));
-  const jsonPath = join(here, "baseline.json");
   const mdPath = join(here, "BASELINE.md");
   const stages = runBench();
   console.log("\nVoxel builder benchmark (deterministic disc input, median of timed runs)\n");
+  console.log("Absolute timings (machine + load dependent — NOT a before/after comparison):\n");
   console.log(fmt(stages));
 
-  const cur: Record<string, number> = {};
-  for (const s of stages) cur[s.name] = s.ms;
+  // The rigorous comparison: optimized vs a bounds-checked reference of the SAME work, interleaved
+  // in THIS run. ref=pre-D2 (getVoxel/setVoxel), opt=direct-index/fillRun. speedup = ref/opt.
+  const ab = runAB();
+  console.log("\nA/B: optimized vs bounds-checked reference (same run, same machine):\n");
+  console.log(fmtAB(ab));
+  console.log(
+    "\n(full-scan-fill = solidify's full-volume loop; column-fill = imageToSolid/imageToVolume inner loop;\n project-scan early-exits on the solid front face, so its bounds-check removal is honestly marginal.)",
+  );
 
-  if (existsSync(jsonPath)) {
-    const base = JSON.parse(readFileSync(jsonPath, "utf8")) as Record<string, number>;
-    console.log("\nvs baseline (baseline.json):");
-    for (const s of stages) {
-      const b = base[s.name];
-      if (b == null) continue;
-      const pct = ((s.ms - b) / b) * 100;
-      const tag = pct <= -5 ? "FASTER" : pct >= 5 ? "slower" : "~same";
-      console.log(`  ${s.name.padEnd(26)} ${b.toFixed(3)} -> ${s.ms.toFixed(3)} ms  (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%  ${tag})`);
-    }
-    console.log("\n(baseline.json kept; delete it to re-baseline)");
-  } else {
-    writeFileSync(jsonPath, JSON.stringify(cur, null, 2) + "\n");
+  if (!existsSync(mdPath)) {
     writeFileSync(
       mdPath,
-      `# Voxel builder benchmark baseline\n\nDeterministic disc input. Median of timed runs (\`pnpm exec tsx packages/voxel/bench/voxel-bench.ts\`).\nNumbers are machine-dependent; what matters is the **before/after delta on the same machine**.\n\n${fmt(stages)}\n`,
+      `# Voxel builder benchmark snapshot\n\nDeterministic disc input. \`pnpm exec tsx packages/voxel/bench/voxel-bench.ts\`.\n\n` +
+        `## Absolute timings (machine + load dependent — reference only, NOT a before/after delta)\n\n${fmt(stages)}\n\n` +
+        `## A/B: optimized vs bounds-checked reference (same run — the rigorous comparison)\n\n${fmtAB(ab)}\n`,
     );
-    console.log(`\nbaseline written -> ${jsonPath} (+ BASELINE.md)`);
+    console.log(`\nsnapshot written -> ${mdPath}`);
   }
 }

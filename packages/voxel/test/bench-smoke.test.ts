@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runBench } from "../bench/voxel-bench";
+import { runBench, runAB } from "../bench/voxel-bench";
 
 // The benchmark is a real, runnable harness — not a stub. This guards it against silent rot:
 // it must execute every stage and report a finite, positive timing + a non-zero work count for
@@ -22,6 +22,22 @@ describe("voxel benchmark harness", () => {
       expect(Number.isFinite(s.ms), `${s.name} ms finite`).toBe(true);
       expect(s.ms, `${s.name} ms > 0`).toBeGreaterThan(0);
       expect(s.units, `${s.name} units > 0`).toBeGreaterThan(0);
+    }
+  });
+
+  // the rigorous A/B (optimized vs bounds-checked reference, same run) must run and report a
+  // finite, positive speedup for every pair — this is what replaces the flawed stale-baseline delta.
+  const ab = runAB({ imgSize: 48, flatDepth: 8, iters: 2, warmup: 1 });
+  it("runs the optimized-vs-reference A/B for each changed loop", () => {
+    const names = ab.map((s) => s.name);
+    expect(names).toContain("column-fill");
+    expect(names).toContain("full-scan-fill");
+    expect(names).toContain("project-scan");
+    for (const s of ab) {
+      expect(Number.isFinite(s.speedup), `${s.name} speedup finite`).toBe(true);
+      expect(s.optMs, `${s.name} optMs > 0`).toBeGreaterThan(0);
+      expect(s.refMs, `${s.name} refMs > 0`).toBeGreaterThan(0);
+      expect(s.speedup, `${s.name} speedup > 0`).toBeGreaterThan(0);
     }
   });
 });
