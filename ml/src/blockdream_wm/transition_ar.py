@@ -115,10 +115,27 @@ class ARTransition(nn.Module):
     def _ff(self, layer, x):
         return layer.linear2(F.gelu(layer.linear1(x)))
 
+    def _pick(self, logits: torch.Tensor, temperature: float, top_k: int) -> torch.Tensor:
+        """Next-token choice. temperature<=0 → argmax (greedy, the default everywhere so the
+        KV-cache equals the greedy reference and all checkpoints behave identically). temperature>0
+        → sample from softmax(logits/temperature), optionally top-k filtered. Sampling is what keeps
+        an autoregressive world-model rollout ALIVE: greedy decode of a copy-previous-trained model
+        converges to a fixed point (the frame freezes), while sampling its predicted distribution
+        produces a continuously-evolving imagined frame - the standard generative-rollout recipe."""
+        if temperature <= 0:
+            return logits.argmax(-1)
+        logits = logits / temperature
+        if top_k and top_k < logits.shape[-1]:
+            kth = torch.topk(logits, top_k, dim=-1).values[..., -1, None]
+            logits = logits.masked_fill(logits < kth, float("-inf"))
+        return torch.multinomial(torch.softmax(logits, dim=-1), 1).squeeze(-1)
+
     @torch.no_grad()
-    def generate(self, prev: torch.Tensor, action_emb: torch.Tensor) -> torch.Tensor:
-        """Greedy autoregressive rollout of the next frame's tokens (B, n_tokens),
-        KV-cached so each token is O(seq) instead of a full O(N) re-pass."""
+    def generate(self, prev: torch.Tensor, action_emb: torch.Tensor,
+                 temperature: float = 0.0, top_k: int = 0) -> torch.Tensor:
+        """Autoregressive rollout of the next frame's tokens (B, n_tokens), KV-cached so each token
+        is O(seq) instead of a full O(N) re-pass. Greedy by default (temperature=0); pass
+        temperature>0 (with optional top_k) to SAMPLE, keeping the imagined rollout from freezing."""
         device = prev.device
         n = self.n_tokens
         _, hd = self._heads()
@@ -144,7 +161,7 @@ class ARTransition(nn.Module):
             x = x + self._ff(layer, layer.norm2(x))
             caches.append([k, v])
 
-        out = [self.head(x[:, -1, :]).argmax(-1)]  # token 0 from the last prefix hidden
+        out = [self._pick(self.head(x[:, -1, :]), temperature, top_k)]  # token 0 from last prefix hidden
 
         for j in range(n - 1):  # tokens 1..n-1, feeding token j at position j
             xt = (self.token_emb(out[-1]).unsqueeze(1)
@@ -157,6 +174,6 @@ class ARTransition(nn.Module):
                 ctx = torch.softmax((q @ K.transpose(-2, -1)) * scale, dim=-1) @ V  # attends all cached
                 xt = xt + self._attn_out(layer, ctx)
                 xt = xt + self._ff(layer, layer.norm2(xt))
-            out.append(self.head(xt[:, -1, :]).argmax(-1))
+            out.append(self._pick(self.head(xt[:, -1, :]), temperature, top_k))
 
         return torch.stack(out, dim=1)  # (B, n)

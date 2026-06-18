@@ -187,10 +187,13 @@ class DriveTransition(nn.Module):
         return loss / max(1, k), {"rgb_roll": (loss / max(1, k)).item()}
 
     @torch.no_grad()
-    def step(self, prev_tokens, prev_lidar, prev_tel, control, history=None):
-        """One recursive world-model step → (next_tokens, next_lidar, next_telemetry)."""
+    def step(self, prev_tokens, prev_lidar, prev_tel, control, history=None,
+             temperature: float = 0.0, top_k: int = 0):
+        """One recursive world-model step → (next_tokens, next_lidar, next_telemetry). temperature>0
+        SAMPLES the next RGB tokens instead of greedy-decoding them, so the imagined rollout keeps
+        evolving instead of converging to a frozen frame (the copy-previous fixed point)."""
         c = self._fuse(control, prev_lidar, prev_tel, history)
-        next_tokens = self.ar.generate(prev_tokens, c)
+        next_tokens = self.ar.generate(prev_tokens, c, temperature=temperature, top_k=top_k)
         next_lidar = torch.sigmoid(self.lidar_head(c))
         next_tel = self.bound_tel(self.telemetry_head(c))
         return next_tokens, next_lidar, next_tel
