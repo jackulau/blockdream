@@ -33,8 +33,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# default location of the fetched weights (gitignored single-copy asset)
-DEFAULT_DECODER_WEIGHTS = "ml/runs/drive/commavq_decoder.bin"
+# default location of the fetched weights (gitignored single-copy asset). Anchored ABSOLUTELY at the
+# package (ml/src/blockdream_wm/drive/ -> parents[3] = ml/) so has_decoder() resolves the same whether
+# the server runs from the repo root or from ml/ (serve_demo.sh does `cd ml`). A cwd-relative default
+# silently missed the weights from ml/ and fell back to the token field - the bug the live demo exposed.
+DEFAULT_DECODER_WEIGHTS = str(Path(__file__).resolve().parents[3] / "runs" / "drive" / "commavq_decoder.bin")
 COMMAVQ_DECODER_URL = (
     "https://huggingface.co/commaai/commavq-gpt2m/resolve/main/decoder_pytorch_model.bin"
 )

@@ -24,3 +24,15 @@ def test_pseudo_control_shape_and_range():
     ctrl = pseudo_control(pose)
     assert ctrl.shape == (40, 3)
     assert np.abs(ctrl).max() <= 1.0 + 1e-6  # normalized
+
+
+def test_decoder_default_path_is_absolute_and_cwd_independent(tmp_path, monkeypatch):
+    """Regression: the serve path runs from ml/ (serve_demo `cd ml`), so a cwd-relative default
+    weights path silently missed the decoder and fell back to the token field. The default must be
+    an absolute, cwd-independent location."""
+    from blockdream_wm.drive import commavq_decoder as D
+    p1 = D.decoder_weights_path()
+    monkeypatch.chdir(tmp_path)
+    p2 = D.decoder_weights_path()
+    assert p1.is_absolute() and p1 == p2
+    assert p1.parent.name == "drive" and p1.parent.parent.name == "runs"
