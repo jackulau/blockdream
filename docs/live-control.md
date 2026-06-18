@@ -10,9 +10,11 @@ open a socket or paint map pixels, there is no client-side input capture without
 Bedrock can do none of it natively (see the bottom of this page). But there **is** a shipped
 no-mod live path: the **RCON sidecar** ([`packages/cli/src/rcon-bridge.ts`](../packages/cli/src/rcon-bridge.ts))
 runs *outside* the game, polls a stock vanilla server's player pose over RCON, and paints
-the model's frames as a solid-block wall - genuinely live at **~2 fps** (every block is an
-RCON round-trip). Setup: [`play-without-fabric.md`](./play-without-fabric.md). The data
-pipeline is proven headless in
+the model's frames as a solid-block wall - genuinely live at **~2 fps, model-bound** (a pool
+of RCON connections paints a frame's commands concurrently, so the sidecar isn't the
+bottleneck; the rate is the AR checkpoint's gen rate). One-command drop-in + the full transport
+story: [`live-cast.md`](./live-cast.md); setup: [`play-without-fabric.md`](./play-without-fabric.md).
+The data pipeline is proven headless in
 [`packages/cli/src/control-sim.ts`](../packages/cli/src/control-sim.ts) +
 `control-sim.test.ts` - no JVM/client needed to verify the contract.
 

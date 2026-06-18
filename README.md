@@ -28,18 +28,21 @@ then in-game: `/reload` → `/function blockdream:setup` → `/function blockdre
 The script preflights the venv / ffmpeg / checkpoint (see [Quickstart](#quickstart-fresh-clone))
 and tells you exactly what's missing.
 
-**Live RCON bridge (no mods, your movement drives the model).** A sidecar process polls a
-stock vanilla server over RCON and repaints a block wall with the model's predicted frames,
-steered by *your* in-game movement - three commands in three terminals:
+**Live cast (no mods, no datapack, your movement drives the model).** Drop into a world that
+is already running and watch the dream stream onto a block wall *in place* - a sidecar owns the
+socket (vanilla can't), polls a stock server's pose over RCON, and repaints the wall with the
+model's predicted frames, steered by *your* movement. One command in a third terminal:
 
 ```bash
-bash scripts/vanilla-server.sh    # 1. throwaway vanilla server (localhost-only, prints the RCON password once)
-bash ml/scripts/serve_demo.sh     # 2. the world-model server (ws://127.0.0.1:8765)
-npx tsx packages/cli/src/rcon-bridge-cli.ts --rcon-pass <pass>   # 3. the bridge sidecar
+bash scripts/vanilla-server.sh                  # 1. throwaway vanilla server (localhost-only, prints the RCON password once)
+bash ml/scripts/serve_demo.sh                   # 2. the world-model server (ws://127.0.0.1:8765)
+bash scripts/cast-live.sh --rcon-pass <pass>    # 3. the live cast (--setup clears the wall in-world; no datapack, no /reload)
 ```
 
-Honest expectations: every command is an RCON round-trip, so the wall updates at roughly
-2 fps - genuinely live, genuinely mod-free. Details in
+Honest expectations: a pool of RCON connections (`--rcon-conns`) paints each frame
+concurrently so the sidecar isn't the bottleneck, leaving the rate **model-bound at ~2 fps**
+for the AR checkpoint - genuinely live, genuinely mod-free, not smooth video. The full
+transport + frame-rate story: [docs/live-cast.md](./docs/live-cast.md); setup + security:
 [docs/play-without-fabric.md](./docs/play-without-fabric.md).
 
 **Fabric mod (the high-FPS alternative).** Want smooth video instead? The optional
@@ -108,6 +111,7 @@ ml/               # Workstream B - world model (Python / PyTorch)
   (install, generate, choose a target, import into Java/Bedrock, troubleshooting)
 - [Technical writeup & results](./docs/results.md) - architecture diagram, methods, graphics, measured numbers
 - [Architecture](./docs/architecture.md) - whole-system map, packages, data flow
+- [Live cast into a running world](./docs/live-cast.md) - stream the world model onto a block wall in-place (no mod, no datapack); the transport + honest frame rates
 - [Play it in Minecraft without Fabric](./docs/play-without-fabric.md) - offline cast + live RCON bridge
 - [3D builds & animation](./docs/3d-and-animation.md) - image→3D, greedy meshing, animation system
 - [Importing animations](./docs/video-import.md) - glTF / .glb / .obj-sequence / GIF / video (.mp4/.webm) → blocks; `--animate explode|wave|buildup` for procedural block-motion

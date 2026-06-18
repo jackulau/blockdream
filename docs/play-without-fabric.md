@@ -12,7 +12,7 @@ optional high-FPS upgrade at the bottom of this page.
 | Live control | ❌ fixed rollout, chosen at cast time | ✅ your movement drives the model | ✅ your movement drives the model |
 | Input source | `--skill` flag only | player pose polled over RCON (movement/look; no keyboard state) | server-observed per-tick pose delta |
 | Display | solid-block wall (datapack playback) | solid-block wall (`setblock`/`fill` over RCON) | item-frame map wall (per-tick pixel resend) |
-| Honest fps | pre-rendered playback at the datapack tick rate | **~2 fps** (every command is an RCON round-trip) | up to ~20 fps (map packets, not setblocks) |
+| Honest fps | pre-rendered playback at the datapack tick rate | **~2 fps**, model-bound (a pool of RCON conns paints concurrently, so the sidecar isn't the bottleneck) | up to ~20 fps (map packets, not setblocks) |
 | Requirements | any vanilla 1.21.x world; ml venv + checkpoint + ffmpeg | the throwaway server below + WM server + Node | JDK 21 build, 1.21.x Fabric server |
 
 ## Offline cast (datapack)
@@ -50,12 +50,18 @@ bash scripts/vanilla-server.sh          # prints the RCON password ONCE - copy i
 # 2. the world-model server (serves runs/skills_real on ws://127.0.0.1:8765)
 bash ml/scripts/serve_demo.sh
 
-# 3. the bridge sidecar (Node, from the repo root)
-npx tsx packages/cli/src/rcon-bridge-cli.ts --rcon-pass <pass>   # add --mock-wm to test without step 2
+# 3. the live cast - one command (clears the wall in-world via --setup, then streams)
+bash scripts/cast-live.sh --rcon-pass <pass>            # add --dry-run to test without steps 1-2
 ```
 
+`cast-live.sh` is the one-command drop-in (preflight + the sidecar with `--setup` on); under
+the hood it runs `packages/cli/src/rcon-bridge-cli.ts`, which you can also call directly for
+fine control (`--mock-wm` to test without step 2, `--rcon-conns N`, `--origin`, `--size`).
 Join `localhost` with a Minecraft Java 1.21.1 client and move around: the wall of blocks
-near spawn repaints with the model's predicted frames, steered by *your* movement.
+near spawn repaints with the model's predicted frames, steered by *your* movement - and
+because `--setup` carves the wall + viewing space in the **running world** over RCON, there's
+nothing to install in the save and no `/reload`. The whole transport + frame-rate story:
+[`live-cast.md`](./live-cast.md).
 
 **How it works** (core logic in [`../packages/cli/src/rcon-bridge.ts`](../packages/cli/src/rcon-bridge.ts),
 all unit-testable without a game): the sidecar polls your pose via RCON
@@ -65,9 +71,12 @@ over WebSocket to the WM server, then paints each returned frame as a vertical
 solid-block wall - quantize to the solid-block palette, delta against the previous
 frame, greedy `fill`-merge, and send the commands back over RCON.
 
-**Honest expectations:** every single command is an RCON round-trip, so the wall updates
-at **roughly 2 fps** with a capped per-frame command budget (overflow cells carry into the
-next frame). It's a genuinely live, genuinely mod-free demo - not the smooth-video path.
+**Honest expectations:** a pool of RCON connections (`--rcon-conns`, default 4) paints a
+frame's commands concurrently rather than one round-trip at a time, so the sidecar isn't the
+bottleneck; the rate is then **model-bound at roughly 2 fps** (the AR checkpoint's CPU gen
+rate), with a capped per-frame command budget (overflow cells carry into the next frame). The
+sidecar logs `gen . paint . effective` fps separately so the ceilings are never conflated.
+It's a genuinely live, genuinely mod-free demo - not the smooth-video path.
 The wall is painted at a **fixed origin near spawn in the disposable flat world** the
 script creates; the sidecar assumes that world, not your own save. RCON also cannot see
 keyboard state, so sprint/jump are *inferred* from speed and vertical motion, and sneaking
