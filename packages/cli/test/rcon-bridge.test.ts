@@ -10,6 +10,7 @@ import {
   isParseError,
   poseToAction,
   frameToWallCommands,
+  buildSetupCommands,
   actionMessage,
   BTN,
   N_BUTTONS,
@@ -276,5 +277,61 @@ describe("frameToWallCommands: per-frame command cap", () => {
       carry = step.remainder;
     }
     expectGridsEqual(grid, expectedWall2D(first.quantized, ORIGIN, resolve), expect);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildSetupCommands - the no-datapack in-world wall clear (drop-in to a running world)
+// ---------------------------------------------------------------------------
+
+interface FillBox { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number; block: string; mode: string }
+function parseFill(line: string): FillBox {
+  const t = line.split(/\s+/);
+  expect(t[0]).toBe("fill");
+  return { x0: +t[1]!, y0: +t[2]!, z0: +t[3]!, x1: +t[4]!, y1: +t[5]!, z1: +t[6]!, block: t[7]!, mode: t[8]! };
+}
+const boxVol = (b: FillBox): number => (b.x1 - b.x0 + 1) * (b.y1 - b.y0 + 1) * (b.z1 - b.z0 + 1);
+
+describe("buildSetupCommands (clear a viewing space in a RUNNING world, no datapack)", () => {
+  const O = { x: 100, y: 64, z: -20 };
+
+  it("a small wall clears as ONE /fill: slab + ±clearance on Z, to air", () => {
+    const cmds = buildSetupCommands(O, 8, 8, { clearance: 3 });
+    expect(cmds).toHaveLength(1);
+    const b = parseFill(cmds[0]!);
+    expect(b).toMatchObject({ x0: 100, y0: 64, z0: -23, x1: 107, y1: 71, z1: -17, block: "minecraft:air", mode: "replace" });
+    expect(boxVol(b)).toBe(8 * 8 * 7);
+  });
+
+  it("clearance 0 clears just the wall slab (one z-plane)", () => {
+    const b = parseFill(buildSetupCommands(O, 8, 8, { clearance: 0 })[0]!);
+    expect([b.z0, b.z1]).toEqual([-20, -20]);
+    expect(boxVol(b)).toBe(8 * 8 * 1);
+  });
+
+  it("default clearance is 3 when unspecified", () => {
+    expect(buildSetupCommands(O, 8, 8)).toEqual(buildSetupCommands(O, 8, 8, { clearance: 3 }));
+  });
+
+  it("an oversized clear splits at the 32768 /fill cap and tiles the box exactly", () => {
+    const W = 200, H = 200, C = 3;
+    const cmds = buildSetupCommands(O, W, H, { clearance: C });
+    expect(cmds.length).toBeGreaterThan(1);
+    const boxes = cmds.map(parseFill);
+    for (const b of boxes) {
+      expect(b.block).toBe("minecraft:air");
+      expect(boxVol(b)).toBeLessThanOrEqual(32768); // every piece within the vanilla cap
+    }
+    // pieces tile the full box exactly: volumes sum, and the union bounds match
+    expect(boxes.reduce((s, b) => s + boxVol(b), 0)).toBe(W * H * (2 * C + 1));
+    expect(Math.min(...boxes.map((b) => b.x0))).toBe(O.x);
+    expect(Math.max(...boxes.map((b) => b.x1))).toBe(O.x + W - 1);
+    expect(Math.min(...boxes.map((b) => b.z0))).toBe(O.z - C);
+    expect(Math.max(...boxes.map((b) => b.z1))).toBe(O.z + C);
+  });
+
+  it("rejects a degenerate wall size", () => {
+    expect(() => buildSetupCommands(O, 0, 8)).toThrow(/≥ 1/);
+    expect(() => buildSetupCommands(O, 8, -1)).toThrow(/≥ 1/);
   });
 });

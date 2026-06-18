@@ -26,6 +26,7 @@ import { runFfmpeg } from "@blockdream/video";
 import type { RgbImage } from "@blockdream/color-core";
 import {
   actionMessage,
+  buildSetupCommands,
   frameToWallCommands,
   isParseError,
   parsePosRotation,
@@ -68,6 +69,11 @@ Options:
                                                           (default 4)
   --max-commands <n>  RCON command budget per frame; overflow carries to the next
                       frame via the remainder contract   (default 256)
+  --setup             before streaming, clear the wall volume + viewing space in the
+                      RUNNING world via /fill (no datapack, no /reload). Drop-in: the
+                      dream appears in-place wherever you point --origin
+  --setup-clearance <n>  blocks of ±Z clearance carved around the wall by --setup
+                                                          (default 3)
   --frames <n>        exit 0 after painting n frames     (default 0 = unlimited)
   --mock-wm           use control-sim's deterministic mock world model (no WS needed)
   --dry-run           implies --mock-wm AND skips RCON entirely: synthesizes a walking
@@ -276,6 +282,8 @@ export async function main(argv: string[]): Promise<number> {
         fps: { type: "string" },
         "rcon-conns": { type: "string" },
         "max-commands": { type: "string" },
+        setup: { type: "boolean" },
+        "setup-clearance": { type: "string" },
         frames: { type: "string" },
         "mock-wm": { type: "boolean" },
         "dry-run": { type: "boolean" },
@@ -307,11 +315,14 @@ export async function main(argv: string[]): Promise<number> {
   const rconConns = parseInt((values["rcon-conns"] as string | undefined) ?? "4", 10);
   const maxCommands = parseInt((values["max-commands"] as string | undefined) ?? "256", 10);
   const maxFrames = parseInt((values["frames"] as string | undefined) ?? "0", 10);
+  const doSetup = Boolean(values["setup"]);
+  const setupClearance = parseInt((values["setup-clearance"] as string | undefined) ?? "3", 10);
 
   if (!Number.isInteger(rconPort) || rconPort <= 0) return fail(`bad --rcon-port`);
   if (!Number.isFinite(fps) || fps <= 0) return fail(`--fps must be > 0`);
   if (!Number.isInteger(rconConns) || rconConns < 1) return fail(`--rcon-conns must be ≥ 1`);
   if (!Number.isInteger(maxCommands) || maxCommands < 1) return fail(`--max-commands must be ≥ 1`);
+  if (!Number.isInteger(setupClearance) || setupClearance < 0) return fail(`--setup-clearance must be ≥ 0`);
   if (!Number.isInteger(maxFrames) || maxFrames < 0) return fail(`--frames must be ≥ 0`);
   if (!dryRun && !rconPass) return fail(`--rcon-pass is required (omit only with --dry-run)`);
 
@@ -375,6 +386,18 @@ export async function main(argv: string[]): Promise<number> {
   if (!dryRun && !player) {
     player = await detectPlayer(rcon!);
     log(`player auto-detected: ${player}`);
+  }
+
+  // ----- optional in-world setup: clear the wall + viewing space (no datapack/reload) -----
+  if (doSetup) {
+    const setupCmds = buildSetupCommands(origin, sizeW, sizeH, { clearance: setupClearance });
+    log(`setup: clearing wall slab + ${setupClearance}-block ±Z clearance in the running world (${setupCmds.length} /fill command(s), no datapack/reload)`);
+    if (dryRun) {
+      for (const c of setupCmds) log(`  setup> ${c}`);
+    } else {
+      await rcon!.sendBatch(setupCmds);
+      log("setup: done - wall volume cleared");
+    }
   }
 
   // ----- mock model state (keyframed inside the pump so a failed batch retries;
