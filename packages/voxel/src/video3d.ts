@@ -18,6 +18,11 @@ export interface Video3dOptions extends SolidifyImageOptions {
   smooth?: number;
   /** Real per-pixel depth [0,1] for frame f (e.g. a depth model). Overrides the silhouette heuristic. */
   depthForFrame?: (frameIndex: number, x: number, y: number) => number;
+  /** Shape-from-shading per frame: luminance/relief [0,1] for frame f. Modulates the silhouette
+   *  envelope (see SolidifyImageOptions.shadingOf) so video subjects gain internal relief instead of
+   *  every frame inflating into a dome. Smoothed by the temporal EMA. Ignored when depthForFrame is
+   *  supplied. Strength comes from the shared shadingGain. */
+  shadingForFrame?: (frameIndex: number, x: number, y: number) => number;
 }
 
 /** Raw (un-normalized) silhouette distance field + subject mask for one frame. */
@@ -63,6 +68,18 @@ export function framesToAnimated3d(frames: QuantizedFrame[], opts: Video3dOption
     } else {
       const r = raws![f]!;
       for (let i = 0; i < n; i++) th[i] = r.mask[i] ? Math.pow(r.dist[i]! * inv, curve) : 0;
+      // shape-from-shading: carve internal relief into the envelope from per-pixel luminance
+      if (opts.shadingForFrame) {
+        const gain = Math.max(0, Math.min(1, opts.shadingGain ?? 0.5));
+        for (let y = 0; y < frame.height; y++)
+          for (let x = 0; x < frame.width; x++) {
+            const i = y * frame.width + x;
+            if (!r.mask[i]) continue;
+            const s = opts.shadingForFrame(f, x, y);
+            const shade = Math.max(0, Math.min(1, Number.isFinite(s) ? s : 0));
+            th[i] = th[i]! * Math.max(1e-3, 1 - gain + gain * shade); // floor → no holes
+          }
+      }
     }
     if (prev && prev.length === n && smooth > 0) for (let i = 0; i < n; i++) th[i] = (1 - smooth) * th[i]! + smooth * prev[i]!;
     prev = th;

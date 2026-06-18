@@ -29,6 +29,16 @@ export interface SolidifyImageOptions {
   /** Real per-pixel depth in [0,1] (1 = thickest). Overrides the silhouette-inflation heuristic.
    *  This is the hook a depth MODEL or a Blender depth pass feeds. (x,y) are image coords. */
   depthOf?: (x: number, y: number) => number;
+  /** Shape-from-shading: per-pixel luminance/relief in [0,1] (1 = closest/brightest → bulges most).
+   *  Unlike depthOf this does NOT replace the silhouette envelope — it MODULATES it, so the subject
+   *  keeps its rounded outline + edge taper while internal structure (a nose, a hood) emerges from
+   *  the image's shading instead of every subject inflating into the same featureless dome. Ignored
+   *  when depthOf is supplied (a true depth map wins). (x,y) are image coords. */
+  shadingOf?: (x: number, y: number) => number;
+  /** Strength of the shadingOf modulation, 0..1 (default 0.5 when shadingOf is set). 0 = pure
+   *  envelope (old behaviour); 1 = thickness fully driven by shading within the envelope. A subject
+   *  pixel always keeps >=1 voxel regardless (no holes). */
+  shadingGain?: number;
   /** Thickness response curve exponent applied to the normalized heuristic distance.
    *  <1 rounds the dome (default 0.5 = sqrt, a fuller bulge); 1 = linear cone. */
   curve?: number;
@@ -222,7 +232,23 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
     let maxd = 0;
     for (let i = 0; i < dist.length; i++) if (dist[i]! > maxd) maxd = dist[i]!;
     const inv = maxd > 0 ? 1 / maxd : 0;
+    // envelope thickness from the silhouette (the rounded dome)...
     for (let i = 0; i < dist.length; i++) thickness[i] = mask[i] ? Math.pow(dist[i]! * inv, curve) : 0;
+    // ...then SHAPE-FROM-SHADING: modulate the envelope by per-pixel luminance so internal structure
+    // appears instead of a featureless dome. mix in [eps,1] keeps the subject floor (no holes even at
+    // gain=1, shade=0 → mix=eps → the >=1-voxel floor below still fills the column).
+    if (opts.shadingOf) {
+      const gain = Math.max(0, Math.min(1, opts.shadingGain ?? 0.5));
+      for (let y = 0; y < height; y++)
+        for (let x = 0; x < width; x++) {
+          const i = y * width + x;
+          if (!mask[i]) continue;
+          const s = opts.shadingOf(x, y);
+          const shade = Math.max(0, Math.min(1, Number.isFinite(s) ? s : 0));
+          const mix = Math.max(1e-3, 1 - gain + gain * shade);
+          thickness[i] = thickness[i]! * mix;
+        }
+    }
   }
 
   const v = createVolume(width, height, maxDepth);
