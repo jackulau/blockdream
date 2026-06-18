@@ -5,11 +5,15 @@
 // export-side merges (emit-commands greedyBoxes, the web greedy mesher) are already greedy
 // and live in other packages, so they are intentionally NOT measured here.
 //
-// Inputs are DETERMINISTIC (seeded mulberry32, fixed sizes) so two runs are directly
-// comparable — that is what lets a before/after diff prove a speedup rather than assert one.
+// Inputs are DETERMINISTIC (seeded mulberry32, fixed sizes) so runs are reproducible.
+//
+// Two outputs:
+//   • absolute timings (runBench) — machine + load dependent, reference only, NOT a before/after delta;
+//   • a rigorous A/B (runAB) — each optimized path vs a bounds-checked reference of the SAME work,
+//     interleaved in the same run, so the speedup is a true same-machine measurement.
 //
 // Run:  pnpm exec tsx packages/voxel/bench/voxel-bench.ts
-// The first run writes bench/baseline.json + bench/BASELINE.md; later runs print a delta vs it.
+// Writes bench/BASELINE.md (an absolute-timings + A/B snapshot) on the first run if it is absent.
 
 import { existsSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
