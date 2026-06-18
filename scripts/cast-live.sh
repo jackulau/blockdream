@@ -36,9 +36,14 @@ CONNS=4
 SETUP=1
 DRYRUN=0
 
-usage() { sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
+  # valued flags need a following argument - fail cleanly instead of a set -u crash on $2
+  case "$1" in
+    --rcon-pass|--rcon-host|--rcon-port|--ws|--skill|--origin|--size|--rcon-conns)
+      [ $# -ge 2 ] || { echo "✗ $1 needs a value (see --help)" >&2; exit 2; } ;;
+  esac
   case "$1" in
     --rcon-pass)  RCON_PASS="$2"; shift 2 ;;
     --rcon-host)  RCON_HOST="$2"; shift 2 ;;

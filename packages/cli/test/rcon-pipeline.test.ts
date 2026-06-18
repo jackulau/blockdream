@@ -28,6 +28,7 @@ interface FakeRcon {
   received: string[]; // command bodies seen (type 2), across all connections
   peakConcurrent: () => number; // max simultaneously in-flight commands (proves parallelism)
   connections: () => number; // distinct sockets that authed
+  openSockets: () => number; // sockets currently open (proves stop() closes them)
   close: () => Promise<void>;
 }
 
@@ -93,6 +94,7 @@ function startFakeRcon(opts: { perCommandDelayMs: number; failCommands?: boolean
         received,
         peakConcurrent: () => peak,
         connections: () => conns,
+        openSockets: () => sockets.size,
         close: () =>
           new Promise<void>((res) => {
             for (const s of sockets) s.destroy(); // don't wait for clients to drain
@@ -175,5 +177,25 @@ describe("RconPool: pooled sends beat serial against a latency-injecting fake se
     const srv = track(await startFakeRcon({ perCommandDelayMs: 1, failCommands: true }));
     const pool = newPool(srv.port, 4);
     await expect(pool.sendBatch(cmds)).rejects.toThrow(/rcon batch/i);
+  });
+
+  it("stop() while a batch/connect is in flight settles cleanly and orphans no socket", async () => {
+    const srv = track(await startFakeRcon({ perCommandDelayMs: 80 }));
+    const pool = newPool(srv.port, 2);
+    // kick off a batch (opens connections), then stop mid-flight - exercises stop()-with-connect-pending
+    const batch = pool
+      .sendBatch(cmds)
+      .then(() => "resolved")
+      .catch((e: Error) => `rejected: ${e.message}`);
+    await pool.stop();
+    const outcome = await batch; // must settle, never hang (test would time out otherwise)
+    expect(typeof outcome).toBe("string");
+    // every socket the pool opened is closed (no orphan from a connect that finished after stop)
+    const until = async (pred: () => boolean, ms = 1500): Promise<boolean> => {
+      const t0 = performance.now();
+      while (!pred() && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 10));
+      return pred();
+    };
+    expect(await until(() => srv.openSockets() === 0)).toBe(true);
   });
 });

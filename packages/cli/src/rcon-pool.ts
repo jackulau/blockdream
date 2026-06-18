@@ -45,8 +45,12 @@ class RconConn {
   async stop(): Promise<void> {
     this.stopped = true;
     const c = this.client;
+    const connecting = this.connecting;
     this.client = null;
+    this.connecting = null;
     if (c) await c.end().catch(() => {});
+    // a connect still in flight when we stopped would otherwise orphan its socket - end it
+    if (connecting) await connecting.then((rc) => rc.end()).catch(() => {});
   }
 
   private async ensure(): Promise<Rcon> {
@@ -56,6 +60,11 @@ class RconConn {
       try {
         const client = await this.connecting;
         this.connecting = null;
+        // stopped while this connect was in flight: don't store/use it, just close it
+        if (this.stopped) {
+          await client.end().catch(() => {});
+          throw new Error("rcon pool stopped");
+        }
         const drop = (why: string): void => {
           if (this.client === client) {
             this.client = null;
