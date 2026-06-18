@@ -362,7 +362,10 @@ async function setup3dViewer(): Promise<void> {
       depthMap && depthMap.length === q.width * q.height
         ? (x: number, y: number) => depthMap![y * q.width + x]!
         : undefined;
-    const vol = log.time("imageToSolid", () => imageToSolid(q, { maxDepth, depthOf }));
+    // shape-from-shading: per-pixel OKLab lightness of the matched block carves internal relief into
+    // the dome (a bright cheek bulges, a dark socket recedes) — ignored when a real depthOf is present.
+    const shadingOf = (x: number, y: number) => pal3d.entries[q.paletteIndex[y * q.width + x]!]!.lab.L;
+    const vol = log.time("imageToSolid", () => imageToSolid(q, { maxDepth, depthOf, shadingOf, shadingGain: 0.5 }));
     log.debug("build3d", { dims: [vol.sx, vol.sy, vol.sz], depthMapped: !!depthOf });
     baseVolume = vol;
     current3d = [vol];

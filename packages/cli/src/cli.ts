@@ -28,6 +28,7 @@ Options:
   --depth <n>        3D build depth in blocks for voxel3d/mcstructure3d (default: 8)
   --smooth <n>       3D video temporal depth smoothing 0..1 (default: 0.35)
   --curve <n>        3D thickness curve exponent (<1 rounds the dome; default: 0.5)
+  --shading <n>      3D shape-from-shading gain 0..1 — luminance carves internal relief (default: 0.5; 0 = off)
   --flat             3D one-sided relief instead of the centered double-sided solid
   --animate <a>      3D block-motion of the built solid: explode | wave | buildup
                        (voxel3d/mcstructure3d/model3d; animates a STILL image or a 3D model.
@@ -70,6 +71,7 @@ export function runCli(argv: string[]): number {
       depth: { type: "string" },
       smooth: { type: "string" },
       curve: { type: "string" },
+      shading: { type: "string" },
       flat: { type: "boolean" },
       animate: { type: "string" },
       "animate-frames": { type: "string" },
@@ -156,6 +158,7 @@ export function runCli(argv: string[]): number {
     depth: values.depth ? Number(values.depth) : undefined,
     smooth: values.smooth ? Number(values.smooth) : undefined,
     curve: values.curve ? Number(values.curve) : undefined,
+    shading: values.shading !== undefined ? Number(values.shading) : undefined,
     symmetric: values.flat ? false : undefined,
     gamutMap: values.gamut ? Number(values.gamut) : undefined,
     paletteVersion: values.version,

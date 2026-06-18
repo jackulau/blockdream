@@ -23,5 +23,13 @@ export function rgbFramesToAnimated3d(
 ): VoxelVolume[] {
   const { quantize, ...video3d } = opts;
   const quantized = frames.map((f) => quantizeFrame(f, palette, quantize ?? { method: "none", gamutMap: 0.8 }));
-  return framesToAnimated3d(quantized, video3d);
+  // shape-from-shading on by default: per-pixel OKLab lightness of the matched block carves internal
+  // relief into each frame's dome. Caller can override shadingForFrame or set shadingGain: 0 to disable.
+  const shadingGain = video3d.shadingGain ?? 0.5;
+  const shadingForFrame =
+    video3d.shadingForFrame ??
+    (shadingGain > 0
+      ? (f: number, x: number, y: number) => palette.entries[quantized[f]!.paletteIndex[y * quantized[f]!.width + x]!]!.lab.L
+      : undefined);
+  return framesToAnimated3d(quantized, { ...video3d, shadingGain, shadingForFrame });
 }
