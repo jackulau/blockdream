@@ -30,6 +30,14 @@ missing=0
 [ -f "$DRIVE_CKPT" ] || { echo "✗ drive checkpoint missing: $DRIVE_CKPT (reproduce the real commaVQ model from the committed fixture: bash ml/scripts/setup_drive_real.sh)" >&2; missing=1; }
 [ "$missing" -eq 0 ] || exit 1
 
+# commaVQ decoder (171MB, MIT) → real dashcam pixels for the driving panel. Best-effort fetch so the
+# demo shows actual footage by default; without it the driving server falls back to the token field.
+DECODER="${DECODER:-$ML/runs/drive/commavq_decoder.bin}"
+if [ ! -s "$DECODER" ]; then
+  echo "[serve_demo] commaVQ decoder absent → fetching for real-pixel driving footage…"
+  bash "$ROOT/scripts/fetch-commavq-decoder.sh" || echo "[serve_demo] ⚠ decoder fetch failed; driving panel shows the token field (offline?)"
+fi
+
 pids=()
 cleanup() { echo; echo "[serve_demo] stopping…"; for p in "${pids[@]:-}"; do kill "$p" 2>/dev/null || true; done; }
 trap cleanup EXIT INT TERM

@@ -89,6 +89,7 @@ const drBev = $<HTMLCanvasElement>("dr-bev");
 const drBevCtx = drBev.getContext("2d")!;
 const drHud = $<HTMLDivElement>("dr-hud");
 const drStatus = $<HTMLSpanElement>("dr-status");
+const drCap = $<HTMLElement>("dr-rgb-cap");
 const drHeld = heldFor(drRgb);
 let drTel: number[] = [];
 
@@ -121,6 +122,11 @@ const drViewer = new Viewer({
   onFrame: (msg) => {
     drawBev((msg.lidar as number[]) ?? []);
     drTel = (msg.telemetry as number[]) ?? drTel;
+    // honest caption: real decoded pixels when comma's VQ decoder is loaded, else the token field
+    drCap.textContent =
+      msg.decoded === false
+        ? "generated commaVQ token field · fetch comma's VQ decoder for real pixels"
+        : "imagined dashcam · comma's VQ tokens decoded to real pixels · arrows to drive";
   },
   onStats: ({ displayFps, genFps, latencyMs }) => {
     const speed = finiteClamp((drTel[3] ?? 0) * 30, 0, 60);

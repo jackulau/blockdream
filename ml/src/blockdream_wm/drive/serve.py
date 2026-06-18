@@ -13,13 +13,22 @@ from ..tokenizer import Tokenizer
 from ..serve import frame_to_png_b64
 from ..device import pick_device
 from .transition import DriveTransition
+from . import commavq_decoder
 
 
 class DriveSession:
-    def __init__(self, ckpt: dict, device: str = "auto"):
+    def __init__(self, ckpt: dict, device: str = "auto",
+                 rgb_temperature: float = 0.0, rgb_top_k: int = 0):
         self.device = pick_device(device)
-        # REAL commaVQ path: pre-tokenized real dashcam (no RGB tokenizer to load), camera-only
-        # (n_lidar=0), rendered as a token field (photoreal decode needs comma's VQ decoder).
+        # RGB-token decode strategy for the recursive rollout. 0 = greedy/argmax (default: the
+        # honest copy-previous dynamics the quality eval measures). The serve/demo path passes
+        # temperature>0 so the imagined dashcam keeps flowing instead of freezing at the greedy
+        # fixed point - sampling the model's own predicted distribution, the standard generative
+        # rollout (telemetry is unaffected: it comes from a deterministic head, not the tokens).
+        self.rgb_temperature = float(rgb_temperature)
+        self.rgb_top_k = int(rgb_top_k)
+        # REAL commaVQ path: pre-tokenized real dashcam (no RGB tokenizer to load), camera-only.
+        # Photoreal pixels via comma's VQ decoder when fetched; else an honest token-field heatmap.
         self.real_source = ckpt.get("real_source")
         self.n_history = int(ckpt.get("n_history", 0))  # legacy checkpoints carry no key → 0
         if self.real_source == "commavq":
@@ -31,7 +40,13 @@ class DriveSession:
                                          codebook_size=ckpt["codebook"], n_lidar=ckpt["n_lidar"],
                                          n_telemetry=ckpt["n_telemetry"], n_history=self.n_history)
             self.codebook = int(ckpt["codebook"])
+            # Photoreal path: comma's VQ decoder turns the predicted tokens into real dashcam
+            # pixels. Present only when the 171MB weights are fetched (gitignored) - else we fall
+            # back to the token-field heatmap, so the demo degrades honestly instead of crashing.
+            self.decoder = (commavq_decoder.load_decoder(device=self.device)
+                            if commavq_decoder.has_decoder() else None)
         else:
+            self.decoder = None
             self.tok = Tokenizer(TokenizerConfig(**ckpt["tokenizer_cfg"]))
             self.tok.load_state_dict(ckpt["tokenizer"])
             n_tokens = (ckpt["image"] // ckpt["downsample"]) ** 2
@@ -64,10 +79,18 @@ class DriveSession:
     @torch.no_grad()
     def _decode(self):
         if self.real_source == "commavq":
-            rgb = self._token_field_rgb()
+            rgb = self._decode_pixels() if self.decoder is not None else self._token_field_rgb()
         else:
             rgb = self.tok.decode_tokens(self.tokens.view(1, self.grid, self.grid))[0]
         return {"rgb": rgb.cpu(), "lidar": self.lidar[0].cpu(), "telemetry": self.tel[0].cpu()}
+
+    @torch.no_grad()
+    def _decode_pixels(self):
+        """Run the model's predicted commaVQ tokens through comma's VQ decoder → REAL
+        (3,128,256) dashcam pixels. Token ids are clamped into the codebook first (a runaway
+        AR step could otherwise emit an out-of-range index that the embedding lookup rejects)."""
+        toks = self.tokens.view(-1).clamp(0, self.codebook - 1)
+        return commavq_decoder.decode_tokens_chw01(self.decoder, toks)
 
     @torch.no_grad()
     def _token_field_rgb(self, out_h: int = 64, out_w: int = 128):
@@ -88,7 +111,9 @@ class DriveSession:
         h = torch.cat(self.hist_rows, dim=-1) if self.n_history > 0 else None
         if self.n_history > 0:  # row_t = (control applied at t, telemetry observed at t) - pre-step
             self.hist_rows = self.hist_rows[1:] + [torch.cat([c, self.tel], dim=-1)]
-        self.tokens, self.lidar, self.tel = self.trans.step(self.tokens, self.lidar, self.tel, c, history=h)
+        self.tokens, self.lidar, self.tel = self.trans.step(
+            self.tokens, self.lidar, self.tel, c, history=h,
+            temperature=self.rgb_temperature, top_k=self.rgb_top_k)
         self.tel = self._physical_tel(self.tel)
         self.step_idx += 1
         return self._decode()
@@ -113,6 +138,8 @@ class DriveSession:
         s.device, s.tok, s.trans, s.grid, s._init = self.device, self.tok, self.trans, self.grid, self._init
         s.n_history = self.n_history
         s.real_source = self.real_source
+        s.decoder = self.decoder  # shared weights (None when not fetched)
+        s.rgb_temperature, s.rgb_top_k = self.rgb_temperature, self.rgb_top_k
         if self.real_source == "commavq":
             s.token_grid, s.codebook = self.token_grid, self.codebook
         s.step_idx = 0
@@ -148,13 +175,16 @@ class DriveServer:
             "type": "frame",
             "step": self.session.step_idx,
             "rgb_png_b64": frame_to_png_b64(o["rgb"]),
+            "decoded": self.session.decoder is not None,  # real pixels vs token-field fallback
             "lidar": [_finite4(x) for x in o["lidar"].tolist()],
             "telemetry": [_finite4(x) for x in o["telemetry"].tolist()],
         }
 
 
-def load_drive_session(path: str, device: str = "auto") -> DriveSession:
-    return DriveSession(torch.load(path, map_location="cpu", weights_only=False), device=device)
+def load_drive_session(path: str, device: str = "auto",
+                       rgb_temperature: float = 0.0, rgb_top_k: int = 0) -> DriveSession:
+    return DriveSession(torch.load(path, map_location="cpu", weights_only=False), device=device,
+                        rgb_temperature=rgb_temperature, rgb_top_k=rgb_top_k)
 
 
 def ws_handler(server: DriveServer):
@@ -200,8 +230,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8766)
     ap.add_argument("--device", default="cpu")  # CPU is faster for sequential AR decode (see serve.py)
+    # Demo default: SAMPLE the imagined rollout so the dashcam keeps flowing (greedy freezes at the
+    # copy-previous fixed point). Set --temperature 0 for the raw greedy dynamics the quality eval reads.
+    ap.add_argument("--temperature", type=float, default=0.8)
+    ap.add_argument("--top-k", type=int, default=100)
     args = ap.parse_args(argv)
-    server = DriveServer(load_drive_session(args.checkpoint, device=args.device))
+    server = DriveServer(load_drive_session(args.checkpoint, device=args.device,
+                                            rgb_temperature=args.temperature, rgb_top_k=args.top_k))
     try:
         asyncio.run(run_ws(server, args.host, args.port))
     except KeyboardInterrupt:

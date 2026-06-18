@@ -6,8 +6,10 @@ locally, fully open source. Built in `blockdream_wm.drive`.
 > **The served model is 100% REAL (goal 029).** `runs/drive` is trained on comma.ai
 > **commaVQ** - real dashcam VQ tokens (128/frame) + control/telemetry derived from comma's
 > **real logged ego-motion** (`.pose.npy`), **zero synthesis**. It is **camera-only** (commaVQ has
-> no LiDAR), served as a control-responsive token field (photoreal pixels need comma's VQ decoder,
-> operator-gated). Reproduce it on any clone from the committed real fixture:
+> no LiDAR), served as **real decoded dashcam pixels** via comma's VQ decoder
+> (`drive/commavq_decoder.py`; fetch the 171MB MIT weights with `bash scripts/fetch-commavq-decoder.sh`),
+> with an honest token-field fallback when the decoder is absent. Reproduce the model on any clone
+> from the committed real fixture:
 > `bash ml/scripts/setup_drive_real.sh` → `runs/drive` (CONTROLLABLE). Provenance is locked in
 > `runs/drive/PROVENANCE.json` and enforced by `scripts/no_synthetic_guard.py`.
 >
@@ -107,12 +109,31 @@ Reference open models to deepen toward: **MUVO** (RGB+LiDAR+occupancy, open code
 **Vista** (RGB action-conditioned, Apache-2.0), **OccWorld/Copilot4D** (LiDAR-as-tokens),
 plus **Oasis/MineWorld** for stable real-time recursive rollout.
 
+## Photoreal decode + live rollout (real driving footage)
+
+The driving model predicts comma's VQ tokens; on their own they are an opaque code, so the demo
+used to draw a token-id heatmap (a colored grid that told the viewer nothing). Two changes make the
+panel render **actual driving footage**:
+
+- **Real pixels (`drive/commavq_decoder.py`).** comma's VQ-VAE decoder - vendored einops-free,
+  byte-compatible with comma's published weights (loaded `strict=True`), MIT (see `LICENSE`) - maps the
+  predicted `(B, 128)` tokens to a `(B, 3, 128, 256)` dashcam image. The 171MB weights are gitignored
+  and fetched on demand: `bash scripts/fetch-commavq-decoder.sh`. The rollout server (`drive/serve.py`)
+  decodes when they are present and falls back to the token field otherwise (so a fresh clone degrades
+  honestly instead of crashing). Proof: `ml/.venv/bin/python ml/scripts/prove_drive_pixels.py`.
+- **Alive rollout (temperature sampling).** Greedy AR decode of a copy-previous-trained model converges
+  to a frozen frame; the serve path SAMPLES the next-token distribution (`--temperature 0.8 --top-k 100`,
+  `transition_ar.generate`) so the imagined dashcam keeps flowing. This is RGB-only - telemetry comes
+  from a deterministic head, so `eval_drive_quality.py` still reads the honest greedy (copy-previous)
+  dynamics and steering controllability is unchanged.
+
 ## Run it
 ```bash
-# REAL served model (commaVQ) - reproduce from the committed real fixture, then serve:
+# REAL served model (commaVQ) - reproduce from the committed real fixture, fetch the decoder, then serve:
 bash ml/scripts/setup_drive_real.sh                                              # → runs/drive (CONTROLLABLE)
+bash scripts/fetch-commavq-decoder.sh                                            # → real dashcam pixels (171MB, MIT)
 python -m blockdream_wm.drive.serve --checkpoint ml/runs/drive/latest.pt --port 8766
-# open apps/web /driving.html → Connect → drive with arrows (camera token field + telemetry HUD;
+# open apps/web /driving.html → Connect → drive with arrows (decoded dashcam pixels + telemetry HUD;
 # LiDAR BEV is n/a - commaVQ is camera-only). Scale up: stream more shards with
 # scripts/collect_real_drive.py --stream-hf, train longer (operator-gated GPU).
 ```
