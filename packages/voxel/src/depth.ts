@@ -95,37 +95,85 @@ export function detectBackgroundMask(frame: QuantizedFrame): Uint8Array {
   return mask;
 }
 
-/** Chamfer (3-4 style, Euclidean-ish) distance from each subject cell to the nearest background
- *  cell OR the image edge. Background/edge sit at distance 0; the subject's interior grows out.
- *  Two passes, O(width·height). Returns distances (0 for background cells). */
+/** 1D squared-distance transform (Felzenszwalb–Huttenlocher): lower envelope of the parabolas
+ *  rooted at each sample of `f`. Writes the transform of `f[0..n)` into `d[0..n)`. O(n). `f` may hold
+ *  +INF (non-seed) samples; the caller guarantees at least one finite sample per line so the
+ *  intersection math never divides by an all-INF pair. Scratch buffers `vtx`/`zb` are caller-owned. */
+function edt1d(f: Float64Array, d: Float64Array, vtx: Int32Array, zb: Float64Array, n: number): void {
+  const INF = 1e20;
+  let k = 0;
+  vtx[0] = 0;
+  zb[0] = -INF;
+  zb[1] = INF;
+  for (let q = 1; q < n; q++) {
+    let s = (f[q]! + q * q - (f[vtx[k]!]! + vtx[k]! * vtx[k]!)) / (2 * q - 2 * vtx[k]!);
+    while (s <= zb[k]!) {
+      k--;
+      s = (f[q]! + q * q - (f[vtx[k]!]! + vtx[k]! * vtx[k]!)) / (2 * q - 2 * vtx[k]!);
+    }
+    k++;
+    vtx[k] = q;
+    zb[k] = s;
+    zb[k + 1] = INF;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) {
+    while (zb[k + 1]! < q) k++;
+    const dx = q - vtx[k]!;
+    d[q] = dx * dx + f[vtx[k]!]!;
+  }
+}
+
+/** EXACT Euclidean distance from each subject cell to the nearest background cell OR the image edge.
+ *  Background/edge sit at distance 0; the subject's interior grows out — a filled disc's centre gets
+ *  a distance equal to its radius and the iso-distance contours are TRUE circles (the old chamfer 3-4
+ *  transform had octagonal contours → faceted, lumpy domes). Implemented as the separable
+ *  Felzenszwalb–Huttenlocher transform (two O(n) passes, columns then rows) over a 1px
+ *  background-padded grid, so a subject touching the image border still tapers there (preserving the
+ *  old edge-as-background behaviour). O(width·height). Returns Euclidean distance (0 for background). */
 export function silhouetteDistance(mask: Uint8Array, width: number, height: number): Float32Array {
-  const INF = 1e9;
-  const D1 = 1; // orthogonal step
-  const D2 = Math.SQRT2; // diagonal step
-  const dist = new Float32Array(width * height);
-  for (let i = 0; i < dist.length; i++) dist[i] = mask[i] ? INF : 0; // subject = INF, background = 0
-  const at = (x: number, y: number): number => (x < 0 || y < 0 || x >= width || y >= height ? 0 : dist[y * width + x]!);
-  // forward pass (top-left → bottom-right). OOB neighbours read as 0 → border tapers like an edge.
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = y * width + x;
-      if (!mask[i]) continue;
-      let d = dist[i]!;
-      d = Math.min(d, at(x - 1, y) + D1, at(x, y - 1) + D1, at(x - 1, y - 1) + D2, at(x + 1, y - 1) + D2);
-      dist[i] = d;
+  const INF = 1e20;
+  // pad by 1 with background on every side → the image edge is a distance-0 seed just outside, AND
+  // every padded column/row contains a seed (so pass 1 is always finite → no INF-INF in pass 2).
+  const W = width + 2;
+  const H = height + 2;
+  const g = new Float64Array(W * H); // squared distance; seed (bg/pad) = 0, subject = +INF
+  for (let y = 1; y <= height; y++)
+    for (let x = 1; x <= width; x++) if (mask[(y - 1) * width + (x - 1)]) g[y * W + x] = INF;
+
+  const m = Math.max(W, H);
+  const f = new Float64Array(m);
+  const d = new Float64Array(m);
+  const vtx = new Int32Array(m);
+  const zb = new Float64Array(m + 1);
+
+  for (let x = 0; x < W; x++) {
+    let any = false;
+    for (let y = 0; y < H; y++) {
+      const val = g[y * W + x]!;
+      f[y] = val;
+      if (val > 0) any = true;
     }
+    if (!any) continue; // all-background column → transform is identity (stays 0); skip the envelope
+    edt1d(f, d, vtx, zb, H);
+    for (let y = 0; y < H; y++) g[y * W + x] = d[y]!;
   }
-  // backward pass (bottom-right → top-left)
-  for (let y = height - 1; y >= 0; y--) {
-    for (let x = width - 1; x >= 0; x--) {
-      const i = y * width + x;
-      if (!mask[i]) continue;
-      let d = dist[i]!;
-      d = Math.min(d, at(x + 1, y) + D1, at(x, y + 1) + D1, at(x + 1, y + 1) + D2, at(x - 1, y + 1) + D2);
-      dist[i] = d;
+  for (let y = 0; y < H; y++) {
+    let any = false;
+    for (let x = 0; x < W; x++) {
+      const val = g[y * W + x]!;
+      f[x] = val;
+      if (val > 0) any = true;
     }
+    if (!any) continue; // all-background row → identity; skip
+    edt1d(f, d, vtx, zb, W);
+    for (let x = 0; x < W; x++) g[y * W + x] = d[x]!;
   }
-  return dist;
+
+  const out = new Float32Array(width * height);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) out[y * width + x] = Math.sqrt(g[(y + 1) * W + (x + 1)]!);
+  return out;
 }
 
 /**
