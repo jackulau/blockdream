@@ -21,7 +21,6 @@
 //   npx tsx packages/cli/src/rcon-bridge-cli.ts --mock-wm --dry-run --frames 2   # offline
 
 import { parseArgs } from "node:util";
-import { Rcon } from "rcon-client";
 import WebSocket from "ws";
 import { runFfmpeg } from "@blockdream/video";
 import type { RgbImage } from "@blockdream/color-core";
@@ -38,6 +37,7 @@ import {
   type WallFrame,
 } from "./rcon-bridge";
 import { mockWorldModel } from "./control-sim";
+import { RconPool } from "./rcon-pool";
 
 const USAGE = `rcon-bridge - no-mod LIVE sidecar: vanilla server (RCON) ⇄ world-model (WS) ⇄ block wall
 
@@ -62,6 +62,10 @@ Options:
   --size <WxH>        wall size in blocks; WM frames are scaled to it (default 64x64,
                       matching the WM frame size)
   --fps <n>           poll/paint rate cap                (default 2)
+  --rcon-conns <n>    parallel RCON connections used to paint a frame's commands; a
+                      pool of N paints ~N× faster than serial (rcon-client serializes
+                      one socket), so the sidecar stops being the paint bottleneck
+                                                          (default 4)
   --max-commands <n>  RCON command budget per frame; overflow carries to the next
                       frame via the remainder contract   (default 256)
   --frames <n>        exit 0 after painting n frames     (default 0 = unlimited)
@@ -78,66 +82,9 @@ const FRAME_TIMEOUT_MS = 60_000; // generation is ~450 ms/frame on CPU, but cold
 const log = (msg: string): void => console.log(`[rcon-bridge] ${msg}`);
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-// ---------------------------------------------------------------------------
-// RCON: lazy connect with retry/backoff; error/end handlers DROP the dead client
-// (collect.mjs's lazy client lacks these - a dead socket there hangs every send)
-// ---------------------------------------------------------------------------
-
-class RconManager {
-  private client: Rcon | null = null;
-  private connecting: Promise<Rcon> | null = null;
-  private backoffMs = BACKOFF_INITIAL_MS;
-  private stopped = false;
-
-  constructor(
-    private readonly host: string,
-    private readonly port: number,
-    private readonly password: string,
-  ) {}
-
-  /** Send one command, (re)connecting with backoff first if needed. */
-  async send(command: string): Promise<string> {
-    const client = await this.ensure();
-    return client.send(command);
-  }
-
-  async stop(): Promise<void> {
-    this.stopped = true;
-    const c = this.client;
-    this.client = null;
-    if (c) await c.end().catch(() => {});
-  }
-
-  private async ensure(): Promise<Rcon> {
-    while (!this.stopped) {
-      if (this.client) return this.client;
-      this.connecting ??= Rcon.connect({ host: this.host, port: this.port, password: this.password });
-      try {
-        const client = await this.connecting;
-        this.connecting = null;
-        const drop = (why: string): void => {
-          if (this.client === client) {
-            this.client = null;
-            if (!this.stopped) log(`rcon connection lost (${why}) - reconnecting on next send`);
-          }
-        };
-        client.on("error", (err) => drop(err instanceof Error ? err.message : String(err)));
-        client.on("end", () => drop("closed"));
-        this.client = client;
-        this.backoffMs = BACKOFF_INITIAL_MS; // healthy again - next outage starts the ladder over
-        log(`rcon connected: ${this.host}:${this.port}`);
-        return client;
-      } catch (e) {
-        this.connecting = null;
-        const delay = this.backoffMs;
-        this.backoffMs = Math.min(this.backoffMs * 2, BACKOFF_MAX_MS);
-        log(`rcon connect failed (${e instanceof Error ? e.message : String(e)}) - retrying in ${delay} ms (cap ${BACKOFF_MAX_MS} ms)`);
-        await sleep(delay);
-      }
-    }
-    throw new Error("rcon manager stopped");
-  }
-}
+// RCON transport is the pool in ./rcon-pool.ts (N parallel connections; `send` for pose
+// polls, `sendBatch` to paint a frame's commands concurrently). Each pool connection owns the
+// same lazy-connect + backoff + drop-dead-socket resilience the single manager used to have.
 
 // ---------------------------------------------------------------------------
 // World-model WS client: serve.py protocol, one-in-flight, backoff reconnect
@@ -285,7 +232,7 @@ function decodeFramePng(png: Buffer, w: number, h: number): RgbImage {
 // player auto-detect: `list` → "There are 1 of a max of 20 players online: Steve"
 // ---------------------------------------------------------------------------
 
-async function detectPlayer(rcon: RconManager): Promise<string> {
+async function detectPlayer(rcon: RconPool): Promise<string> {
   for (;;) {
     let reply: string;
     try {
@@ -327,6 +274,7 @@ export async function main(argv: string[]): Promise<number> {
         origin: { type: "string" },
         size: { type: "string" },
         fps: { type: "string" },
+        "rcon-conns": { type: "string" },
         "max-commands": { type: "string" },
         frames: { type: "string" },
         "mock-wm": { type: "boolean" },
@@ -356,11 +304,13 @@ export async function main(argv: string[]): Promise<number> {
   const wsUrl = (values["ws"] as string | undefined) ?? "ws://127.0.0.1:8765";
   const skill = (values["skill"] as string | undefined) ?? "walk";
   const fps = Number((values["fps"] as string | undefined) ?? "2");
+  const rconConns = parseInt((values["rcon-conns"] as string | undefined) ?? "4", 10);
   const maxCommands = parseInt((values["max-commands"] as string | undefined) ?? "256", 10);
   const maxFrames = parseInt((values["frames"] as string | undefined) ?? "0", 10);
 
   if (!Number.isInteger(rconPort) || rconPort <= 0) return fail(`bad --rcon-port`);
   if (!Number.isFinite(fps) || fps <= 0) return fail(`--fps must be > 0`);
+  if (!Number.isInteger(rconConns) || rconConns < 1) return fail(`--rcon-conns must be ≥ 1`);
   if (!Number.isInteger(maxCommands) || maxCommands < 1) return fail(`--max-commands must be ≥ 1`);
   if (!Number.isInteger(maxFrames) || maxFrames < 0) return fail(`--frames must be ≥ 0`);
   if (!dryRun && !rconPass) return fail(`--rcon-pass is required (omit only with --dry-run)`);
@@ -378,11 +328,11 @@ export async function main(argv: string[]): Promise<number> {
 
   log(
     `wall ${sizeW}×${sizeH} at (${origin.x},${origin.y},${origin.z}) skill=${skill} fps≤${fps} budget=${maxCommands} cmds/frame` +
-      `${mockWm ? " [mock-wm]" : ` ws=${wsUrl}`}${dryRun ? " [dry-run: no RCON]" : ` rcon=${rconHost}:${rconPort}`}`,
+      `${mockWm ? " [mock-wm]" : ` ws=${wsUrl}`}${dryRun ? " [dry-run: no RCON]" : ` rcon=${rconHost}:${rconPort} ×${rconConns} conns`}`,
   );
 
   let stopped = false;
-  const rcon = dryRun ? null : new RconManager(rconHost, rconPort, rconPass!);
+  const rcon = dryRun ? null : new RconPool({ host: rconHost, port: rconPort, password: rconPass!, conns: rconConns, log });
   const wm = mockWm ? null : new WmClient(wsUrl);
 
   process.once("SIGINT", () => {
@@ -404,9 +354,9 @@ export async function main(argv: string[]): Promise<number> {
     const keyframe = !prevWall;
     const wall = frameToWallCommands(frame, origin, prevWall, { carry, maxCommands });
     if (!dryRun) {
-      // sequential sends; a throw leaves prevWall/carry untouched so the next
+      // pooled concurrent sends; a throw leaves prevWall/carry untouched so the next
       // delta (old prevWall → new frame) repaints everything this batch missed
-      for (const cmd of wall.commands) await rcon!.send(cmd);
+      await rcon!.sendBatch(wall.commands);
     }
     const now = Date.now();
     const fpsStr = lastPaintAt ? (1000 / (now - lastPaintAt)).toFixed(2) : "-";
