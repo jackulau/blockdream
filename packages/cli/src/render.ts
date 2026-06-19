@@ -22,7 +22,7 @@ import { extractFrames } from "@blockdream/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
-import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateSequence, SEQUENCE_ANIMS, type SequenceAnimName, type VoxelVolume } from "@blockdream/voxel";
+import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateSequence, rotateYQuarterTurns, SEQUENCE_ANIMS, type SequenceAnimName, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -62,6 +62,24 @@ export interface RenderOptions {
   gamutMap?: number; // quantizer hue-rigidity lambda for out-of-gamut colours (keeps source hue)
   animate?: SequenceAnimName; // 3D: procedural block-motion (explode/wave/buildup) of the built solid
   animateFrames?: number; // frames for the procedural animation (default 24)
+  origin?: { x: number; y: number; z: number }; // 3D build spawn coordinates in-world (datapack; default 0,64,0)
+  facing?: Facing; // 3D build orientation: which way the build faces (north|south|east|west; default south/+Z)
+}
+
+/** Compass direction a 3D build faces. south = +Z = the un-rotated default. */
+export type Facing = "north" | "south" | "east" | "west";
+const FACINGS: ReadonlySet<string> = new Set(["north", "south", "east", "west"]);
+export function isFacing(s: string): s is Facing {
+  return FACINGS.has(s);
+}
+// south is the native +Z orientation (no rotation); each step is one +90° yaw quarter-turn.
+const FACING_QUARTER_TURNS: Record<Facing, number> = { south: 0, west: 1, north: 2, east: 3 };
+
+/** Rotate a built volume sequence to face `facing` (an exact, lossless static yaw). No-op for south. */
+function applyFacing(volumes: VoxelVolume[], facing: Facing | undefined): VoxelVolume[] {
+  if (!facing || facing === "south") return volumes;
+  const turns = FACING_QUARTER_TURNS[facing];
+  return volumes.map((v) => rotateYQuarterTurns(v, turns));
 }
 
 export { SEQUENCE_ANIMS };
@@ -171,6 +189,7 @@ export function render(opts: RenderOptions): RenderResult {
     }
     assertNonEmpty3d(volumes);
     volumes = applyAnimate(volumes, opts); // --animate: procedural block-motion of the built model
+    volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     if (edition === "bedrock") {
       volumes.forEach((vol, fi) => {
         const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
@@ -182,7 +201,7 @@ export function render(opts: RenderOptions): RenderResult {
       notes.push(`3D model → Bedrock .mcstructure (${volumes.length} frame(s), ${v0.sx}×${v0.sy}×${v0.sz}); place with a structure block.`);
     } else {
       const pack = generateVoxelDatapack(volumes, resolveBlock, {
-        namespace: "blockdream_model", packFormat: mc.packFormat,
+        namespace: "blockdream_model", packFormat: mc.packFormat, origin: opts.origin,
         supportedFormats: JAVA_DATAPACK_SUPPORTED, optimize: (cells, r) => greedyBoxes(cells, r),
       });
       const mv = volumes[0]!;
@@ -275,7 +294,7 @@ export function render(opts: RenderOptions): RenderResult {
       shadingGain > 0
         ? (f: number, x: number, y: number) => pal.entries[q[f]!.paletteIndex[y * q[f]!.width + x]!]!.lab.L
         : undefined;
-    const volumes = applyAnimate(
+    let volumes = applyAnimate(
       framesToAnimated3d(q, {
         maxDepth: opts.depth ?? 8,
         smooth: opts.smooth,
@@ -287,9 +306,11 @@ export function render(opts: RenderOptions): RenderResult {
       opts,
     );
     assertNonEmpty3d(volumes);
+    volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     const pack = generateVoxelDatapack(volumes, resolveBlock, {
       namespace: "blockdream_3d",
       packFormat: mc.packFormat,
+      origin: opts.origin,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
     });
@@ -320,11 +341,12 @@ export function render(opts: RenderOptions): RenderResult {
   if (opts.target === "mcstructure3d") {
     // image/video → temporally-stable 3D volumes (same pipeline as voxel3d) → a TRUE 3D Bedrock
     // .mcstructure per frame (depth = volume depth, not the 1-thick wall of `mcstructure`)
-    const volumes = applyAnimate(
+    let volumes = applyAnimate(
       framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric }),
       opts,
     );
     assertNonEmpty3d(volumes);
+    volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     volumes.forEach((vol, fi) => {
       const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
       const path = join(opts.out, volumes.length > 1 ? `frame_${fi}.mcstructure` : `model3d.mcstructure`);
