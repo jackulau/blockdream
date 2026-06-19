@@ -23,7 +23,7 @@ import { imageToSolid } from "../src/depth";
 import { imageToVolume } from "../src/voxelize";
 import { volumeToFrame } from "../src/project";
 import { solidify } from "../src/obj";
-import { spinSequence } from "../src/spin";
+import { spinSequence, spin, padXZToSquare } from "../src/spin";
 import { createVolume, setVoxel, getVoxel, fillRun, EMPTY, forEachSolid, countSolid, type VoxelVolume } from "../src/volume";
 
 // ---- deterministic PRNG (no Math.random → reproducible inputs) ----
@@ -316,6 +316,23 @@ export function runAB(cfg: BenchConfig = {}): ABStage[] {
     };
     const { optMs, refMs } = timeAB(opt, ref, iters, warmup);
     out.push({ name: "project-scan", optMs, refMs, speedup: refMs / optMs });
+  }
+
+  // 4. baked spin (goal 045) — optimized spinSequence (Y-invariant trig hoisted out + air-column skip)
+  //    vs the generic inverse spin() doing the SAME rotation on the cube-padded build. The two produce
+  //    BYTE-IDENTICAL output (asserted in spin.test.ts), so this is a true same-work timing of the win.
+  {
+    const build = imageToSolid(discFrame(size), { maxDepth: depth });
+    const padded = padXZToSquare(build);
+    const frames = 6;
+    const opt = () => {
+      spinSequence(build, frames);
+    };
+    const ref = () => {
+      spin(padded, frames, "y");
+    };
+    const { optMs, refMs } = timeAB(opt, ref, iters, warmup);
+    out.push({ name: "spinSequence", optMs, refMs, speedup: refMs / optMs });
   }
 
   return out;

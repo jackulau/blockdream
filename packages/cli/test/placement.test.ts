@@ -224,6 +224,12 @@ describe("larger builds hold up: budgets + new controls compose at scale (D4)", 
     expect(Math.min(...cs.map((c) => c.y))).toBeGreaterThanOrEqual(O.y);
   }, 20000);
 
+  it("a larger --animate spin build emits a valid datapack within budget (exercises optimized spinSequence)", () => {
+    const res = render({ input: writeObj("spinbig.obj"), out: join(dir, "spinbig"), target: "model3d", width: 40, height: 40, animate: "spin", animateFrames: 6 });
+    expect(res.frameCount).toBe(6);
+    expect(assertBudget(res.filesWritten)).toBeGreaterThan(0);
+  }, 15000);
+
   it("a large non-cubic build spins without exploding the voxel count beyond its swept footprint", () => {
     const v = createVolume(96, 48, 6); // wide, shallow - the real build shape
     for (let i = 0; i < 96; i += 3) setVoxel(v, i, i % 48, i % 6, 5);
