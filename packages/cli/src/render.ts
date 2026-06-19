@@ -192,7 +192,7 @@ export function render(opts: RenderOptions): RenderResult {
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     if (edition === "bedrock") {
       volumes.forEach((vol, fi) => {
-        const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
+        const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION, origin: opts.origin });
         const path = join(opts.out, volumes.length > 1 ? `model_${fi}.mcstructure` : `model3d.mcstructure`);
         writeFile(path, buf);
         filesWritten.push(path);
@@ -329,7 +329,7 @@ export function render(opts: RenderOptions): RenderResult {
 
   if (opts.target === "mcstructure") {
     q.forEach((frame, fi) => {
-      const buf = buildMcStructure(frame, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
+      const buf = buildMcStructure(frame, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION, origin: opts.origin });
       const path = join(opts.out, q.length > 1 ? `frame_${fi}.mcstructure` : `art.mcstructure`);
       writeFile(path, buf);
       filesWritten.push(path);
@@ -348,7 +348,7 @@ export function render(opts: RenderOptions): RenderResult {
     assertNonEmpty3d(volumes);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     volumes.forEach((vol, fi) => {
-      const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION });
+      const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION, origin: opts.origin });
       const path = join(opts.out, volumes.length > 1 ? `frame_${fi}.mcstructure` : `model3d.mcstructure`);
       writeFile(path, buf);
       filesWritten.push(path);
