@@ -96,6 +96,21 @@ A still paints once; a multi-frame input loops `--loops` times (`<= 0` = endless
 frame sent as a delta off the previous so only changed blocks update. ffmpeg missing prints the same
 clear `@blockdream/video` message as the rest of the pipeline.
 
+`--image` paints a flat wall; **`--build <path>`** casts a real **3D build** instead - it inflates the
+image to a depth-`--depth` solid (`imageToSolid`), orients it with `--facing`, and streams
+`setblock`/`fill` at `--origin` that are byte-identical to the 3D datapack's keyframe (so casting live
+equals baking + loading). `--setup` here clears the build's full W×H×D box, not a flat slab.
+
+```bash
+# a 3D build from an image, 12 voxels deep, placed and facing east, clearing the box first
+npx tsx packages/cli/src/rcon-bridge-cli.ts --rcon-pass <pass> \
+  --build photo.png --size 64x64 --depth 12 --origin 100,70,-20 --facing east --setup
+```
+
+This completes the build-delivery matrix: a build reaches Minecraft offline (datapack / `.mcstructure`,
+2D and 3D) and live (a 2D wall via `--image`, a 3D build via `--build`) - all honoring coordinates,
+direction, and animation.
+
 ## Honest frame rates
 
 The sidecar reports three rates separately every frame (and as a run summary) so they're never
