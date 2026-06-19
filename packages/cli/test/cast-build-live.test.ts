@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildToLiveCommands, buildBoxSetupCommands, type WallFrame } from "../src/rcon-bridge";
+import { buildToLiveCommands, buildToLiveFrames, buildBoxSetupCommands, type WallFrame } from "../src/rcon-bridge";
 
 function solidFrame(w: number, h: number, rgb: [number, number, number]): WallFrame {
   const pixels = new Uint8Array(w * h * 3);
@@ -45,5 +45,30 @@ describe("buildToLiveCommands (cast a 3D build live via RCON)", () => {
     expect(south.sx).toBe(10); // south = no turn
     expect([east.sx, east.sz]).toEqual([south.sz, south.sx]); // east swaps X/Z
     expect(east.sy).toBe(south.sy); // height unchanged by a Y rotation
+  });
+});
+
+describe("buildToLiveFrames (live 3D animation)", () => {
+  it("no --animate → one keyframe list (identical to buildToLiveCommands)", () => {
+    const f = solidFrame(8, 8, RED);
+    const origin = { x: 1, y: 2, z: 3 };
+    const { frameCommands } = buildToLiveFrames(f, origin, { depth: 4 });
+    expect(frameCommands).toHaveLength(1);
+    expect(frameCommands[0]).toEqual(buildToLiveCommands(f, origin, { depth: 4 }).commands);
+  });
+
+  it("--animate spin → N delta frames on a cube-padded build (never clips)", () => {
+    const f = solidFrame(10, 6, RED); // non-cubic footprint
+    const { frameCommands, volume } = buildToLiveFrames(f, { x: 0, y: 0, z: 0 }, { depth: 3, animate: "spin", animateFrames: 6 });
+    expect(frameCommands).toHaveLength(6);
+    expect(volume.sx).toBe(volume.sz); // cube-padded X/Z so the spin never clips
+    expect(frameCommands[0]!.length).toBeGreaterThan(0); // frame 0 = keyframe
+    expect(frameCommands.every((fr) => Array.isArray(fr))).toBe(true);
+  });
+
+  it("--animate-frames sets the frame count", () => {
+    const f = solidFrame(8, 8, RED);
+    const { frameCommands } = buildToLiveFrames(f, { x: 0, y: 0, z: 0 }, { depth: 2, animate: "spin", animateFrames: 12 });
+    expect(frameCommands).toHaveLength(12);
   });
 });

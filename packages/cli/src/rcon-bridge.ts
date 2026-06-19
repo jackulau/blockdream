@@ -17,11 +17,12 @@ import {
   makeBlockResolver,
   fillLines,
   voxelToLiveCommands,
+  voxelFramesToLiveCommands,
   DEFAULT_MAX_COMMANDS,
   type Cell,
   type PlacedCell,
 } from "@blockdream/emit-commands";
-import { imageToSolid, rotateYQuarterTurns, type VoxelVolume } from "@blockdream/voxel";
+import { imageToSolid, rotateYQuarterTurns, generateBaked, BAKEABLE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
 import { getSolidBlockMapPalette } from "@blockdream/palette";
 import {
   preparePalette,
@@ -464,19 +465,51 @@ export interface BuildCastOptions {
  * the 3D datapack's keyframe, so casting live equals baking + loading. Returns the commands and the
  * oriented volume (for the caller's setup box). Pure: the sidecar owns the RCON socket.
  */
+/** Quantize an image to the solid palette → depth-`depth` solid → orient by `facing`. The shared
+ *  image → build-volume step behind both the static and animated live casts. */
+function imageToBuildVolume(frame: WallFrame, opts: BuildCastOptions): VoxelVolume {
+  const pal = solidPalette(opts.paletteVersion);
+  const q = quantizeFrame(toRgb(frame), pal, { method: opts.dither ?? "bayer" });
+  const volume = imageToSolid(q, { maxDepth: Math.max(1, Math.floor(opts.depth ?? 16)) });
+  const turns = FACING_TURNS[opts.facing ?? "south"];
+  return turns ? rotateYQuarterTurns(volume, turns) : volume;
+}
+
 export function buildToLiveCommands(
   frame: WallFrame,
   origin: { x: number; y: number; z: number },
   opts: BuildCastOptions = {},
 ): { commands: string[]; volume: VoxelVolume } {
-  const pal = solidPalette(opts.paletteVersion);
   const resolve = makeBlockResolver(opts.paletteVersion);
-  const q = quantizeFrame(toRgb(frame), pal, { method: opts.dither ?? "bayer" });
-  let volume = imageToSolid(q, { maxDepth: Math.max(1, Math.floor(opts.depth ?? 16)) });
-  const turns = FACING_TURNS[opts.facing ?? "south"];
-  if (turns) volume = rotateYQuarterTurns(volume, turns);
+  const volume = imageToBuildVolume(frame, opts);
   const commands = voxelToLiveCommands(volume, origin, resolve, { fallbackBlock: opts.fallbackBlock });
   return { commands, volume };
+}
+
+export interface BuildAnimCastOptions extends BuildCastOptions {
+  /** Bake an animation of the build (spin / explode / wave / buildup …). Omit for a single static frame. */
+  animate?: BakeableAnimName;
+  /** Frames in the baked animation. Default 24. */
+  animateFrames?: number;
+}
+
+/** The animated 3D counterpart of {@link buildToLiveCommands}: build the image into a 3D build, bake
+ *  it into a volume sequence (`generateBaked` - a spin is cube-padded so it never clips), and
+ *  delta-encode to per-frame live command sets (`voxelFramesToLiveCommands`, byte-equal to the 3D
+ *  datapack). Returns the per-frame commands and frame 0's (oriented/padded) volume for the setup box.
+ *  No `animate` → a single keyframe list. Pure: the sidecar streams the frames over RCON. */
+export function buildToLiveFrames(
+  frame: WallFrame,
+  origin: { x: number; y: number; z: number },
+  opts: BuildAnimCastOptions = {},
+): { frameCommands: string[][]; volume: VoxelVolume } {
+  const resolve = makeBlockResolver(opts.paletteVersion);
+  const base = imageToBuildVolume(frame, opts);
+  const volumes = opts.animate
+    ? generateBaked(opts.animate, base, Math.max(1, Math.floor(opts.animateFrames ?? 24)))
+    : [base];
+  const frameCommands = voxelFramesToLiveCommands(volumes, origin, resolve, { fallbackBlock: opts.fallbackBlock });
+  return { frameCommands, volume: volumes[0]! };
 }
 
 /** `/fill … air` commands that clear a build's W×H×D box at `origin` (split at the 32768 cap) -

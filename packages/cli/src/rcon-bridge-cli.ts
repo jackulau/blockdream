@@ -23,13 +23,14 @@
 import { parseArgs } from "node:util";
 import WebSocket from "ws";
 import { readFileSync } from "node:fs";
+import { BAKEABLE_ANIMS, type BakeableAnimName } from "@blockdream/voxel";
 import { runFfmpeg, ffmpegMissingMessage } from "@blockdream/video";
 import type { RgbImage } from "@blockdream/color-core";
 import {
   actionMessage,
   buildBoxSetupCommands,
   buildSetupCommands,
-  buildToLiveCommands,
+  buildToLiveFrames,
   castImageFrames,
   frameToWallCommands,
   isParseError,
@@ -73,6 +74,9 @@ Options:
   --build <path>      cast a 3D BUILD (image → voxels) into the world live via RCON -
                       setblock/fill at --origin/--facing, no datapack (vs --image's flat wall)
   --depth <n>         build thickness in voxels for --build               (default 16)
+  --animate <anim>    animate a --build live: spin | explode | wave | buildup | ... -
+                      streamed as a delta-encoded 3D animation at --fps, repeat with --loops
+  --animate-frames <n>  frames in the baked --animate sequence            (default 24)
   --origin <x,y,z>    wall's bottom-left block           (default 10,-60,10 - on a 1.21
                       superflat the top grass block is y=-61 and players stand at
                       y=-60, so the wall base sits at ground level near spawn)
@@ -324,6 +328,8 @@ export async function main(argv: string[]): Promise<number> {
         image: { type: "string" },
         build: { type: "string" },
         depth: { type: "string" },
+        animate: { type: "string" },
+        "animate-frames": { type: "string" },
         loops: { type: "string" },
         size: { type: "string" },
         fps: { type: "string" },
@@ -368,6 +374,12 @@ export async function main(argv: string[]): Promise<number> {
   const buildDepth = parseInt((values["depth"] as string | undefined) ?? "16", 10);
   if (values["depth"] !== undefined && (!Number.isInteger(buildDepth) || buildDepth < 1)) return fail(`--depth must be an integer >= 1`);
   if (imagePath && buildPath) return fail(`--image and --build are mutually exclusive (flat wall vs 3D build)`);
+  const animateArg = values["animate"] as string | undefined; // bake a live 3D animation of the --build
+  if (animateArg && !BAKEABLE_ANIMS.includes(animateArg as BakeableAnimName)) return fail(`--animate must be one of: ${BAKEABLE_ANIMS.join(", ")}`);
+  if (animateArg && !buildPath) return fail(`--animate only applies to --build (the live 3D build)`);
+  const buildAnimate = animateArg as BakeableAnimName | undefined;
+  const animateFrames = parseInt((values["animate-frames"] as string | undefined) ?? "24", 10);
+  if (values["animate-frames"] !== undefined && (!Number.isInteger(animateFrames) || animateFrames < 1)) return fail(`--animate-frames must be an integer >= 1`);
   const fps = Number((values["fps"] as string | undefined) ?? "2");
   const rconConns = parseInt((values["rcon-conns"] as string | undefined) ?? "4", 10);
   const maxCommands = parseInt((values["max-commands"] as string | undefined) ?? "256", 10);
@@ -506,25 +518,35 @@ export async function main(argv: string[]): Promise<number> {
       return fail(`${e instanceof Error ? e.message : String(e)}\n${ffmpegMissingMessage()}`);
     }
     const wallFrame: WallFrame = { width: frame.width, height: frame.height, pixels: frame.data };
-    const { commands, volume } = buildToLiveCommands(wallFrame, origin, { depth: buildDepth, facing: wallFacing });
+    const { frameCommands, volume } = buildToLiveFrames(wallFrame, origin, {
+      depth: buildDepth,
+      facing: wallFacing,
+      animate: buildAnimate,
+      animateFrames,
+    });
+    // --setup clears the build box; folding it into frame 0 means each loop re-clears, so a looping
+    // animation wraps cleanly (no stale blocks from the previous pass).
+    if (doSetup && frameCommands.length > 0) {
+      frameCommands[0] = [...buildBoxSetupCommands(origin, volume), ...frameCommands[0]!];
+    }
     log(
-      `build cast: "${buildPath}" → ${volume.sx}×${volume.sy}×${volume.sz} build (depth ${buildDepth}) ` +
-        `at ${origin.x},${origin.y},${origin.z} facing ${wallFacing}, ${commands.length} command(s)` +
-        `${dryRun ? " [dry-run: no RCON]" : ""}`,
+      `build cast: "${buildPath}" → ${volume.sx}×${volume.sy}×${volume.sz} build (depth ${buildDepth})` +
+        `${buildAnimate ? ` ${buildAnimate} ×${frameCommands.length} frames` : ""} at ${origin.x},${origin.y},${origin.z} ` +
+        `facing ${wallFacing}${dryRun ? " [dry-run: no RCON]" : ""}`,
     );
-    const batch: string[] = [];
-    if (doSetup) {
-      const setupCmds = buildBoxSetupCommands(origin, volume);
-      log(`setup: clearing the ${volume.sx}×${volume.sy}×${volume.sz} build box (${setupCmds.length} /fill command(s), no datapack/reload)`);
-      batch.push(...setupCmds);
-    }
-    batch.push(...commands);
-    if (dryRun) {
-      for (const c of batch) log(`  > ${c}`);
-    } else {
-      await rcon!.sendBatch(batch);
-    }
-    log(`build cast: done - ${commands.length} block command(s) placed`);
+    const painted = await castImageFrames(
+      frameCommands,
+      async (cmds, i) => {
+        if (dryRun) {
+          log(`  frame ${i}: ${cmds.length} cmd(s)${frameCommands.length === 1 ? "" : " (dry-run)"}`);
+          if (frameCommands.length === 1) for (const c of cmds) log(`    ${c}`);
+        } else {
+          await rcon!.sendBatch(cmds);
+        }
+      },
+      { loops: buildAnimate ? imageLoops : 1, fps, shouldStop: () => stopped },
+    );
+    log(`build cast: done - ${painted} frame(s) placed`);
     await rcon?.stop();
     return 0;
   }
