@@ -31,6 +31,14 @@ export interface McStructureOptions {
   blockVersion?: number;
   /** Block placed where a pixel has no mapped block (default minecraft:air). */
   fill?: BlockRef;
+  /** structure_world_origin stamped into the NBT - the coords the structure was captured at
+   *  (a structure block re-places relative to where YOU stand; this is provenance). Default 0,0,0. */
+  origin?: { x: number; y: number; z: number };
+}
+
+/** structure_world_origin NBT from an optional origin (default 0,0,0). */
+function originList(origin?: { x: number; y: number; z: number }): NbtValue {
+  return List(TAG.Int, [Int(origin?.x ?? 0), Int(origin?.y ?? 0), Int(origin?.z ?? 0)]);
 }
 
 function statesCompound(states: Record<string, string | number> = {}): NbtValue {
@@ -108,7 +116,7 @@ export function buildMcStructure(
         }),
       }),
     }),
-    structure_world_origin: List(TAG.Int, [Int(0), Int(0), Int(0)]),
+    structure_world_origin: originList(opts.origin),
   });
 
   return writeNbt("", root, "little");
@@ -168,7 +176,7 @@ export function buildVoxelMcStructure(
         default: Compound({ block_palette: List(TAG.Compound, blockPalette), block_position_data: Compound({}) }),
       }),
     }),
-    structure_world_origin: List(TAG.Int, [Int(0), Int(0), Int(0)]),
+    structure_world_origin: originList(opts.origin),
   });
   return writeNbt("", root, "little");
 }
@@ -183,6 +191,8 @@ export interface ParsedMcStructure {
   blockNames: string[];
   /** layer-0 palette index per cell, in Bedrock x→y→z order. */
   indices: number[];
+  /** structure_world_origin stamped into the NBT. */
+  origin: [number, number, number];
 }
 
 /** Parse back a `.mcstructure` (for tests/tools). */
@@ -214,5 +224,9 @@ export function readMcStructure(buf: Buffer): ParsedMcStructure {
   if (bi?.type === TAG.List && bi.value[0]?.type === TAG.List) {
     for (const v of bi.value[0].value) if (v.type === TAG.Int) indices.push(v.value);
   }
-  return { size, blockNames, indices };
+
+  const swo = root.value["structure_world_origin"];
+  const origin = (swo?.type === TAG.List ? swo.value.map((v) => (v.type === TAG.Int ? v.value : 0)) : [0, 0, 0]) as [number, number, number];
+
+  return { size, blockNames, indices, origin };
 }

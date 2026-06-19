@@ -281,6 +281,80 @@ describe("frameToWallCommands: per-frame command cap", () => {
 });
 
 // ---------------------------------------------------------------------------
+// frameToWallCommands: --facing orients the wall plane (live cast direction)
+// ---------------------------------------------------------------------------
+
+describe("frameToWallCommands: --facing orients the wall plane", () => {
+  const FW = 8, FH = 6;
+  const halvesXY = rgbFrame(FW, FH, (x) => (x < FW / 2 ? RED : BLUE));
+  const FACINGS = ["south", "north", "east", "west"] as const;
+
+  // distinct values seen on a constant ("plane") axis across all setblock/fill coords
+  function planeAxisValues(commands: string[], axis: "x" | "z"): number[] {
+    const lo = axis === "x" ? 1 : 3;
+    const hi = axis === "x" ? 4 : 6;
+    const vals = new Set<number>();
+    for (const l of commands) {
+      const t = l.split(/\s+/);
+      vals.add(+t[lo]!);
+      if (t[0] === "fill") vals.add(+t[hi]!);
+    }
+    return [...vals].sort((a, b) => a - b);
+  }
+  const paintedCount = (commands: string[]): number => {
+    const g: Grid = new Map();
+    applyCommands(commands, g);
+    return g.size;
+  };
+
+  it("south (default) is byte-identical to omitting --facing (no regression)", () => {
+    const a = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none" });
+    const b = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: "south" });
+    expect(b.commands).toEqual(a.commands);
+  });
+
+  it("south/north stand in the XY plane (z = origin.z); east/west in the ZY plane (x = origin.x)", () => {
+    for (const fc of ["south", "north"] as const) {
+      const c = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: fc }).commands;
+      expect(planeAxisValues(c, "z")).toEqual([ORIGIN.z]); // flat in Z
+    }
+    for (const fc of ["east", "west"] as const) {
+      const c = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: fc }).commands;
+      expect(planeAxisValues(c, "x")).toEqual([ORIGIN.x]); // flat in X
+    }
+  });
+
+  it("every facing paints the same number of blocks (relocated, never lost)", () => {
+    const counts = FACINGS.map((fc) => paintedCount(frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: fc }).commands));
+    expect(new Set(counts).size).toBe(1); // all equal
+    expect(counts[0]).toBe(FW * FH); // every cell placed
+  });
+
+  it("scales: a 64×64 wall facing east stays flat in X, places all cells, and clears within the /fill cap", () => {
+    const big = rgbFrame(64, 64, (x, y) => (((x + y) & 1) ? RED : BLUE)); // busy checker (worst case)
+    const paint = frameToWallCommands(big, ORIGIN, undefined, { dither: "none", facing: "east" });
+    expect(planeAxisValues(paint.commands, "x")).toEqual([ORIGIN.x]); // flat in X at scale
+    expect(paintedCount(paint.commands)).toBe(64 * 64); // every cell placed
+    const setup = buildSetupCommands(ORIGIN, 64, 64, { clearance: 3, facing: "east" });
+    for (const l of setup) {
+      const t = l.split(/\s+/);
+      const vol = (+t[4]! - +t[1]! + 1) * (+t[5]! - +t[2]! + 1) * (+t[6]! - +t[3]! + 1);
+      expect(vol).toBeLessThanOrEqual(32768); // each /fill within the vanilla cap
+    }
+  });
+
+  it("east rotates the plane vs south (distinct commands), west mirrors east's column axis", () => {
+    const south = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: "south" }).commands;
+    const east = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: "east" }).commands;
+    const west = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: "west" }).commands;
+    expect(east).not.toEqual(south);
+    // east + west span the same Z range (the wall width), but mirrored ⇒ different commands
+    expect(planeAxisValues(east, "x")).toEqual(planeAxisValues(west, "x")); // both flat at origin.x
+    expect(east).not.toEqual(west);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // buildSetupCommands - the no-datapack in-world wall clear (drop-in to a running world)
 // ---------------------------------------------------------------------------
 
@@ -311,6 +385,17 @@ describe("buildSetupCommands (clear a viewing space in a RUNNING world, no datap
 
   it("default clearance is 3 when unspecified", () => {
     expect(buildSetupCommands(O, 8, 8)).toEqual(buildSetupCommands(O, 8, 8, { clearance: 3 }));
+  });
+
+  it("facing east carves the clearance on X and runs the wall width on Z (the ZY plane)", () => {
+    const b = parseFill(buildSetupCommands(O, 8, 8, { clearance: 3, facing: "east" })[0]!);
+    expect([b.x0, b.x1]).toEqual([O.x - 3, O.x + 3]); // clearance along X (the wall normal)
+    expect([b.z0, b.z1]).toEqual([O.z, O.z + 7]); // wall width along Z
+    expect(boxVol(b)).toBe(7 * 8 * 8);
+    // south (default) is the transpose: clearance on Z, width on X
+    const s = parseFill(buildSetupCommands(O, 8, 8, { clearance: 3, facing: "south" })[0]!);
+    expect([s.x0, s.x1]).toEqual([O.x, O.x + 7]);
+    expect([s.z0, s.z1]).toEqual([O.z - 3, O.z + 3]);
   });
 
   it("an oversized clear splits at the 32768 /fill cap and tiles the box exactly", () => {

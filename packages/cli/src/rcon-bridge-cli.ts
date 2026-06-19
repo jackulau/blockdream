@@ -29,12 +29,14 @@ import {
   buildSetupCommands,
   frameToWallCommands,
   isParseError,
+  isWallFacing,
   parsePosRotation,
   poseToAction,
   N_BUTTONS,
   type Action,
   type RconPose,
   type WallCommands,
+  type WallFacing,
   type WallFrame,
 } from "./rcon-bridge";
 import { mockWorldModel } from "./control-sim";
@@ -57,6 +59,9 @@ Options:
                       exactly one player is online)
   --ws <url>          world-model WS server              (default ws://127.0.0.1:8765)
   --skill <s>         movement type sent to the WM       (default walk)
+  --facing <dir>      direction the wall faces: north | south | east | west; orients the
+                      paint plane (south = XY plane at z; east/west = ZY plane at x)
+                                                          (default south)
   --origin <x,y,z>    wall's bottom-left block           (default 10,-60,10 - on a 1.21
                       superflat the top grass block is y=-61 and players stand at
                       y=-60, so the wall base sits at ground level near spawn)
@@ -278,6 +283,7 @@ export async function main(argv: string[]): Promise<number> {
         ws: { type: "string" },
         skill: { type: "string" },
         origin: { type: "string" },
+        facing: { type: "string" },
         size: { type: "string" },
         fps: { type: "string" },
         "rcon-conns": { type: "string" },
@@ -311,6 +317,9 @@ export async function main(argv: string[]): Promise<number> {
   const rconPass = values["rcon-pass"] as string | undefined;
   const wsUrl = (values["ws"] as string | undefined) ?? "ws://127.0.0.1:8765";
   const skill = (values["skill"] as string | undefined) ?? "walk";
+  const facingArg = values["facing"] as string | undefined;
+  if (facingArg && !isWallFacing(facingArg)) return fail(`--facing must be north|south|east|west`);
+  const wallFacing: WallFacing = (facingArg as WallFacing | undefined) ?? "south";
   const fps = Number((values["fps"] as string | undefined) ?? "2");
   const rconConns = parseInt((values["rcon-conns"] as string | undefined) ?? "4", 10);
   const maxCommands = parseInt((values["max-commands"] as string | undefined) ?? "256", 10);
@@ -370,7 +379,7 @@ export async function main(argv: string[]): Promise<number> {
   const paint = async (rgb: RgbImage, genMs: number): Promise<void> => {
     const frame: WallFrame = { width: rgb.width, height: rgb.height, pixels: rgb.data };
     const keyframe = !prevWall;
-    const wall = frameToWallCommands(frame, origin, prevWall, { carry, maxCommands });
+    const wall = frameToWallCommands(frame, origin, prevWall, { carry, maxCommands, facing: wallFacing });
     const paintT0 = Date.now();
     if (!dryRun) {
       // pooled concurrent sends; a throw leaves prevWall/carry untouched so the next
@@ -406,8 +415,8 @@ export async function main(argv: string[]): Promise<number> {
 
   // ----- optional in-world setup: clear the wall + viewing space (no datapack/reload) -----
   if (doSetup) {
-    const setupCmds = buildSetupCommands(origin, sizeW, sizeH, { clearance: setupClearance });
-    log(`setup: clearing wall slab + ${setupClearance}-block ±Z clearance in the running world (${setupCmds.length} /fill command(s), no datapack/reload)`);
+    const setupCmds = buildSetupCommands(origin, sizeW, sizeH, { clearance: setupClearance, facing: wallFacing });
+    log(`setup: clearing wall slab + ${setupClearance}-block clearance (facing ${wallFacing}) in the running world (${setupCmds.length} /fill command(s), no datapack/reload)`);
     if (dryRun) {
       for (const c of setupCmds) log(`  setup> ${c}`);
     } else {

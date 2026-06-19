@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { render } from "../src/render";
 import { rotateYQuarterTurns, createVolume, setVoxel, getVoxel, countSolid, spinSequence, padXZToSquare, BAKEABLE_ANIMS } from "@blockdream/voxel";
 import { DEFAULT_MAX_COMMANDS } from "@blockdream/emit-commands";
+import { readMcStructure } from "@blockdream/emit-bedrock";
 
 // goal 043: users designate how a build spawns in Minecraft - origin COORDINATES (D1) and
 // facing DIRECTION (D2). Uses the model3d cube path (no image decode) for fast determinism.
@@ -187,6 +188,21 @@ function assertBudget(filesWritten: string[]): number {
   }
   return totalPlacements;
 }
+
+describe("--origin stamps the Bedrock .mcstructure world origin (044 D2)", () => {
+  it("structure_world_origin equals the supplied origin", () => {
+    const O = { x: 12, y: 70, z: -8 };
+    const res = render({ input: writeObj("so.obj"), out: join(dir, "so"), target: "model3d", edition: "bedrock", width: 10, height: 10, origin: O });
+    const sf = res.filesWritten.find((f) => f.endsWith(".mcstructure"))!;
+    expect(readMcStructure(readFileSync(sf)).origin).toEqual([12, 70, -8]);
+  });
+
+  it("defaults to 0,0,0 when --origin omitted", () => {
+    const res = render({ input: writeObj("sd.obj"), out: join(dir, "sd"), target: "model3d", edition: "bedrock", width: 10, height: 10 });
+    const sf = res.filesWritten.find((f) => f.endsWith(".mcstructure"))!;
+    expect(readMcStructure(readFileSync(sf)).origin).toEqual([0, 0, 0]);
+  });
+});
 
 describe("larger builds hold up: budgets + new controls compose at scale (D4)", () => {
   it("a large 64³ build emits a valid datapack within every command budget", () => {

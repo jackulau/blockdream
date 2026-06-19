@@ -167,6 +167,40 @@ export interface WallFrame {
   pixels: Uint8Array | Uint8ClampedArray;
 }
 
+/** Compass direction the live wall faces. south = the native XY-plane-at-z wall (no rotation). */
+export type WallFacing = "north" | "south" | "east" | "west";
+const WALL_FACINGS: ReadonlySet<string> = new Set(["north", "south", "east", "west"]);
+export function isWallFacing(s: string): s is WallFacing {
+  return WALL_FACINGS.has(s);
+}
+
+/**
+ * Map an image cell (cx,cy) to its world block for a wall at `origin` facing `facing`. Rows always
+ * run down Y (image row 0 at the top). south/north put columns on X (wall in the XY plane at
+ * z=origin.z); east/west put columns on Z (wall in the ZY plane at x=origin.x). north/west mirror the
+ * column axis so the image reads correctly from the opposite side. south is the byte-identical default.
+ */
+function placeCell(
+  origin: { x: number; y: number; z: number },
+  facing: WallFacing,
+  W: number,
+  H: number,
+  cx: number,
+  cy: number,
+): { x: number; y: number; z: number } {
+  const y = origin.y + (H - 1 - cy);
+  switch (facing) {
+    case "north":
+      return { x: origin.x + (W - 1 - cx), y, z: origin.z };
+    case "east":
+      return { x: origin.x, y, z: origin.z + cx };
+    case "west":
+      return { x: origin.x, y, z: origin.z + (W - 1 - cx) };
+    default:
+      return { x: origin.x + cx, y, z: origin.z }; // south
+  }
+}
+
 export interface WallCommandOptions {
   /**
    * Per-frame command budget (docs/vanilla-command-budgets.md - the same 8000-command
@@ -181,6 +215,8 @@ export interface WallCommandOptions {
   paletteVersion?: string;
   /** Dither method. Default "bayer" - temporally stable, so deltas stay small. */
   dither?: DitherMethod;
+  /** Direction the wall faces (orients its plane). Default "south" (XY plane at z=origin.z). */
+  facing?: WallFacing;
 }
 
 export interface WallCommands {
@@ -252,6 +288,8 @@ export function frameToWallCommands(
   const pal = solidPalette(opts.paletteVersion);
   const resolve = makeBlockResolver(opts.paletteVersion);
   const H = frame.height;
+  const W = frame.width;
+  const facing = opts.facing ?? "south";
 
   const curQ = quantizeFrame(toRgb(frame), pal, { method: dither });
   let cells: Cell[];
@@ -269,12 +307,8 @@ export function frameToWallCommands(
   const pending = new Map<string, PlacedCell>();
   for (const c of opts.carry ?? []) pending.set(wkey(c.x, c.y, c.z), c);
   for (const c of cells) {
-    const p: PlacedCell = {
-      x: origin.x + c.x,
-      y: origin.y + (H - 1 - c.y), // image row 0 at the top of the wall
-      z: origin.z,
-      mapColorId: c.mapColorId,
-    };
+    const pos = placeCell(origin, facing, W, H, c.x, c.y);
+    const p: PlacedCell = { x: pos.x, y: pos.y, z: pos.z, mapColorId: c.mapColorId };
     pending.set(wkey(p.x, p.y, p.z), p);
   }
 
@@ -305,12 +339,15 @@ export function frameToWallCommands(
 
 export interface WallSetupOptions {
   /**
-   * Blocks of clearance carved on EACH ±Z side of the wall so it's visible from either
-   * approach (the wall slab itself is also cleared, since the keyframe repaints it). Default 3.
+   * Blocks of clearance carved on EACH side of the wall (perpendicular to its plane) so it's
+   * visible from either approach (the wall slab itself is also cleared, since the keyframe
+   * repaints it). Default 3.
    */
   clearance?: number;
   /** Block to clear the volume to. Default "minecraft:air". */
   clearBlock?: string;
+  /** Direction the wall faces; the clearance is carved along its normal. Default "south" (±Z). */
+  facing?: WallFacing;
 }
 
 /**
@@ -333,14 +370,13 @@ export function buildSetupCommands(
   }
   const clearance = Math.max(0, Math.floor(opts.clearance ?? 3));
   const block = opts.clearBlock ?? "minecraft:air";
-  return fillLines(
-    origin.x,
-    origin.y,
-    origin.z - clearance,
-    origin.x + width - 1,
-    origin.y + height - 1,
-    origin.z + clearance,
-    block,
-    "replace",
-  );
+  const facing = opts.facing ?? "south";
+  // east/west put the wall in the ZY plane (columns along Z), so width runs Z and clearance runs X;
+  // south/north keep it in the XY plane (width along X, clearance along Z) - the original box.
+  const eastWest = facing === "east" || facing === "west";
+  const x0 = eastWest ? origin.x - clearance : origin.x;
+  const x1 = eastWest ? origin.x + clearance : origin.x + width - 1;
+  const z0 = eastWest ? origin.z : origin.z - clearance;
+  const z1 = eastWest ? origin.z + width - 1 : origin.z + clearance;
+  return fillLines(x0, origin.y, z0, x1, origin.y + height - 1, z1, block, "replace");
 }
