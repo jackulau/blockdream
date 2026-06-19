@@ -1,9 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { render, SEQUENCE_ANIMS, isFacing, type RenderOptions, type RenderTarget, type Edition, type Facing } from "./render";
+import { render, BAKEABLE_ANIMS, isFacing, type RenderOptions, type RenderTarget, type Edition, type Facing } from "./render";
 import { previewPng } from "./preview";
 import type { DitherMethod } from "@blockdream/color-core";
-import type { SequenceAnimName } from "@blockdream/voxel";
+import type { BakeableAnimName } from "@blockdream/voxel";
 
 const USAGE = `blockdream render <input> [options]
 blockdream preview <input> --out preview.png   (side-by-side source | block-art PNG)
@@ -30,7 +30,7 @@ Options:
   --curve <n>        3D thickness curve exponent (<1 rounds the dome; default: 0.5)
   --shading <n>      3D shape-from-shading gain 0..1 — luminance carves internal relief (default: 0.5; 0 = off)
   --flat             3D one-sided relief instead of the centered double-sided solid
-  --animate <a>      3D block-motion of the built solid: explode | wave | buildup
+  --animate <a>      3D block-motion of the built solid: explode | wave | buildup | spin
                        (voxel3d/mcstructure3d/model3d; animates a STILL image or a 3D model.
                         For a clip it animates the first frame.)
   --animate-frames <n>  frame count for --animate (default: 24)
@@ -141,9 +141,9 @@ export function runCli(argv: string[]): number {
     return 2;
   }
 
-  const animate = values.animate as SequenceAnimName | undefined;
-  if (animate && !(SEQUENCE_ANIMS as ReadonlyArray<string>).includes(animate)) {
-    process.stderr.write(`unknown --animate ${animate} (valid: ${SEQUENCE_ANIMS.join(" | ")})\n`);
+  const animate = values.animate as BakeableAnimName | undefined;
+  if (animate && !(BAKEABLE_ANIMS as ReadonlyArray<string>).includes(animate)) {
+    process.stderr.write(`unknown --animate ${animate} (valid: ${BAKEABLE_ANIMS.join(" | ")})\n`);
     return 2;
   }
 

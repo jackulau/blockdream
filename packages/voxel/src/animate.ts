@@ -9,6 +9,7 @@
 // All pure + deterministic → unit-testable, and the easing curves are shared by both.
 
 import { createVolume, forEachSolid, setVoxel, type VoxelVolume } from "./volume";
+import { spinSequence } from "./spin";
 
 // ---- easing curves (t in [0,1] → eased [0,1]) ---------------------------------------------------
 export type Easing = (t: number) => number;
@@ -168,4 +169,17 @@ export function generateSequence(name: SequenceAnimName, v: VoxelVolume, frames 
   if (name === "explode") return explodeAssemble(v, frames);
   if (name === "wave") return wave(v, frames);
   return buildUp(v, frames);
+}
+
+// Animations a CLI user can BAKE into a vanilla datapack (a playable block sequence): the three
+// content sequences PLUS "spin" (the build rotating in place). The pure-transform anims that only
+// translate/scale (bob/rock/tumble/pulse/orbit) stay viewer-only - they don't bake cleanly to
+// discrete blocks. "spin" lives in spin.ts (cube-padded so a non-cubic build never clips).
+export const BAKEABLE_ANIMS = [...SEQUENCE_ANIMS, "spin"] as const;
+export type BakeableAnimName = (typeof BAKEABLE_ANIMS)[number];
+
+/** Bake any {@link BAKEABLE_ANIMS} animation into a VoxelVolume frame sequence for a datapack. */
+export function generateBaked(name: BakeableAnimName, v: VoxelVolume, frames = 24): VoxelVolume[] {
+  if (name === "spin") return spinSequence(v, frames);
+  return generateSequence(name, v, frames);
 }

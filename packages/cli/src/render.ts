@@ -22,7 +22,7 @@ import { extractFrames } from "@blockdream/video";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
-import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateSequence, rotateYQuarterTurns, SEQUENCE_ANIMS, type SequenceAnimName, type VoxelVolume } from "@blockdream/voxel";
+import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -60,7 +60,7 @@ export interface RenderOptions {
   shading?: number; // 3D: shape-from-shading gain 0..1 (luminance carves internal relief; default 0.5; 0 = off)
   symmetric?: boolean; // 3D: centered double-sided solid (default true); false = one-sided relief
   gamutMap?: number; // quantizer hue-rigidity lambda for out-of-gamut colours (keeps source hue)
-  animate?: SequenceAnimName; // 3D: procedural block-motion (explode/wave/buildup) of the built solid
+  animate?: BakeableAnimName; // 3D: baked block-motion of the built solid (explode/wave/buildup/spin)
   animateFrames?: number; // frames for the procedural animation (default 24)
   origin?: { x: number; y: number; z: number }; // 3D build spawn coordinates in-world (datapack; default 0,64,0)
   facing?: Facing; // 3D build orientation: which way the build faces (north|south|east|west; default south/+Z)
@@ -82,14 +82,14 @@ function applyFacing(volumes: VoxelVolume[], facing: Facing | undefined): VoxelV
   return volumes.map((v) => rotateYQuarterTurns(v, turns));
 }
 
-export { SEQUENCE_ANIMS };
+export { BAKEABLE_ANIMS, SEQUENCE_ANIMS };
 
-/** When `--animate` is set, turn the FIRST built 3D solid into a procedural block-motion sequence
- *  (explode/wave/buildup). Predictable everywhere: a still image, a static mesh, or the first frame
- *  of a clip all become the SAME kind of animated build. No-op when --animate is absent. */
+/** When `--animate` is set, turn the FIRST built 3D solid into a baked block-motion sequence
+ *  (explode/wave/buildup/spin). Predictable everywhere: a still image, a static mesh, or the first
+ *  frame of a clip all become the SAME kind of animated build. No-op when --animate is absent. */
 function applyAnimate(volumes: VoxelVolume[], opts: RenderOptions): VoxelVolume[] {
   if (!opts.animate || volumes.length === 0) return volumes;
-  return generateSequence(opts.animate, volumes[0]!, opts.animateFrames ?? 24);
+  return generateBaked(opts.animate, volumes[0]!, opts.animateFrames ?? 24);
 }
 
 export interface RenderResult {

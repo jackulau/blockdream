@@ -88,6 +88,30 @@ export function rotateYQuarterTurns(v: VoxelVolume, turns: number): VoxelVolume 
   return out;
 }
 
+/** Centre `v` in a SQUARE X/Z footprint (max(sx,sz) on both axes), keeping sy. A Y-spin then
+ *  rotates inside a square base, so a non-cubic build (the common W×H×shallow-depth case) never
+ *  clips its width into the depth axis. No-op when already square in X/Z. */
+export function padXZToSquare(v: VoxelVolume): VoxelVolume {
+  const d = Math.max(v.sx, v.sz);
+  if (v.sx === d && v.sz === d) return v;
+  const out = createVolume(d, v.sy, d);
+  const ox = (d - v.sx) >> 1;
+  const oz = (d - v.sz) >> 1;
+  for (let z = 0; z < v.sz; z++)
+    for (let y = 0; y < v.sy; y++)
+      for (let x = 0; x < v.sx; x++) {
+        const val = getVoxel(v, x, y, z);
+        if (val !== EMPTY) setVoxel(out, x + ox, y, z + oz, val);
+      }
+  return out;
+}
+
+/** A baked full Y-spin: `frames` volumes of the build rotating in place. Cube-pads X/Z first so a
+ *  non-cubic build never clips. This is the rotating-build animation for a vanilla datapack. */
+export function spinSequence(v: VoxelVolume, frames = 24): VoxelVolume[] {
+  return spin(padXZToSquare(v), frames, "y");
+}
+
 /** A full 360° turn about `axis`, split into nFrames volumes (frame 0 = identity). */
 export function spin(v: VoxelVolume, nFrames: number, axis: SpinAxis = "y"): VoxelVolume[] {
   if (nFrames <= 0) throw new Error("spin needs nFrames > 0");

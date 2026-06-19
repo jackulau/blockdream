@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { render } from "../src/render";
-import { rotateYQuarterTurns, createVolume, setVoxel, getVoxel, countSolid } from "@blockdream/voxel";
+import { rotateYQuarterTurns, createVolume, setVoxel, getVoxel, countSolid, spinSequence, padXZToSquare, BAKEABLE_ANIMS } from "@blockdream/voxel";
 
 // goal 043: users designate how a build spawns in Minecraft - origin COORDINATES (D1) and
 // facing DIRECTION (D2). Uses the model3d cube path (no image decode) for fast determinism.
@@ -133,5 +133,37 @@ describe("--facing: orient the build (D2)", () => {
     const def = render({ input: writeObj("fd.obj"), out: join(dir, "fd"), target: "model3d", width: 10, height: 10 });
     const south = render({ input: writeObj("fsd.obj"), out: join(dir, "fsd"), target: "model3d", width: 10, height: 10, facing: "south" });
     expect(framesBody(def.filesWritten)).toBe(framesBody(south.filesWritten));
+  });
+});
+
+describe("--animate spin: bake a rotating-build datapack (D3)", () => {
+  it("spin is a bakeable animation alongside explode/wave/buildup", () => {
+    expect(BAKEABLE_ANIMS as readonly string[]).toContain("spin");
+    expect(BAKEABLE_ANIMS as readonly string[]).toContain("explode");
+  });
+
+  it("padXZToSquare squares a non-cubic footprint, keeping height + every voxel", () => {
+    const v = createVolume(8, 5, 2); // shallow depth (the common build shape)
+    setVoxel(v, 0, 0, 0, 4);
+    setVoxel(v, 7, 4, 1, 6);
+    const p = padXZToSquare(v);
+    expect([p.sx, p.sz]).toEqual([8, 8]); // squared to max(8,2)
+    expect(p.sy).toBe(5);
+    expect(countSolid(p)).toBe(countSolid(v)); // padding only adds air
+  });
+
+  it("spinSequence emits N frames that don't clip (frame 0 identity, count ~preserved)", () => {
+    const v = createVolume(10, 6, 3); // non-cubic: would clip under the sampling rotateY
+    for (let i = 0; i < 10; i++) setVoxel(v, i, i % 6, (i * 2) % 3, 5);
+    const base = countSolid(v);
+    const seq = spinSequence(v, 8);
+    expect(seq.length).toBe(8);
+    expect(countSolid(seq[0]!)).toBe(base); // 0° = identity (after cube-pad, padding is air)
+    for (const f of seq) expect(countSolid(f)).toBeGreaterThan(base * 0.6); // rigid turn, no wholesale clip
+  });
+
+  it("render --animate spin produces a multi-frame datapack", () => {
+    const res = render({ input: writeObj("sp.obj"), out: join(dir, "sp"), target: "model3d", width: 12, height: 12, animate: "spin", animateFrames: 6 });
+    expect(res.frameCount).toBe(6);
   });
 });
