@@ -71,6 +71,31 @@ RCON cannot see keyboard state, so sprint/jump are *inferred* from speed and ver
 and sneaking is never detected - the movement that reaches the model is what the server can
 observe about your pose.
 
+## Cast your own image or animation (not the model)
+
+The same mod-free RCON transport also paints **your own** picture - not only the world-model stream.
+`--image <path>` decodes any still (`png`/`jpg`/`webp`) or animation (`gif`/`mp4`/`webm`) with ffmpeg
+and paints it as a block wall in the running world, with the same `--origin` / `--facing` / `--setup`
+placement controls and no datapack/reload. No world-model server is needed - this path skips the WS
+port entirely (it is the live counterpart to baking a block-art datapack offline).
+
+```bash
+# a still image, placed at coords and facing east, clearing viewing space first
+npx tsx packages/cli/src/rcon-bridge-cli.ts --rcon-pass <pass> \
+  --image logo.png --size 64x64 --origin 100,70,-20 --facing east --setup
+
+# a GIF/video looped as a LIVE animation (frame 0 keyframe, the rest deltas) at 8 fps, endless
+npx tsx packages/cli/src/rcon-bridge-cli.ts --rcon-pass <pass> \
+  --image clip.gif --size 48x48 --origin 100,70,-20 --fps 8 --loops 0
+
+# preview the commands without touching a server
+npx tsx packages/cli/src/rcon-bridge-cli.ts --dry-run --image logo.png --size 32x32
+```
+
+A still paints once; a multi-frame input loops `--loops` times (`<= 0` = endless) at `--fps`, each
+frame sent as a delta off the previous so only changed blocks update. ffmpeg missing prints the same
+clear `@blockdream/video` message as the rest of the pipeline.
+
 ## Honest frame rates
 
 The sidecar reports three rates separately every frame (and as a run summary) so they're never

@@ -22,11 +22,13 @@
 
 import { parseArgs } from "node:util";
 import WebSocket from "ws";
-import { runFfmpeg } from "@blockdream/video";
+import { readFileSync } from "node:fs";
+import { runFfmpeg, ffmpegMissingMessage } from "@blockdream/video";
 import type { RgbImage } from "@blockdream/color-core";
 import {
   actionMessage,
   buildSetupCommands,
+  castImageFrames,
   frameToWallCommands,
   isParseError,
   isWallFacing,
@@ -62,6 +64,10 @@ Options:
   --facing <dir>      direction the wall faces: north | south | east | west; orients the
                       paint plane (south = XY plane at z; east/west = ZY plane at x)
                                                           (default south)
+  --image <path>      cast YOUR OWN image/animation (png/jpg/gif/mp4...) into the world
+                      via RCON instead of the world model - paints at --origin/--facing,
+                      no datapack/reload. A still = one paint; a GIF/video loops at --fps.
+  --loops <n>         times to repeat an --image animation (<= 0 = endless)  (default 1)
   --origin <x,y,z>    wall's bottom-left block           (default 10,-60,10 - on a 1.21
                       superflat the top grass block is y=-61 and players stand at
                       y=-60, so the wall base sits at ground level near spawn)
@@ -239,6 +245,32 @@ function decodeFramePng(png: Buffer, w: number, h: number): RgbImage {
   return { width: w, height: h, data: new Uint8Array(stdout.buffer, stdout.byteOffset, stdout.length) };
 }
 
+/**
+ * Decode a user's image FILE (any ffmpeg-readable format: png/jpg/webp, or a GIF/mp4/webm animation)
+ * to one-or-more RGB frames scaled to w×h. A still image yields 1 frame; an animation yields N. This
+ * backs `--image` - casting your OWN content into a running world (vs the world-model stream).
+ */
+function decodeImageFrames(path: string, w: number, h: number): RgbImage[] {
+  const input = readFileSync(path);
+  const args = [
+    "-v", "error",
+    "-i", "pipe:0",
+    "-vf", `scale=${w}:${h}:flags=area`,
+    "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
+  ];
+  const { stdout, status, stderr } = runFfmpeg(args, 1 << 28, input);
+  const frameBytes = w * h * 3;
+  if (status !== 0 || stdout.length === 0 || stdout.length % frameBytes !== 0) {
+    throw new Error(`image decode failed (status ${status}, ${stdout.length} B, not a multiple of ${frameBytes} for ${w}×${h}): ${stderr.slice(0, 200)}`);
+  }
+  const n = stdout.length / frameBytes;
+  const frames: RgbImage[] = [];
+  for (let i = 0; i < n; i++) {
+    frames.push({ width: w, height: h, data: new Uint8Array(stdout.buffer, stdout.byteOffset + i * frameBytes, frameBytes) });
+  }
+  return frames;
+}
+
 // ---------------------------------------------------------------------------
 // player auto-detect: `list` → "There are 1 of a max of 20 players online: Steve"
 // ---------------------------------------------------------------------------
@@ -284,6 +316,8 @@ export async function main(argv: string[]): Promise<number> {
         skill: { type: "string" },
         origin: { type: "string" },
         facing: { type: "string" },
+        image: { type: "string" },
+        loops: { type: "string" },
         size: { type: "string" },
         fps: { type: "string" },
         "rcon-conns": { type: "string" },
@@ -320,6 +354,9 @@ export async function main(argv: string[]): Promise<number> {
   const facingArg = values["facing"] as string | undefined;
   if (facingArg && !isWallFacing(facingArg)) return fail(`--facing must be north|south|east|west`);
   const wallFacing: WallFacing = (facingArg as WallFacing | undefined) ?? "south";
+  const imagePath = values["image"] as string | undefined; // cast a static image/animation, not the WM
+  const imageLoops = parseInt((values["loops"] as string | undefined) ?? "1", 10);
+  if (values["loops"] !== undefined && !Number.isInteger(imageLoops)) return fail(`--loops must be an integer (<= 0 = endless)`);
   const fps = Number((values["fps"] as string | undefined) ?? "2");
   const rconConns = parseInt((values["rcon-conns"] as string | undefined) ?? "4", 10);
   const maxCommands = parseInt((values["max-commands"] as string | undefined) ?? "256", 10);
@@ -353,7 +390,7 @@ export async function main(argv: string[]): Promise<number> {
 
   let stopped = false;
   const rcon = dryRun ? null : new RconPool({ host: rconHost, port: rconPort, password: rconPass!, conns: rconConns, log });
-  const wm = mockWm ? null : new WmClient(wsUrl);
+  const wm = mockWm || imagePath ? null : new WmClient(wsUrl); // --image casts a file, not the WM stream
 
   process.once("SIGINT", () => {
     log("SIGINT - closing rcon + ws");
@@ -406,9 +443,9 @@ export async function main(argv: string[]): Promise<number> {
     );
   };
 
-  // ----- resolve the player (real RCON modes only) -----
+  // ----- resolve the player (real RCON modes only; --image paints at --origin, no player needed) -----
   let player = values["player"] as string | undefined;
-  if (!dryRun && !player) {
+  if (!dryRun && !player && !imagePath) {
     player = await detectPlayer(rcon!);
     log(`player auto-detected: ${player}`);
   }
@@ -423,6 +460,29 @@ export async function main(argv: string[]): Promise<number> {
       await rcon!.sendBatch(setupCmds);
       log("setup: done - wall volume cleared");
     }
+  }
+
+  // ----- --image: cast a static image / animation into the world, then exit (no WM pump) -----
+  if (imagePath) {
+    let frames: RgbImage[];
+    try {
+      frames = decodeImageFrames(imagePath, sizeW, sizeH);
+    } catch (e) {
+      return fail(`${e instanceof Error ? e.message : String(e)}\n${ffmpegMissingMessage()}`);
+    }
+    log(
+      `image cast: "${imagePath}" → ${frames.length} frame(s) at ${sizeW}×${sizeH}, ` +
+        `origin ${origin.x},${origin.y},${origin.z} facing ${wallFacing}, loops ${imageLoops <= 0 ? "∞" : imageLoops}` +
+        `${dryRun ? " [dry-run: no RCON]" : ""}`,
+    );
+    const n = await castImageFrames(frames, async (frame) => paint(frame, 0), {
+      loops: imageLoops,
+      fps,
+      shouldStop: () => stopped,
+    });
+    log(`image cast: done - ${n} frame(s) painted`);
+    await rcon?.stop();
+    return 0;
   }
 
   // ----- mock model state (keyframed inside the pump so a failed batch retries;
