@@ -1,9 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { render, SEQUENCE_ANIMS, type RenderOptions, type RenderTarget, type Edition } from "./render";
+import { render, BAKEABLE_ANIMS, isFacing, type RenderOptions, type RenderTarget, type Edition, type Facing } from "./render";
 import { previewPng } from "./preview";
 import type { DitherMethod } from "@blockdream/color-core";
-import type { SequenceAnimName } from "@blockdream/voxel";
+import type { BakeableAnimName } from "@blockdream/voxel";
 
 const USAGE = `blockdream render <input> [options]
 blockdream preview <input> --out preview.png   (side-by-side source | block-art PNG)
@@ -30,10 +30,12 @@ Options:
   --curve <n>        3D thickness curve exponent (<1 rounds the dome; default: 0.5)
   --shading <n>      3D shape-from-shading gain 0..1 — luminance carves internal relief (default: 0.5; 0 = off)
   --flat             3D one-sided relief instead of the centered double-sided solid
-  --animate <a>      3D block-motion of the built solid: explode | wave | buildup
+  --animate <a>      3D block-motion of the built solid: explode | wave | buildup | spin
                        (voxel3d/mcstructure3d/model3d; animates a STILL image or a 3D model.
                         For a clip it animates the first frame.)
   --animate-frames <n>  frame count for --animate (default: 24)
+  --origin <x,y,z>   where the 3D build spawns in-world (voxel3d/model3d datapack; default 0,64,0)
+  --facing <dir>     which way the 3D build faces: north | south | east | west (default: south/+Z)
   --version <ver>    target Minecraft version: 1.21 .. 1.21.10 (default: 1.21).
                        Sets pack_format / DataVersion / block stamps. Java datapacks
                        also declare supported_formats so one pack loads across the
@@ -75,6 +77,8 @@ export function runCli(argv: string[]): number {
       flat: { type: "boolean" },
       animate: { type: "string" },
       "animate-frames": { type: "string" },
+      origin: { type: "string" },
+      facing: { type: "string" },
       version: { type: "string" },
       out: { type: "string" },
       palette: { type: "string" },
@@ -137,9 +141,25 @@ export function runCli(argv: string[]): number {
     return 2;
   }
 
-  const animate = values.animate as SequenceAnimName | undefined;
-  if (animate && !(SEQUENCE_ANIMS as ReadonlyArray<string>).includes(animate)) {
-    process.stderr.write(`unknown --animate ${animate} (valid: ${SEQUENCE_ANIMS.join(" | ")})\n`);
+  const animate = values.animate as BakeableAnimName | undefined;
+  if (animate && !(BAKEABLE_ANIMS as ReadonlyArray<string>).includes(animate)) {
+    process.stderr.write(`unknown --animate ${animate} (valid: ${BAKEABLE_ANIMS.join(" | ")})\n`);
+    return 2;
+  }
+
+  let origin: { x: number; y: number; z: number } | undefined;
+  if (values.origin) {
+    const m = /^(-?\d+),(-?\d+),(-?\d+)$/.exec(values.origin);
+    if (!m) {
+      process.stderr.write(`--origin must be x,y,z integers (e.g. 10,64,-20)\n`);
+      return 2;
+    }
+    origin = { x: parseInt(m[1]!, 10), y: parseInt(m[2]!, 10), z: parseInt(m[3]!, 10) };
+  }
+
+  const facing = values.facing as Facing | undefined;
+  if (facing && !isFacing(facing)) {
+    process.stderr.write(`unknown --facing ${facing} (valid: north | south | east | west)\n`);
     return 2;
   }
 
@@ -164,6 +184,8 @@ export function runCli(argv: string[]): number {
     paletteVersion: values.version,
     animate,
     animateFrames: values["animate-frames"] ? Number(values["animate-frames"]) : undefined,
+    origin,
+    facing,
   };
 
   try {
