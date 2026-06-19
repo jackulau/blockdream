@@ -33,6 +33,7 @@ describe("voxel benchmark harness", () => {
     expect(names).toContain("column-fill");
     expect(names).toContain("full-scan-fill");
     expect(names).toContain("project-scan");
+    expect(names).toContain("spinSequence");
     for (const s of ab) {
       expect(Number.isFinite(s.speedup), `${s.name} speedup finite`).toBe(true);
       expect(s.optMs, `${s.name} optMs > 0`).toBeGreaterThan(0);
@@ -40,4 +41,13 @@ describe("voxel benchmark harness", () => {
       expect(s.speedup, `${s.name} speedup > 0`).toBeGreaterThan(0);
     }
   });
+
+  // goal 045: the optimized spinSequence must be measurably FASTER than the reference inverse spin
+  // (same byte-identical output). At a non-trivial size the air-column skip makes the win clear.
+  it("the optimized spinSequence beats the reference inverse spin on a larger build", () => {
+    const big = runAB({ imgSize: 96, flatDepth: 8, iters: 3, warmup: 1 });
+    const sp = big.find((s) => s.name === "spinSequence");
+    expect(sp).toBeDefined();
+    expect(sp!.speedup).toBeGreaterThan(1.5);
+  }, 20000);
 });
