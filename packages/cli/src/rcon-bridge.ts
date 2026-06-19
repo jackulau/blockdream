@@ -380,3 +380,57 @@ export function buildSetupCommands(
   const z1 = eastWest ? origin.z + width - 1 : origin.z + clearance;
   return fillLines(x0, origin.y, z0, x1, origin.y + height - 1, z1, block, "replace");
 }
+
+// ---------------------------------------------------------------------------
+// 5. cast a static image / animation (NOT the world model) into a running world
+// ---------------------------------------------------------------------------
+
+export interface ImageCastOptions {
+  /** Times to repeat the frame sequence; <= 0 = endless (until shouldStop). Default 1. */
+  loops?: number;
+  /** Frames/sec pacing between paints (0 = as fast as possible). Default 0. */
+  fps?: number;
+  /** Sleep hook (injectable for tests). Default setTimeout. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Clock hook (injectable for tests). Default Date.now. */
+  now?: () => number;
+  /** Cooperative stop check between frames (e.g. SIGINT). */
+  shouldStop?: () => boolean;
+}
+
+/**
+ * Drive `paint` over a frame sequence - the loop behind casting a user's OWN image/animation live
+ * (vs the world-model stream). Pure orchestration: it owns NO sockets and decodes nothing; the caller's
+ * `paint` does the frame→wall→RCON work (so the per-frame delta + budget carry are exactly the live
+ * path's). A single image is a one-frame sequence (painted once); a GIF/video is N frames looped at
+ * `fps`. `paint` receives the running paint index (0 = the keyframe). Returns the number of frames
+ * painted. Generic over the frame type so it is unit-testable with synthetic frames + a fake paint.
+ */
+export async function castImageFrames<F>(
+  frames: F[],
+  paint: (frame: F, index: number) => Promise<void>,
+  opts: ImageCastOptions = {},
+): Promise<number> {
+  if (frames.length === 0) throw new Error("castImageFrames: no frames to cast");
+  const loops = opts.loops ?? 1;
+  const endless = loops <= 0;
+  const fps = Math.max(0, opts.fps ?? 0);
+  const frameMs = fps > 0 ? 1000 / fps : 0;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const now = opts.now ?? Date.now;
+  let painted = 0;
+  for (let loop = 0; endless || loop < loops; loop++) {
+    for (let i = 0; i < frames.length; i++) {
+      if (opts.shouldStop?.()) return painted;
+      const t = now();
+      await paint(frames[i]!, painted);
+      painted++;
+      const isLast = !endless && loop === loops - 1 && i === frames.length - 1;
+      if (frameMs > 0 && !isLast) {
+        const rest = frameMs - (now() - t);
+        if (rest > 0) await sleep(rest);
+      }
+    }
+  }
+  return painted;
+}
