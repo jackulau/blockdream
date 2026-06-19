@@ -330,6 +330,19 @@ describe("frameToWallCommands: --facing orients the wall plane", () => {
     expect(counts[0]).toBe(FW * FH); // every cell placed
   });
 
+  it("scales: a 64×64 wall facing east stays flat in X, places all cells, and clears within the /fill cap", () => {
+    const big = rgbFrame(64, 64, (x, y) => (((x + y) & 1) ? RED : BLUE)); // busy checker (worst case)
+    const paint = frameToWallCommands(big, ORIGIN, undefined, { dither: "none", facing: "east" });
+    expect(planeAxisValues(paint.commands, "x")).toEqual([ORIGIN.x]); // flat in X at scale
+    expect(paintedCount(paint.commands)).toBe(64 * 64); // every cell placed
+    const setup = buildSetupCommands(ORIGIN, 64, 64, { clearance: 3, facing: "east" });
+    for (const l of setup) {
+      const t = l.split(/\s+/);
+      const vol = (+t[4]! - +t[1]! + 1) * (+t[5]! - +t[2]! + 1) * (+t[6]! - +t[3]! + 1);
+      expect(vol).toBeLessThanOrEqual(32768); // each /fill within the vanilla cap
+    }
+  });
+
   it("east rotates the plane vs south (distinct commands), west mirrors east's column axis", () => {
     const south = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: "south" }).commands;
     const east = frameToWallCommands(halvesXY, ORIGIN, undefined, { dither: "none", facing: "east" }).commands;
