@@ -23,6 +23,7 @@ import { imageToSolid } from "../src/depth";
 import { imageToVolume } from "../src/voxelize";
 import { volumeToFrame } from "../src/project";
 import { solidify } from "../src/obj";
+import { spinSequence } from "../src/spin";
 import { createVolume, setVoxel, getVoxel, fillRun, EMPTY, forEachSolid, countSolid, type VoxelVolume } from "../src/volume";
 
 // ---- deterministic PRNG (no Math.random → reproducible inputs) ----
@@ -184,6 +185,17 @@ export function runBench(cfg: BenchConfig = {}): BenchStage[] {
   });
   // keep `counted` honest (and ensure the loop isn't optimised away)
   if (counted !== countSolid(solid)) throw new Error(`forEachSolid mismatch ${counted} != ${countSolid(solid)}`);
+
+  // 7. bake a Y-spin (the --animate spin path: cube-pad X/Z + N sampled rotations) — the new
+  //    placement code path's scaling cost (a wide-shallow build sweeps a square footprint).
+  const spinFrames = 8;
+  stages.push({
+    name: "spinSequence",
+    ms: timeIt(() => {
+      spinSequence(solid, spinFrames);
+    }, iters, warmup),
+    units: solid.sx * solid.sy * solid.sz * spinFrames,
+  });
 
   return stages;
 }

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { render } from "../src/render";
 import { rotateYQuarterTurns, createVolume, setVoxel, getVoxel, countSolid, spinSequence, padXZToSquare, BAKEABLE_ANIMS } from "@blockdream/voxel";
+import { DEFAULT_MAX_COMMANDS } from "@blockdream/emit-commands";
 
 // goal 043: users designate how a build spawns in Minecraft - origin COORDINATES (D1) and
 // facing DIRECTION (D2). Uses the model3d cube path (no image decode) for fast determinism.
@@ -165,5 +166,54 @@ describe("--animate spin: bake a rotating-build datapack (D3)", () => {
   it("render --animate spin produces a multi-frame datapack", () => {
     const res = render({ input: writeObj("sp.obj"), out: join(dir, "sp"), target: "model3d", width: 12, height: 12, animate: "spin", animateFrames: 6 });
     expect(res.frameCount).toBe(6);
+  });
+});
+
+/** Every emitted .mcfunction must respect the per-function command budget and the 32768 /fill cap. */
+function assertBudget(filesWritten: string[]): number {
+  const fns = filesWritten.filter((f) => f.endsWith(".mcfunction"));
+  let totalPlacements = 0;
+  for (const f of fns) {
+    const lines = readFileSync(f, "utf8").split("\n").filter((l) => /^(setblock|fill) /.test(l));
+    totalPlacements += lines.length;
+    expect(lines.length, `${f} within per-function budget`).toBeLessThanOrEqual(DEFAULT_MAX_COMMANDS);
+    for (const l of lines) {
+      const m = /^fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+)/.exec(l);
+      if (m) {
+        const vol = (Math.abs(+m[4]! - +m[1]!) + 1) * (Math.abs(+m[5]! - +m[2]!) + 1) * (Math.abs(+m[6]! - +m[3]!) + 1);
+        expect(vol, `${l} within 32768 /fill cap`).toBeLessThanOrEqual(32768);
+      }
+    }
+  }
+  return totalPlacements;
+}
+
+describe("larger builds hold up: budgets + new controls compose at scale (D4)", () => {
+  it("a large 64³ build emits a valid datapack within every command budget", () => {
+    const res = render({ input: writeObj("big.obj"), out: join(dir, "big"), target: "model3d", width: 64, height: 64 });
+    expect(res.filesWritten.length).toBeGreaterThan(0);
+    expect(assertBudget(res.filesWritten)).toBeGreaterThan(0); // real, non-trivial build
+  });
+
+  it("origin + facing + spin all compose on a larger build (no clip, budgets hold, origin respected)", () => {
+    const O = { x: 200, y: 80, z: -100 };
+    const res = render({
+      input: writeObj("big2.obj"), out: join(dir, "big2"), target: "model3d",
+      width: 40, height: 40, origin: O, facing: "east", animate: "spin", animateFrames: 4,
+    });
+    expect(res.frameCount).toBe(4);
+    assertBudget(res.filesWritten);
+    const cs = coords(res.filesWritten);
+    expect(Math.min(...cs.map((c) => c.x))).toBeGreaterThanOrEqual(O.x); // origin honoured under facing+spin
+    expect(Math.min(...cs.map((c) => c.y))).toBeGreaterThanOrEqual(O.y);
+  }, 20000);
+
+  it("a large non-cubic build spins without exploding the voxel count beyond its swept footprint", () => {
+    const v = createVolume(96, 48, 6); // wide, shallow - the real build shape
+    for (let i = 0; i < 96; i += 3) setVoxel(v, i, i % 48, i % 6, 5);
+    const seq = spinSequence(v, 8);
+    // cube-pads X/Z to 96 (the swept radius), NOT to a 96³ over-pad of Y
+    expect([seq[0]!.sx, seq[0]!.sy, seq[0]!.sz]).toEqual([96, 48, 96]);
+    expect(countSolid(seq[0]!)).toBe(countSolid(v)); // identity frame loses nothing
   });
 });
