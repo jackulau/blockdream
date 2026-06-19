@@ -89,7 +89,12 @@ const M4_REAL_FLAG = /--real\s+(ml\/)?runs\/m4\b/;
 const MODULE_RE = /python3?\s+-m\s+(blockdream_wm(?:\.[A-Za-z0-9_]+)*)/g;
 
 let linkCount = 0;
+let imgCount = 0;
 let moduleCount = 0;
+// relative image embeds (markdown ![alt](path) + HTML <img src=...>) - only RELATIVE paths
+// (leading "."); absolute http(s)/protocol-relative/data: URIs are skipped on purpose.
+const MD_IMG_RE = /!\[[^\]]*\]\((\.[^)\s]+\.(?:png|jpe?g|gif|webp|svg|bmp|avif))(?:\s+"[^"]*")?\)/gi;
+const HTML_IMG_RE = /<img\b[^>]*?\bsrc\s*=\s*["'](\.[^"']+\.(?:png|jpe?g|gif|webp|svg|bmp|avif))["']/gi;
 for (const rel of tracked) {
   const f = join(ROOT, rel);
   const text = readFileSync(f, "utf8");
@@ -99,6 +104,15 @@ for (const rel of tracked) {
     const target = resolve(dirname(f), m[1]);
     linkCount++;
     if (!existsSync(target)) fail(`${rel} links to missing ${m[1]}`);
+  }
+
+  // relative image embeds must resolve (a broken README/docs screenshot rots silently otherwise)
+  for (const re of [MD_IMG_RE, HTML_IMG_RE]) {
+    for (const m of text.matchAll(re)) {
+      const target = resolve(dirname(f), m[1]);
+      imgCount++;
+      if (!existsSync(target)) fail(`${rel} embeds missing image ${m[1]}`);
+    }
   }
 
   // python -m blockdream_wm.<module> snippets must map to real modules (file or package)
@@ -126,6 +140,6 @@ for (const rel of tracked) {
 
 console.log(
   `OK: ${Object.keys(REQUIRED).length} required docs present with sections; ` +
-    `${tracked.length} tracked .md scanned; ${linkCount} relative .md links resolve; ` +
+    `${tracked.length} tracked .md scanned; ${linkCount} relative .md links + ${imgCount} image links resolve; ` +
     `${moduleCount} blockdream_wm module refs valid; no pre-rebrand identifiers or stale serve paths`,
 );
