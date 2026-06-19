@@ -30,6 +30,7 @@ RCON_PORT=25575
 RCON_PASS=""
 WS="ws://127.0.0.1:8765"
 SKILL=walk
+FACING=south
 ORIGIN="10,-60,10"
 SIZE="64x64"
 CONNS=4
@@ -41,7 +42,7 @@ usage() { sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 while [ $# -gt 0 ]; do
   # valued flags need a following argument - fail cleanly instead of a set -u crash on $2
   case "$1" in
-    --rcon-pass|--rcon-host|--rcon-port|--ws|--skill|--origin|--size|--rcon-conns)
+    --rcon-pass|--rcon-host|--rcon-port|--ws|--skill|--facing|--origin|--size|--rcon-conns)
       [ $# -ge 2 ] || { echo "✗ $1 needs a value (see --help)" >&2; exit 2; } ;;
   esac
   case "$1" in
@@ -50,6 +51,7 @@ while [ $# -gt 0 ]; do
     --rcon-port)  RCON_PORT="$2"; shift 2 ;;
     --ws)         WS="$2";        shift 2 ;;
     --skill)      SKILL="$2";     shift 2 ;;
+    --facing)     FACING="$2";    shift 2 ;;
     --origin)     ORIGIN="$2";    shift 2 ;;
     --size)       SIZE="$2";      shift 2 ;;
     --rcon-conns) CONNS="$2";     shift 2 ;;
@@ -81,7 +83,7 @@ echo "             2. world-model WS server:        bash ml/scripts/serve_demo.s
 echo "[cast-live] this sidecar then paints the dream onto a ${SIZE} wall at ${ORIGIN} (skill=${SKILL}, ${CONNS} RCON conns)."
 
 # ----- run the sidecar -----
-ARGS=(--ws "$WS" --skill "$SKILL" --origin "$ORIGIN" --size "$SIZE" --rcon-conns "$CONNS")
+ARGS=(--ws "$WS" --skill "$SKILL" --facing "$FACING" --origin "$ORIGIN" --size "$SIZE" --rcon-conns "$CONNS")
 [ "$SETUP" -eq 1 ] && ARGS+=(--setup)
 if [ "$DRYRUN" -eq 1 ]; then
   ARGS+=(--dry-run --frames 4)
