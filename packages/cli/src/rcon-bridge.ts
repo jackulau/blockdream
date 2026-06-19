@@ -16,10 +16,12 @@ import {
   greedyBoxes,
   makeBlockResolver,
   fillLines,
+  voxelToLiveCommands,
   DEFAULT_MAX_COMMANDS,
   type Cell,
   type PlacedCell,
 } from "@blockdream/emit-commands";
+import { imageToSolid, rotateYQuarterTurns, type VoxelVolume } from "@blockdream/voxel";
 import { getSolidBlockMapPalette } from "@blockdream/palette";
 import {
   preparePalette,
@@ -433,4 +435,66 @@ export async function castImageFrames<F>(
     }
   }
   return painted;
+}
+
+// ---------------------------------------------------------------------------
+// 6. cast a 3D BUILD (image → voxels) into a running world (live, no datapack)
+// ---------------------------------------------------------------------------
+
+const FACING_TURNS: Record<WallFacing, number> = { south: 0, west: 1, north: 2, east: 3 };
+
+export interface BuildCastOptions {
+  /** Max build thickness in voxels (imageToSolid maxDepth). Default 16. */
+  depth?: number;
+  /** Orient the build (lossless 90° quarter-turns about Y). Default "south" (no turn). */
+  facing?: WallFacing;
+  /** Palette/version line. */
+  paletteVersion?: string;
+  /** Dither method for the quantize. Default "bayer". */
+  dither?: DitherMethod;
+  /** Block for an unmapped solid voxel. Default minecraft:air. */
+  fallbackBlock?: string;
+}
+
+/**
+ * Turn an image (RGB(A) frame) into a 3D block BUILD and the literal `setblock`/`fill` commands that
+ * place it at `origin` - the LIVE 3D counterpart of `frameToWallCommands` (a flat wall). The image is
+ * quantized to the solid palette, inflated to a depth-`depth` solid (`imageToSolid`), oriented by
+ * `facing` (lossless `rotateYQuarterTurns`), then emitted via `voxelToLiveCommands` - byte-identical to
+ * the 3D datapack's keyframe, so casting live equals baking + loading. Returns the commands and the
+ * oriented volume (for the caller's setup box). Pure: the sidecar owns the RCON socket.
+ */
+export function buildToLiveCommands(
+  frame: WallFrame,
+  origin: { x: number; y: number; z: number },
+  opts: BuildCastOptions = {},
+): { commands: string[]; volume: VoxelVolume } {
+  const pal = solidPalette(opts.paletteVersion);
+  const resolve = makeBlockResolver(opts.paletteVersion);
+  const q = quantizeFrame(toRgb(frame), pal, { method: opts.dither ?? "bayer" });
+  let volume = imageToSolid(q, { maxDepth: Math.max(1, Math.floor(opts.depth ?? 16)) });
+  const turns = FACING_TURNS[opts.facing ?? "south"];
+  if (turns) volume = rotateYQuarterTurns(volume, turns);
+  const commands = voxelToLiveCommands(volume, origin, resolve, { fallbackBlock: opts.fallbackBlock });
+  return { commands, volume };
+}
+
+/** `/fill … air` commands that clear a build's W×H×D box at `origin` (split at the 32768 cap) -
+ *  the 3D analogue of {@link buildSetupCommands}, run once before casting a build live. */
+export function buildBoxSetupCommands(
+  origin: { x: number; y: number; z: number },
+  volume: VoxelVolume,
+  opts: { clearBlock?: string } = {},
+): string[] {
+  const block = opts.clearBlock ?? "minecraft:air";
+  return fillLines(
+    origin.x,
+    origin.y,
+    origin.z,
+    origin.x + volume.sx - 1,
+    origin.y + volume.sy - 1,
+    origin.z + volume.sz - 1,
+    block,
+    "replace",
+  );
 }
