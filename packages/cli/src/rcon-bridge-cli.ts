@@ -27,7 +27,9 @@ import { runFfmpeg, ffmpegMissingMessage } from "@blockdream/video";
 import type { RgbImage } from "@blockdream/color-core";
 import {
   actionMessage,
+  buildBoxSetupCommands,
   buildSetupCommands,
+  buildToLiveCommands,
   castImageFrames,
   frameToWallCommands,
   isParseError,
@@ -68,6 +70,9 @@ Options:
                       via RCON instead of the world model - paints at --origin/--facing,
                       no datapack/reload. A still = one paint; a GIF/video loops at --fps.
   --loops <n>         times to repeat an --image animation (<= 0 = endless)  (default 1)
+  --build <path>      cast a 3D BUILD (image → voxels) into the world live via RCON -
+                      setblock/fill at --origin/--facing, no datapack (vs --image's flat wall)
+  --depth <n>         build thickness in voxels for --build               (default 16)
   --origin <x,y,z>    wall's bottom-left block           (default 10,-60,10 - on a 1.21
                       superflat the top grass block is y=-61 and players stand at
                       y=-60, so the wall base sits at ground level near spawn)
@@ -317,6 +322,8 @@ export async function main(argv: string[]): Promise<number> {
         origin: { type: "string" },
         facing: { type: "string" },
         image: { type: "string" },
+        build: { type: "string" },
+        depth: { type: "string" },
         loops: { type: "string" },
         size: { type: "string" },
         fps: { type: "string" },
@@ -357,6 +364,10 @@ export async function main(argv: string[]): Promise<number> {
   const imagePath = values["image"] as string | undefined; // cast a static image/animation, not the WM
   const imageLoops = parseInt((values["loops"] as string | undefined) ?? "1", 10);
   if (values["loops"] !== undefined && !Number.isInteger(imageLoops)) return fail(`--loops must be an integer (<= 0 = endless)`);
+  const buildPath = values["build"] as string | undefined; // cast a 3D BUILD (image → voxels), not a flat wall
+  const buildDepth = parseInt((values["depth"] as string | undefined) ?? "16", 10);
+  if (values["depth"] !== undefined && (!Number.isInteger(buildDepth) || buildDepth < 1)) return fail(`--depth must be an integer >= 1`);
+  if (imagePath && buildPath) return fail(`--image and --build are mutually exclusive (flat wall vs 3D build)`);
   const fps = Number((values["fps"] as string | undefined) ?? "2");
   const rconConns = parseInt((values["rcon-conns"] as string | undefined) ?? "4", 10);
   const maxCommands = parseInt((values["max-commands"] as string | undefined) ?? "256", 10);
@@ -390,7 +401,7 @@ export async function main(argv: string[]): Promise<number> {
 
   let stopped = false;
   const rcon = dryRun ? null : new RconPool({ host: rconHost, port: rconPort, password: rconPass!, conns: rconConns, log });
-  const wm = mockWm || imagePath ? null : new WmClient(wsUrl); // --image casts a file, not the WM stream
+  const wm = mockWm || imagePath || buildPath ? null : new WmClient(wsUrl); // --image/--build cast a file, not the WM stream
 
   process.once("SIGINT", () => {
     log("SIGINT - closing rcon + ws");
@@ -443,15 +454,16 @@ export async function main(argv: string[]): Promise<number> {
     );
   };
 
-  // ----- resolve the player (real RCON modes only; --image paints at --origin, no player needed) -----
+  // ----- resolve the player (real RCON modes only; --image/--build paint at --origin, no player needed) -----
   let player = values["player"] as string | undefined;
-  if (!dryRun && !player && !imagePath) {
+  if (!dryRun && !player && !imagePath && !buildPath) {
     player = await detectPlayer(rcon!);
     log(`player auto-detected: ${player}`);
   }
 
   // ----- optional in-world setup: clear the wall + viewing space (no datapack/reload) -----
-  if (doSetup) {
+  // (--build does its OWN 3D build-box setup below; this flat-wall clear is for the WM stream / --image)
+  if (doSetup && !buildPath) {
     const setupCmds = buildSetupCommands(origin, sizeW, sizeH, { clearance: setupClearance, facing: wallFacing });
     log(`setup: clearing wall slab + ${setupClearance}-block clearance (facing ${wallFacing}) in the running world (${setupCmds.length} /fill command(s), no datapack/reload)`);
     if (dryRun) {
@@ -481,6 +493,38 @@ export async function main(argv: string[]): Promise<number> {
       shouldStop: () => stopped,
     });
     log(`image cast: done - ${n} frame(s) painted`);
+    await rcon?.stop();
+    return 0;
+  }
+
+  // ----- --build: cast a 3D BUILD (image → voxels) into the world via RCON, then exit -----
+  if (buildPath) {
+    let frame: RgbImage;
+    try {
+      frame = decodeImageFrames(buildPath, sizeW, sizeH)[0]!;
+    } catch (e) {
+      return fail(`${e instanceof Error ? e.message : String(e)}\n${ffmpegMissingMessage()}`);
+    }
+    const wallFrame: WallFrame = { width: frame.width, height: frame.height, pixels: frame.data };
+    const { commands, volume } = buildToLiveCommands(wallFrame, origin, { depth: buildDepth, facing: wallFacing });
+    log(
+      `build cast: "${buildPath}" → ${volume.sx}×${volume.sy}×${volume.sz} build (depth ${buildDepth}) ` +
+        `at ${origin.x},${origin.y},${origin.z} facing ${wallFacing}, ${commands.length} command(s)` +
+        `${dryRun ? " [dry-run: no RCON]" : ""}`,
+    );
+    const batch: string[] = [];
+    if (doSetup) {
+      const setupCmds = buildBoxSetupCommands(origin, volume);
+      log(`setup: clearing the ${volume.sx}×${volume.sy}×${volume.sz} build box (${setupCmds.length} /fill command(s), no datapack/reload)`);
+      batch.push(...setupCmds);
+    }
+    batch.push(...commands);
+    if (dryRun) {
+      for (const c of batch) log(`  > ${c}`);
+    } else {
+      await rcon!.sendBatch(batch);
+    }
+    log(`build cast: done - ${commands.length} block command(s) placed`);
     await rcon?.stop();
     return 0;
   }
