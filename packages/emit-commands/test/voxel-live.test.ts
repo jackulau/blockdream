@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createVolume, setVoxel } from "@blockdream/voxel";
-import { voxelToLiveCommands, generateVoxelDatapack, greedyBoxes } from "../src/index";
+import { voxelToLiveCommands, voxelFramesToLiveCommands, generateVoxelDatapack, greedyBoxes } from "../src/index";
 
 // a tiny solid resolver: 7 → stone, 9 → oak_planks, else unmapped
 const resolve = (id: number): string | undefined =>
@@ -45,5 +45,31 @@ describe("voxelToLiveCommands (live 3D build over RCON)", () => {
     setVoxel(v, 0, 0, 0, 42); // not in the resolver
     const cmds = voxelToLiveCommands(v, { x: 0, y: 0, z: 0 }, resolve, { fallbackBlock: "minecraft:cobblestone" });
     expect(cmds).toEqual(["setblock 0 0 0 minecraft:cobblestone replace"]);
+  });
+});
+
+describe("voxelFramesToLiveCommands (live 3D animation, delta-encoded)", () => {
+  it("each frame is byte-identical to the datapack's frames/f (live animation == offline)", () => {
+    const a = build();
+    const b = build();
+    setVoxel(b, 2, 1, 0, 7); // frame 1 adds one voxel → a small delta off frame 0
+    const volumes = [a, b];
+    const origin = { x: 10, y: 64, z: -5 };
+    const frames = voxelFramesToLiveCommands(volumes, origin, resolve);
+    expect(frames).toHaveLength(2);
+    const pack = generateVoxelDatapack(volumes, resolve, { origin, optimize: (c, r) => greedyBoxes(c, r) });
+    for (let f = 0; f < 2; f++) {
+      const fn = [...pack.files.entries()].find(([k]) => k.endsWith(`frames/${f}.mcfunction`));
+      expect(fn, `datapack frames/${f}`).toBeDefined();
+      const dp = fn![1].split("\n").filter((l) => l.trim() !== "" && !l.startsWith("#"));
+      expect(frames[f]).toEqual(dp);
+    }
+    expect(frames[1]!.length).toBeLessThan(frames[0]!.length); // frame 1 is a delta, smaller than the keyframe
+  });
+
+  it("a single volume yields one keyframe list (== voxelToLiveCommands)", () => {
+    const v = build();
+    const origin = { x: 1, y: 2, z: 3 };
+    expect(voxelFramesToLiveCommands([v], origin, resolve)).toEqual([voxelToLiveCommands(v, origin, resolve)]);
   });
 });
