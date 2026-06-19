@@ -6,7 +6,7 @@
 
 import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
-import { fillLines } from "./fill";
+import { fillLines, greedyBoxes } from "./fill";
 import type { DatapackOptions, GeneratedPack } from "./datapack";
 
 const RESERVED = new Set(["minecraft"]);
@@ -67,6 +67,37 @@ export interface VoxelDatapackOptions extends DatapackOptions {
 
 function blockOf(id: number, resolveBlock: (id: number) => string | undefined, fallback: string, air: string): string {
   return id === EMPTY ? air : (resolveBlock(id) ?? fallback);
+}
+
+export interface VoxelLiveOptions {
+  /** Block placed where a solid voxel has no mapped block. Default minecraft:air. */
+  fallbackBlock?: string;
+}
+
+/**
+ * A 3D build's blocks as standalone `setblock`/`fill` commands at `origin` - the LIVE counterpart of
+ * {@link generateVoxelDatapack}. By construction it is byte-identical to that datapack's frame-0
+ * keyframe function body (same `computeVoxelDeltas` cells, same world offset, same `greedyBoxes`
+ * merge), so casting a static build live over RCON places exactly what baking + loading would. No
+ * scoreboard/macro wrapper, no `forceload`: just the block commands. An all-air volume yields `[]`.
+ * Orient the build before calling (e.g. `rotateYQuarterTurns` for `--facing`); this paints as given.
+ */
+export function voxelToLiveCommands(
+  volume: VoxelVolume,
+  origin: { x: number; y: number; z: number },
+  resolveBlock: (id: number) => string | undefined,
+  opts: VoxelLiveOptions = {},
+): string[] {
+  const fallback = opts.fallbackBlock ?? "minecraft:air";
+  const air = "minecraft:air";
+  const resolve = (id: number) => blockOf(id, resolveBlock, fallback, air);
+  const cells = computeVoxelDeltas([volume])[0]!.cells.map((c) => ({
+    x: origin.x + c.x,
+    y: origin.y + c.y,
+    z: origin.z + c.z,
+    mapColorId: c.mapColorId,
+  }));
+  return greedyBoxes(cells, resolve);
 }
 
 /** Generate a vanilla Java datapack that builds (and animates) a 3D voxel volume. */
