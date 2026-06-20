@@ -45,6 +45,22 @@ for the AR checkpoint - genuinely live, genuinely mod-free, not smooth video. Th
 transport + frame-rate story: [docs/live-cast.md](./docs/live-cast.md); setup + security:
 [docs/play-without-fabric.md](./docs/play-without-fabric.md).
 
+**Cast your OWN image or build (live).** The same RCON transport paints *your* content, not only the
+world model. `cast-asset.sh` streams a picture, GIF, or 3D build into a running world, placed where you
+choose, with no datapack and no `/reload`:
+
+```bash
+bash scripts/cast-asset.sh --image logo.png  --rcon-pass <pass> --origin 100,70,-20 --facing east --setup
+bash scripts/cast-asset.sh --build photo.png --rcon-pass <pass> --depth 12 --setup                 # a 3D build
+bash scripts/cast-asset.sh --build logo.png  --rcon-pass <pass> --animate spin --loops 0 --setup   # spinning 3D
+```
+
+**You designate the placement** - `--origin x,y,z` (coordinates), `--facing north|south|east|west`
+(direction), and `--animate spin|explode|wave|buildup` (animation): the same controls the offline
+datapack and Bedrock `.mcstructure` builders take, so a build lands where, facing which way, and moving
+how you ask - whether baked or cast live. `--image` paints a flat wall; `--build` a 3D build; a GIF/video
+or `--animate` loops as a live animation. Details: [docs/live-cast.md](./docs/live-cast.md).
+
 **Fabric mod (the high-FPS alternative).** Want smooth video instead? The optional
 [Fabric mod](./mods/java-fabric/README.md) swaps each map's colour array per tick - real
 video on an item-frame map wall (up to ~20 fps), with the same live world-model control:
