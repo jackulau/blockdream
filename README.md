@@ -173,6 +173,11 @@ the docs gate, and the Fabric mod build. Checks needing gitignored single-copy a
 (textures, checkpoints, ONNX) or JDK 21 print `⏭ SKIP` with the regen command instead of failing;
 any check that runs and fails exits nonzero. Checkpoint provenance lives in [`ml/CHECKPOINTS.md`](./ml/CHECKPOINTS.md).
 
+For the inner dev loop, **`BLOCKDREAM_FAST=1 bash scripts/verify-all.sh`** skips the CPU-heavy ML runtime
+gates (the driving evals + world-model serve, ~15-20 min) and the slow decoder/inference tests
+(`pytest -m "not slow"`) for a quick pass; the unflagged command runs the full suite (what CI and a final
+check use).
+
 ## Colour foundation
 
 The renderer authors a filled map's `colors` byte array **directly**, so the game does **not**
