@@ -73,6 +73,10 @@ observe about your pose.
 
 ## Cast your own image or animation (not the model)
 
+> One-command form: **`bash scripts/cast-asset.sh --image <path> --rcon-pass <pass> --setup`** (or
+> `--build <path>` for 3D, `--animate spin` to animate). It wraps the `rcon-bridge-cli.ts` invocations
+> below - no world-model server needed. The raw flags are documented here for reference.
+
 The same mod-free RCON transport also paints **your own** picture - not only the world-model stream.
 `--image <path>` decodes any still (`png`/`jpg`/`webp`) or animation (`gif`/`mp4`/`webm`) with ffmpeg
 and paints it as a block wall in the running world, with the same `--origin` / `--facing` / `--setup`
