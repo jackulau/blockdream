@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { writeNbt, readNbt, Compound, List, Int, Long, Str, Float, Double, Byte, IntArray, TAG } from "../src/index";
+import { writeNbt, readNbt, Compound, List, IntList, Int, Long, Str, Float, Double, Byte, IntArray, TAG } from "../src/index";
 
 // The growable ByteWriter must produce byte-identical output to the old chunk-concat writer. These
 // exercise the doubling/ensure logic (writes that straddle a growth boundary) + every primitive width
@@ -45,5 +45,26 @@ describe("ByteWriter (growable buffer) is correct across growth boundaries + wid
     const big = "x".repeat(5000); // > 1024, forces growth mid-string
     const { root: back } = readNbt(writeNbt("", Compound({ s: Str(big) }), "little"), "little");
     expect((back as { value: Record<string, { value: string }> }).value["s"]!.value).toBe(big);
+  });
+
+  it("IntList serializes BYTE-IDENTICALLY to a List<Int> of Int() objects (both endians)", () => {
+    const arr = new Int32Array([0, 1, -1, 123456, -2147483648, 2147483647, 42, -7]);
+    for (const fmt of ["little", "big"] as const) {
+      const viaIntList = writeNbt("", Compound({ x: IntList(arr) }), fmt);
+      const viaObjects = writeNbt("", Compound({ x: List(TAG.Int, Array.from(arr, Int)) }), fmt);
+      expect(Buffer.compare(viaIntList, viaObjects)).toBe(0);
+    }
+    // round-trips back as a normal List<Int>
+    const { root } = readNbt(writeNbt("", Compound({ x: IntList(arr) }), "little"), "little");
+    const list = (root as { value: Record<string, { value: { value: number }[] }> }).value["x"]!;
+    expect(list.value.map((t) => t.value)).toEqual(Array.from(arr));
+  });
+
+  it("IntList nested inside a List<List<Int>> (the .mcstructure block_indices shape) is byte-identical", () => {
+    const a = new Int32Array([1, 2, 3]);
+    const b = new Int32Array([-1, -1, -1]);
+    const viaIntList = writeNbt("", Compound({ block_indices: List(TAG.List, [IntList(a), IntList(b)]) }), "little");
+    const viaObjects = writeNbt("", Compound({ block_indices: List(TAG.List, [List(TAG.Int, Array.from(a, Int)), List(TAG.Int, Array.from(b, Int))]) }), "little");
+    expect(Buffer.compare(viaIntList, viaObjects)).toBe(0);
   });
 });

@@ -37,7 +37,7 @@ export type NbtValue =
   | { type: typeof TAG.Double; value: number }
   | { type: typeof TAG.ByteArray; value: Uint8Array }
   | { type: typeof TAG.String; value: string }
-  | { type: typeof TAG.List; elementType: TagType; value: NbtValue[] }
+  | { type: typeof TAG.List; elementType: TagType; value: NbtValue[]; ints?: Int32Array }
   | { type: typeof TAG.Compound; value: NbtCompound }
   | { type: typeof TAG.IntArray; value: Int32Array }
   | { type: typeof TAG.LongArray; value: BigInt64Array };
@@ -59,6 +59,13 @@ export const Str = (value: string): NbtValue => ({ type: TAG.String, value });
 export const List = (elementType: TagType, value: NbtValue[]): NbtValue => ({ type: TAG.List, elementType, value });
 export const Compound = (value: NbtCompound): NbtValue => ({ type: TAG.Compound, value });
 export const IntArray = (value: Int32Array): NbtValue => ({ type: TAG.IntArray, value });
+/**
+ * A `List<Int>` backed by a raw `Int32Array` instead of N `Int()` objects - serializes BYTE-IDENTICALLY
+ * to `List(TAG.Int, [...].map(Int))` but skips the per-element wrapper objects (the .mcstructure index
+ * layers are ~12.6M ints each; wrapping them was the 5.6-26s GC-variable cost). readNbt reads it back as
+ * a normal List<Int>.
+ */
+export const IntList = (ints: Int32Array): NbtValue => ({ type: TAG.List, elementType: TAG.Int, value: [], ints });
 export const LongArray = (value: BigInt64Array): NbtValue => ({ type: TAG.LongArray, value });
 
 // Writer -------------------------------------------------------------------
@@ -171,8 +178,14 @@ function writePayload(w: ByteWriter, tag: NbtValue): void {
       break;
     case TAG.List:
       w.u8(tag.elementType);
-      w.i32(tag.value.length);
-      for (const el of tag.value) writePayload(w, el);
+      if (tag.ints) {
+        // IntList fast path: write the raw ints directly - byte-identical to a List<Int> of Int() objects
+        w.i32(tag.ints.length);
+        for (let i = 0; i < tag.ints.length; i++) w.i32(tag.ints[i]!);
+      } else {
+        w.i32(tag.value.length);
+        for (const el of tag.value) writePayload(w, el);
+      }
       break;
     case TAG.Compound:
       for (const [name, child] of Object.entries(tag.value)) {
