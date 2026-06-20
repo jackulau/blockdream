@@ -17,10 +17,13 @@ _ML = Path(__file__).resolve().parents[1]  # ml/ - resolve artifacts from here, 
 WEIGHTS = _ML / "runs/drive/commavq_decoder.bin"
 FIXTURES = _ML / "tests/fixtures/commavq_real"
 
-pytestmark = pytest.mark.skipif(
-    not WEIGHTS.is_file(),
-    reason="commaVQ decoder weights absent - run scripts/fetch-commavq-decoder.sh (171MB)",
-)
+pytestmark = [
+    pytest.mark.slow,  # CPU-heavy decoder inference - excluded by verify-all fast mode (-m "not slow")
+    pytest.mark.skipif(
+        not WEIGHTS.is_file(),
+        reason="commaVQ decoder weights absent - run scripts/fetch-commavq-decoder.sh (171MB)",
+    ),
+]
 
 
 def _real_token_frames(n: int = 6) -> np.ndarray:

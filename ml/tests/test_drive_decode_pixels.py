@@ -18,10 +18,13 @@ _ML = Path(__file__).resolve().parents[1]  # ml/ - resolve artifacts from here, 
 CKPT = _ML / "runs/drive/latest.pt"
 WEIGHTS = _ML / "runs/drive/commavq_decoder.bin"
 
-pytestmark = pytest.mark.skipif(
-    not (CKPT.is_file() and WEIGHTS.is_file()),
-    reason="driving checkpoint or commaVQ decoder weights absent (gitignored)",
-)
+pytestmark = [
+    pytest.mark.slow,  # CPU-heavy WM rollout + decode - excluded by verify-all fast mode (-m "not slow")
+    pytest.mark.skipif(
+        not (CKPT.is_file() and WEIGHTS.is_file()),
+        reason="driving checkpoint or commaVQ decoder weights absent (gitignored)",
+    ),
+]
 
 
 def _load(temperature=0.0, top_k=0):

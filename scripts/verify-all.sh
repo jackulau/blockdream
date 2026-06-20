@@ -16,6 +16,10 @@ cd "$ROOT"
 ML="$ROOT/ml"
 PY="$ML/.venv/bin/python"
 STRICT="${BLOCKDREAM_STRICT:-0}"
+# BLOCKDREAM_FAST=1 → a ~2-3min iterate gate: skips the CPU-heavy ML runtime gates (driving evals + WM
+# serve) and excludes slow-marked tests (decoder/WM inference). The DEFAULT (unset) runs EVERYTHING - the
+# full suite is what CI + a final check run; fast mode is an explicit opt-out for the inner dev loop.
+FAST="${BLOCKDREAM_FAST:-}"
 
 pass=0; skip=0
 note()  { printf '\n- %s\n' "$*"; }
@@ -58,12 +62,17 @@ ok "check-docs.mjs"
 
 note "ML test suite (pytest)"
 if [ -x "$PY" ]; then
-  (cd "$ML" && "$PY" -m pytest -q >/dev/null)
-  ok "ml pytest"
+  PYTEST_ARGS=(-q)
+  [ -n "$FAST" ] && PYTEST_ARGS+=(-m "not slow")  # fast mode skips the slow decoder/WM-inference tests
+  (cd "$ML" && "$PY" -m pytest "${PYTEST_ARGS[@]}" >/dev/null)
+  ok "ml pytest${FAST:+ (fast: -m 'not slow')}"
 else
   skipped "ml pytest - no venv at ml/.venv (regen: bash ml/scripts/setup_venv.sh)"
 fi
 
+if [ -n "$FAST" ]; then
+  skipped_allowed "ML runtime gates (driving evals + WM serve, the ~15-20min CPU-heavy block) - BLOCKDREAM_FAST set; run full: bash scripts/verify-all.sh"
+else
 note "ML runtime gates (served checkpoints)"
 if [ -x "$PY" ] && [ -f "$ML/runs/skills_real/latest.pt" ]; then
   (cd "$ML" && "$PY" scripts/verify_movement_types.py --checkpoint runs/skills_real/latest.pt >/dev/null)
@@ -91,6 +100,7 @@ if [ -x "$PY" ] && [ -f "$ML/runs/drive/latest.pt" ] && [ -f "$ML/runs/drive/com
 else
   skipped "drive photoreal - commaVQ decoder absent (fetch: bash scripts/fetch-commavq-decoder.sh, 171MB MIT)"
 fi
+fi  # end ML-runtime-gates BLOCKDREAM_FAST guard
 if [ -x "$PY" ]; then
   (cd "$ML" && "$PY" scripts/no_synthetic_guard.py >/dev/null)
   ok "NO SYNTHETIC in any served/live world-model path (provenance sidecars + path refs + on-disk pools)"
