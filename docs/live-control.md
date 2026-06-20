@@ -102,6 +102,11 @@ Bedrock-native (behavior pack / Script API) cannot do it: no socket, no map pixe
 - **Verified in CI (no game):** action derivation from pose deltas, the action-message schema
   (matches `serve.py`), and frame→map-colour-tiles - all in `control-sim.test.ts` (13 tests),
   driving the same transforms the Java classes implement.
-- **Operator-gated:** building the jar (needs JDK 21 + Fabric toolchain) and running it against
-  a live 1.21 client + the Python server. The repo has no JDK/MC sandbox, so the mod is
-  code-complete and contract-tested, not CI-compiled (see `mods/java-fabric/README.md`).
+- **Build verified (JDK 21):** the mod compiles clean from source -
+  `cd mods/java-fabric && JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew clean build` →
+  `BUILD SUCCESSFUL`, emitting `build/libs/blockdream-mapwall-0.1.0.jar` (Fabric Loom pulls MC 1.21.1 +
+  mappings; the wrapper is pinned to Gradle 8.10). `bash scripts/fabric-install.sh --build-only` wraps
+  this with a JDK 21 preflight (`java_home -v 21`, which resolves Homebrew's keg-only openjdk@21).
+- **Operator-gated:** only *running* the jar against a live 1.21 **client** + the Python server -
+  that touches your Minecraft GUI install (Fabric Loader + Fabric API in your mods folder), which a
+  headless box can't do. The jar itself is now build-verified, not just contract-tested.
