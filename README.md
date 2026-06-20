@@ -53,13 +53,15 @@ choose, with no datapack and no `/reload`:
 bash scripts/cast-asset.sh --image logo.png  --rcon-pass <pass> --origin 100,70,-20 --facing east --setup
 bash scripts/cast-asset.sh --build photo.png --rcon-pass <pass> --depth 12 --setup                 # a 3D build
 bash scripts/cast-asset.sh --build logo.png  --rcon-pass <pass> --animate spin --loops 0 --setup   # spinning 3D
+bash scripts/cast-asset.sh --build clip.mp4  --rcon-pass <pass> --depth 8 --fps 6 --loops 0 --setup # a video as a live 3D animation
 ```
 
 **You designate the placement** - `--origin x,y,z` (coordinates), `--facing north|south|east|west`
 (direction), and `--animate spin|explode|wave|buildup` (animation): the same controls the offline
 datapack and Bedrock `.mcstructure` builders take, so a build lands where, facing which way, and moving
-how you ask - whether baked or cast live. `--image` paints a flat wall; `--build` a 3D build; a GIF/video
-or `--animate` loops as a live animation. Details: [docs/live-cast.md](./docs/live-cast.md).
+how you ask - whether baked or cast live. `--image` paints a flat wall; `--build` a 3D build. A GIF or
+video animates either way: as a moving 2D wall (`--image`) or as a **real-content 3D animation** -
+every frame its own build (`--build`). Details: [docs/live-cast.md](./docs/live-cast.md).
 
 **Fabric mod (the high-FPS alternative).** Want smooth video instead? The optional
 [Fabric mod](./mods/java-fabric/README.md) swaps each map's colour array per tick - real
