@@ -31,6 +31,7 @@ import {
   buildBoxSetupCommands,
   buildSetupCommands,
   buildToLiveFrames,
+  videoBuildToLiveFrames,
   castImageFrames,
   frameToWallCommands,
   isParseError,
@@ -72,7 +73,8 @@ Options:
                       no datapack/reload. A still = one paint; a GIF/video loops at --fps.
   --loops <n>         times to repeat an --image animation (<= 0 = endless)  (default 1)
   --build <path>      cast a 3D BUILD (image → voxels) into the world live via RCON -
-                      setblock/fill at --origin/--facing, no datapack (vs --image's flat wall)
+                      setblock/fill at --origin/--facing, no datapack (vs --image's flat wall).
+                      A VIDEO/GIF --build casts a real-content live 3D animation (each frame a build)
   --depth <n>         build thickness in voxels for --build               (default 16)
   --animate <anim>    animate a --build live: spin | explode | wave | buildup | ... -
                       streamed as a delta-encoded 3D animation at --fps, repeat with --loops
@@ -511,29 +513,33 @@ export async function main(argv: string[]): Promise<number> {
 
   // ----- --build: cast a 3D BUILD (image → voxels) into the world via RCON, then exit -----
   if (buildPath) {
-    let frame: RgbImage;
+    let decoded: RgbImage[];
     try {
-      frame = decodeImageFrames(buildPath, sizeW, sizeH)[0]!;
+      decoded = decodeImageFrames(buildPath, sizeW, sizeH);
     } catch (e) {
       return fail(`${e instanceof Error ? e.message : String(e)}\n${ffmpegMissingMessage()}`);
     }
-    const wallFrame: WallFrame = { width: frame.width, height: frame.height, pixels: frame.data };
-    const { frameCommands, volume } = buildToLiveFrames(wallFrame, origin, {
-      depth: buildDepth,
-      facing: wallFacing,
-      animate: buildAnimate,
-      animateFrames,
-    });
+    const wallFrames: WallFrame[] = decoded.map((f) => ({ width: f.width, height: f.height, pixels: f.data }));
+    // a multi-frame input (video/GIF) is a REAL-CONTENT 3D animation (each frame its own build); a still
+    // is static or a PROCEDURAL --animate of that one frame. The two animation sources are exclusive.
+    const isVideo = wallFrames.length > 1;
+    if (isVideo && buildAnimate) {
+      return fail(`--animate (procedural) can't combine with a multi-frame --build (a video/GIF is already its own animation)`);
+    }
+    const { frameCommands, volume } = isVideo
+      ? videoBuildToLiveFrames(wallFrames, origin, { depth: buildDepth, facing: wallFacing })
+      : buildToLiveFrames(wallFrames[0]!, origin, { depth: buildDepth, facing: wallFacing, animate: buildAnimate, animateFrames });
     // --setup clears the build box; folding it into frame 0 means each loop re-clears, so a looping
     // animation wraps cleanly (no stale blocks from the previous pass).
     if (doSetup && frameCommands.length > 0) {
       frameCommands[0] = [...buildBoxSetupCommands(origin, volume), ...frameCommands[0]!];
     }
+    const kind = isVideo ? `video ×${frameCommands.length} frames` : buildAnimate ? `${buildAnimate} ×${frameCommands.length} frames` : "static";
     log(
-      `build cast: "${buildPath}" → ${volume.sx}×${volume.sy}×${volume.sz} build (depth ${buildDepth})` +
-        `${buildAnimate ? ` ${buildAnimate} ×${frameCommands.length} frames` : ""} at ${origin.x},${origin.y},${origin.z} ` +
-        `facing ${wallFacing}${dryRun ? " [dry-run: no RCON]" : ""}`,
+      `build cast: "${buildPath}" → ${volume.sx}×${volume.sy}×${volume.sz} build (depth ${buildDepth}) ${kind} ` +
+        `at ${origin.x},${origin.y},${origin.z} facing ${wallFacing}${dryRun ? " [dry-run: no RCON]" : ""}`,
     );
+    const looping = isVideo || buildAnimate;
     const painted = await castImageFrames(
       frameCommands,
       async (cmds, i) => {
@@ -544,7 +550,7 @@ export async function main(argv: string[]): Promise<number> {
           await rcon!.sendBatch(cmds);
         }
       },
-      { loops: buildAnimate ? imageLoops : 1, fps, shouldStop: () => stopped },
+      { loops: looping ? imageLoops : 1, fps, shouldStop: () => stopped },
     );
     log(`build cast: done - ${painted} frame(s) placed`);
     await rcon?.stop();
