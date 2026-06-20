@@ -70,6 +70,10 @@ export const LongArray = (value: BigInt64Array): NbtValue => ({ type: TAG.LongAr
 
 // Writer -------------------------------------------------------------------
 
+// Host byte order. On a little-endian host an Int32Array's bytes ARE the LE int32 sequence, so writing
+// a little-endian NBT int list is a single bulk copy rather than N writeInt32LE calls.
+const HOST_LE = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+
 // One growable buffer written in place. The previous version allocated a tiny Buffer per primitive +
 // pushed to a chunks[] array, then Buffer.concat at the end - ~25M allocations for a large .mcstructure's
 // index layers (~40 s at 512px). This writes each primitive directly into a buffer that doubles on
@@ -139,6 +143,15 @@ class ByteWriter {
     Buffer.from(v.buffer, v.byteOffset, v.byteLength).copy(this.buf, this.len);
     this.len += v.byteLength;
   }
+  /** Write an Int32Array as NBT int32s. On a little-endian host writing little-endian, the array's raw
+   *  bytes ARE the output - one bulk copy instead of N writeInt32LE calls (the .mcstructure index path). */
+  intArray(arr: Int32Array): void {
+    if (this.le && HOST_LE) {
+      this.bytes(new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength));
+    } else {
+      for (let i = 0; i < arr.length; i++) this.i32(arr[i]!);
+    }
+  }
   str(v: string): void {
     const utf8 = Buffer.from(v, "utf8");
     this.i16(utf8.length);
@@ -181,7 +194,7 @@ function writePayload(w: ByteWriter, tag: NbtValue): void {
       if (tag.ints) {
         // IntList fast path: write the raw ints directly - byte-identical to a List<Int> of Int() objects
         w.i32(tag.ints.length);
-        for (let i = 0; i < tag.ints.length; i++) w.i32(tag.ints[i]!);
+        w.intArray(tag.ints);
       } else {
         w.i32(tag.value.length);
         for (const el of tag.value) writePayload(w, el);
@@ -197,7 +210,7 @@ function writePayload(w: ByteWriter, tag: NbtValue): void {
       break;
     case TAG.IntArray:
       w.i32(tag.value.length);
-      for (const n of tag.value) w.i32(n);
+      w.intArray(tag.value);
       break;
     case TAG.LongArray:
       w.i32(tag.value.length);
