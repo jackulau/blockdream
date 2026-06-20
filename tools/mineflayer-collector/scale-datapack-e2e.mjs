@@ -14,7 +14,7 @@
 
 import { Rcon } from "rcon-client";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtempSync, copyFileSync, existsSync, rmSync, readFileSync, writeFileSync, createWriteStream } from "node:fs";
+import { mkdtempSync, copyFileSync, existsSync, rmSync, readFileSync, writeFileSync, readdirSync, createWriteStream } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
@@ -64,11 +64,21 @@ try {
   const zip = join(outDir, `${NS}.zip`);
   if (!existsSync(zip)) throw new Error(`CLI did not emit ${NS}.zip: ${cli.slice(-300)}`);
 
-  // ---- 3. parse the emitter's own frames/0 fills → expected solid voxels (sample some)
-  const frame0 = readFileSync(join(outDir, "data", NS, "function", "frames", "0.mcfunction"), "utf8");
-  const fills = [...frame0.matchAll(/^fill (-?\d+) (-?\d+) (-?\d+) -?\d+ -?\d+ -?\d+ (minecraft:\S+?)(?: replace)?$/gm)];
+  // ---- 3. parse the emitter's own fills → expected solid voxels (sample some). Large builds
+  //         (256px+) CHUNK the frame: frames/0.mcfunction dispatches frames/0/part*.mcfunction, so
+  //         gather fills from frames/0 AND any part chunks (covers both direct + chunked layouts).
+  const fnDir = join(outDir, "data", NS, "function");
+  let body = readFileSync(join(fnDir, "frames", "0.mcfunction"), "utf8");
+  const partDir = join(fnDir, "frames", "0");
+  const chunked = existsSync(partDir);
+  if (chunked) {
+    for (const f of readdirSync(partDir).filter((n) => n.endsWith(".mcfunction")).sort()) {
+      body += "\n" + readFileSync(join(partDir, f), "utf8");
+    }
+  }
+  const fills = [...body.matchAll(/^fill (-?\d+) (-?\d+) (-?\d+) -?\d+ -?\d+ -?\d+ (minecraft:\S+?)(?: replace)?$/gm)];
   if (fills.length < 50) throw new Error(`expected a large build (>=50 fills), got ${fills.length} - not a scale test`);
-  log(`large 3D build: ${fills.length} fills emitted (greedyBoxes-merged), sampling solid corners`);
+  log(`large 3D build: ${fills.length} fills emitted (greedyBoxes-merged${chunked ? ", chunked into part functions" : ""}), sampling solid corners`);
   // sample ~24 first-corners spread across the fill list (each is a known-solid voxel)
   const stride = Math.max(1, Math.floor(fills.length / 24));
   const samples = [];
@@ -120,7 +130,10 @@ try {
     }
   }
 
-  rconClient = await Rcon.connect({ host: "127.0.0.1", port: RCON_PORT, password: RCON_PASS });
+  // a very large build (e.g. 256px = ~15k fills) runs its whole :setup in one server tick, which can
+  // take tens of seconds - well past rcon-client's ~5 s default ("Timeout for packet id 2"). Give RCON
+  // a generous timeout so the heavy one-shot setup can finish before we read voxels back.
+  rconClient = await Rcon.connect({ host: "127.0.0.1", port: RCON_PORT, password: RCON_PASS, timeout: 120_000 });
   const rcon = (cmd) => rconClient.send(cmd);
 
   // ---- 5. pack enabled at boot AND survives /reload (the documented user flow)
