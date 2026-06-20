@@ -186,9 +186,14 @@ export function greedyBoxes(cells: PlacedCell[], resolve: (mapColorId: number) =
   return lines;
 }
 
-/** Max bounding-box cells the dense typed-array path will grid (~96 MB of Uint16+Uint8); a larger or
- *  sparser box uses {@link greedyBoxesSparse} so memory never blows up. */
-const GREEDY_GRID_CAP = 32_000_000;
+/** Max bounding-box cells the dense typed-array path will grid (~192 MB of Uint16+Uint8 at the cap); a
+ *  larger or sparser box uses {@link greedyBoxesSparse}. Sized to cover realistic large builds
+ *  (e.g. a 1024px image at depth 48 ≈ 50M) on the fast no-Map path. */
+const GREEDY_GRID_CAP = 64_000_000;
+
+/** JS `Map` tops out near 2^24 entries; the string-key fallback keeps one Map entry per cell, so above
+ *  this it would die with a cryptic "Map maximum size exceeded". Fail loud with a useful message. */
+const SPARSE_MAX_CELLS = 16_000_000;
 
 /**
  * The original string-keyed greedy mesh - retained as the byte-identical fallback for a bounding box
@@ -196,6 +201,12 @@ const GREEDY_GRID_CAP = 32_000_000;
  */
 export function greedyBoxesSparse(cells: PlacedCell[], resolve: (mapColorId: number) => string): string[] {
   if (cells.length === 0) return [];
+  if (cells.length > SPARSE_MAX_CELLS) {
+    throw new Error(
+      `greedyBoxes: build too large for the string-key fallback (${cells.length} cells > ${SPARSE_MAX_CELLS}). ` +
+        `Its bounding box also exceeded the dense-grid cap (${GREEDY_GRID_CAP} cells) - reduce the resolution or depth.`,
+    );
+  }
   const blockAt = new Map<string, string>();
   for (const c of cells) blockAt.set(key3(c.x, c.y, c.z), resolve(c.mapColorId));
   const visited = new Set<string>();

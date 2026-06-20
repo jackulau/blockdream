@@ -63,51 +63,74 @@ export const LongArray = (value: BigInt64Array): NbtValue => ({ type: TAG.LongAr
 
 // Writer -------------------------------------------------------------------
 
+// One growable buffer written in place. The previous version allocated a tiny Buffer per primitive +
+// pushed to a chunks[] array, then Buffer.concat at the end - ~25M allocations for a large .mcstructure's
+// index layers (~40 s at 512px). This writes each primitive directly into a buffer that doubles on
+// demand: byte-identical output, an order of magnitude faster on large structures.
 class ByteWriter {
-  private chunks: Buffer[] = [];
-  constructor(private le: boolean) {}
+  private buf: Buffer;
+  private len = 0;
+  constructor(private le: boolean) {
+    this.buf = Buffer.allocUnsafe(1024);
+  }
 
+  private ensure(n: number): void {
+    const need = this.len + n;
+    if (need > this.buf.length) {
+      let cap = this.buf.length * 2;
+      while (cap < need) cap *= 2;
+      const nb = Buffer.allocUnsafe(cap);
+      this.buf.copy(nb, 0, 0, this.len);
+      this.buf = nb;
+    }
+  }
   push(b: Buffer): void {
-    this.chunks.push(b);
+    this.ensure(b.length);
+    b.copy(this.buf, this.len);
+    this.len += b.length;
   }
   u8(v: number): void {
-    this.push(Buffer.from([v & 0xff]));
+    this.ensure(1);
+    this.buf[this.len++] = v & 0xff;
   }
   i8(v: number): void {
-    this.push(Buffer.from([v & 0xff]));
+    this.ensure(1);
+    this.buf[this.len++] = v & 0xff;
   }
   i16(v: number): void {
-    const b = Buffer.allocUnsafe(2);
-    if (this.le) b.writeInt16LE(v | 0, 0);
-    else b.writeInt16BE(v | 0, 0);
-    this.push(b);
+    this.ensure(2);
+    if (this.le) this.buf.writeInt16LE(v | 0, this.len);
+    else this.buf.writeInt16BE(v | 0, this.len);
+    this.len += 2;
   }
   i32(v: number): void {
-    const b = Buffer.allocUnsafe(4);
-    if (this.le) b.writeInt32LE(v | 0, 0);
-    else b.writeInt32BE(v | 0, 0);
-    this.push(b);
+    this.ensure(4);
+    if (this.le) this.buf.writeInt32LE(v | 0, this.len);
+    else this.buf.writeInt32BE(v | 0, this.len);
+    this.len += 4;
   }
   i64(v: bigint): void {
-    const b = Buffer.allocUnsafe(8);
-    if (this.le) b.writeBigInt64LE(v, 0);
-    else b.writeBigInt64BE(v, 0);
-    this.push(b);
+    this.ensure(8);
+    if (this.le) this.buf.writeBigInt64LE(v, this.len);
+    else this.buf.writeBigInt64BE(v, this.len);
+    this.len += 8;
   }
   f32(v: number): void {
-    const b = Buffer.allocUnsafe(4);
-    if (this.le) b.writeFloatLE(v, 0);
-    else b.writeFloatBE(v, 0);
-    this.push(b);
+    this.ensure(4);
+    if (this.le) this.buf.writeFloatLE(v, this.len);
+    else this.buf.writeFloatBE(v, this.len);
+    this.len += 4;
   }
   f64(v: number): void {
-    const b = Buffer.allocUnsafe(8);
-    if (this.le) b.writeDoubleLE(v, 0);
-    else b.writeDoubleBE(v, 0);
-    this.push(b);
+    this.ensure(8);
+    if (this.le) this.buf.writeDoubleLE(v, this.len);
+    else this.buf.writeDoubleBE(v, this.len);
+    this.len += 8;
   }
   bytes(v: Uint8Array): void {
-    this.push(Buffer.from(v.buffer, v.byteOffset, v.byteLength));
+    this.ensure(v.byteLength);
+    Buffer.from(v.buffer, v.byteOffset, v.byteLength).copy(this.buf, this.len);
+    this.len += v.byteLength;
   }
   str(v: string): void {
     const utf8 = Buffer.from(v, "utf8");
@@ -115,7 +138,7 @@ class ByteWriter {
     this.push(utf8);
   }
   result(): Buffer {
-    return Buffer.concat(this.chunks);
+    return Buffer.from(this.buf.subarray(0, this.len));
   }
 }
 

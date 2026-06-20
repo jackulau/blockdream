@@ -44,6 +44,12 @@ describe("greedyBoxes (typed-array grid optimization)", () => {
     expect(out).toHaveLength(2); // two distant setblocks, not a giant fill
   });
 
+  it("greedyBoxesSparse fails loud above the JS Map limit instead of a cryptic 'Map maximum size exceeded'", () => {
+    // a length-only fake: the guard reads .length and throws before touching any cell (no 16M alloc)
+    const tooBig = { length: 16_000_001 } as unknown as PlacedCell[];
+    expect(() => greedyBoxesSparse(tooBig, resolve)).toThrow(/build too large/);
+  });
+
   it("is byte-identical AND faster than the string-key reference on a large multi-box build", () => {
     const cells = block(128, 128, 4, (x, y, z) => (x * 3 + y * 5 + z) % 6); // ~65k cells, many boxes
     const t0 = performance.now();
