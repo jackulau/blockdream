@@ -82,6 +82,120 @@ const key3 = (x: number, y: number, z: number) => `${x}|${y}|${z}`;
  */
 export function greedyBoxes(cells: PlacedCell[], resolve: (mapColorId: number) => string): string[] {
   if (cells.length === 0) return [];
+  // Bounding box → a dense typed-array grid keyed by a single linear integer instead of an `x|y|z`
+  // STRING (the old hot spot: millions of string allocations + Map/Set hashing made a 5.6M-cell build
+  // take ~13 s). The greedy mesh below is byte-identical to greedyBoxesSparse; this just swaps the
+  // backing store. A bounding box too large to grid densely falls back to the string-key path.
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (const c of cells) {
+    if (c.x < minX) minX = c.x;
+    if (c.x > maxX) maxX = c.x;
+    if (c.y < minY) minY = c.y;
+    if (c.y > maxY) maxY = c.y;
+    if (c.z < minZ) minZ = c.z;
+    if (c.z > maxZ) maxZ = c.z;
+  }
+  const W = maxX - minX + 1, H = maxY - minY + 1, D = maxZ - minZ + 1;
+  const vol = W * H * D;
+  if (!Number.isFinite(vol) || vol > GREEDY_GRID_CAP) return greedyBoxesSparse(cells, resolve);
+
+  // intern resolved blocks to 1-based ids (0 = absent); >65534 distinct blocks → bail (never happens
+  // for the bounded solid palette, but keeps the Uint16 grid honest).
+  const blockList: string[] = [];
+  const blockId = new Map<string, number>();
+  const grid = new Uint16Array(vol);
+  for (const c of cells) {
+    const b = resolve(c.mapColorId);
+    let id = blockId.get(b);
+    if (id === undefined) {
+      id = blockList.length + 1;
+      if (id > 0xffff) return greedyBoxesSparse(cells, resolve);
+      blockId.set(b, id);
+      blockList.push(b);
+    }
+    grid[((c.z - minZ) * H + (c.y - minY)) * W + (c.x - minX)] = id;
+  }
+  const visited = new Uint8Array(vol);
+  const lines: string[] = [];
+
+  // seed in z→y→x (the grid's natural linear order = the old version's sort order)
+  for (let z = 0; z < D; z++) {
+    for (let y = 0; y < H; y++) {
+      const rowBase = (z * H + y) * W;
+      for (let x = 0; x < W; x++) {
+        const k0 = rowBase + x;
+        const bi = grid[k0]!; // Uint16Array access is always a number at a valid index
+        if (bi === 0 || visited[k0]) continue;
+
+        // extend +X
+        let x1 = x;
+        while (x1 + 1 < W) {
+          const k = rowBase + x1 + 1;
+          if (grid[k] === bi && !visited[k]) x1++;
+          else break;
+        }
+
+        // extend +Y while the whole [x..x1] row matches
+        let y1 = y;
+        for (;;) {
+          const ny = y1 + 1;
+          if (ny >= H) break;
+          const nb = (z * H + ny) * W;
+          let ok = true;
+          for (let xx = x; xx <= x1; xx++) {
+            const k = nb + xx;
+            if (grid[k] !== bi || visited[k]) { ok = false; break; }
+          }
+          if (!ok) break;
+          y1 = ny;
+        }
+
+        // extend +Z while the whole [x..x1]×[y..y1] rect matches
+        let z1 = z;
+        for (;;) {
+          const nz = z1 + 1;
+          if (nz >= D) break;
+          let ok = true;
+          zcheck: for (let yy = y; yy <= y1; yy++) {
+            const nb = (nz * H + yy) * W;
+            for (let xx = x; xx <= x1; xx++) {
+              const k = nb + xx;
+              if (grid[k] !== bi || visited[k]) { ok = false; break zcheck; }
+            }
+          }
+          if (!ok) break;
+          z1 = nz;
+        }
+
+        for (let zz = z; zz <= z1; zz++)
+          for (let yy = y; yy <= y1; yy++) {
+            const nb = (zz * H + yy) * W;
+            for (let xx = x; xx <= x1; xx++) visited[nb + xx] = 1;
+          }
+
+        const block = blockList[bi - 1]!;
+        const wx0 = x + minX, wy0 = y + minY, wz0 = z + minZ;
+        if (x === x1 && y === y1 && z === z1) {
+          lines.push(`setblock ${wx0} ${wy0} ${wz0} ${block} replace`);
+        } else {
+          lines.push(...fillLines(wx0, wy0, wz0, x1 + minX, y1 + minY, z1 + minZ, block, "replace"));
+        }
+      }
+    }
+  }
+  return lines;
+}
+
+/** Max bounding-box cells the dense typed-array path will grid (~96 MB of Uint16+Uint8); a larger or
+ *  sparser box uses {@link greedyBoxesSparse} so memory never blows up. */
+const GREEDY_GRID_CAP = 32_000_000;
+
+/**
+ * The original string-keyed greedy mesh - retained as the byte-identical fallback for a bounding box
+ * too large/sparse for {@link greedyBoxes}'s dense typed-array grid. Same algorithm, `x|y|z` Map keys.
+ */
+export function greedyBoxesSparse(cells: PlacedCell[], resolve: (mapColorId: number) => string): string[] {
+  if (cells.length === 0) return [];
   const blockAt = new Map<string, string>();
   for (const c of cells) blockAt.set(key3(c.x, c.y, c.z), resolve(c.mapColorId));
   const visited = new Set<string>();
