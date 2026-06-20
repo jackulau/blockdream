@@ -512,6 +512,27 @@ export function buildToLiveFrames(
   return { frameCommands, volume: volumes[0]! };
 }
 
+/**
+ * Cast a VIDEO/GIF (its decoded frames) as a live 3D animation: each frame is inflated to its OWN
+ * depth-`depth` build (shared {@link imageToBuildVolume}: quantize → imageToSolid → facing), then the
+ * sequence is delta-encoded by {@link voxelFramesToLiveCommands}. This is the REAL-CONTENT 3D animation
+ * (every frame is the actual footage) - the counterpart of --image's 2D video and of
+ * {@link buildToLiveFrames}'s PROCEDURAL --animate (a still spun/exploded). All frames share dims
+ * (`imageToSolid` returns sz=maxDepth and the facing turn is the same for every frame), so the
+ * delta-encode needs no padding. Returns the per-frame commands + frame 0's volume (for the setup box).
+ */
+export function videoBuildToLiveFrames(
+  frames: WallFrame[],
+  origin: { x: number; y: number; z: number },
+  opts: BuildCastOptions = {},
+): { frameCommands: string[][]; volume: VoxelVolume } {
+  if (frames.length === 0) throw new Error("videoBuildToLiveFrames: no frames");
+  const resolve = makeBlockResolver(opts.paletteVersion);
+  const volumes = frames.map((f) => imageToBuildVolume(f, opts));
+  const frameCommands = voxelFramesToLiveCommands(volumes, origin, resolve, { fallbackBlock: opts.fallbackBlock });
+  return { frameCommands, volume: volumes[0]! };
+}
+
 /** `/fill … air` commands that clear a build's W×H×D box at `origin` (split at the 32768 cap) -
  *  the 3D analogue of {@link buildSetupCommands}, run once before casting a build live. */
 export function buildBoxSetupCommands(
