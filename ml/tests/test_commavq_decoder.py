@@ -13,8 +13,9 @@ import torch
 
 from blockdream_wm.drive import commavq_decoder as D
 
-WEIGHTS = Path("ml/runs/drive/commavq_decoder.bin")
-FIXTURES = Path("ml/tests/fixtures/commavq_real")
+_ML = Path(__file__).resolve().parents[1]  # ml/ - resolve artifacts from here, not the CWD (pytest runs from ml/)
+WEIGHTS = _ML / "runs/drive/commavq_decoder.bin"
+FIXTURES = _ML / "tests/fixtures/commavq_real"
 
 pytestmark = pytest.mark.skipif(
     not WEIGHTS.is_file(),

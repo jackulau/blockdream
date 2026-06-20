@@ -14,8 +14,9 @@ import numpy as np
 import pytest
 import torch
 
-CKPT = Path("ml/runs/drive/latest.pt")
-WEIGHTS = Path("ml/runs/drive/commavq_decoder.bin")
+_ML = Path(__file__).resolve().parents[1]  # ml/ - resolve artifacts from here, not the CWD (pytest runs from ml/)
+CKPT = _ML / "runs/drive/latest.pt"
+WEIGHTS = _ML / "runs/drive/commavq_decoder.bin"
 
 pytestmark = pytest.mark.skipif(
     not (CKPT.is_file() and WEIGHTS.is_file()),
