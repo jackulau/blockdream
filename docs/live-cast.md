@@ -170,3 +170,21 @@ Two independent ceilings, two fixes:
   WS port. It needs a JDK 21 build (`bash scripts/fabric-install.sh`); the no-mod RCON cast
   above needs none of that. 30 fps full-screen in real Minecraft is not physically available -
   see [`fps-budget.md`](./fps-budget.md) for why.
+
+## Proven end-to-end against a real server
+
+This is not dry-run-only. Two opt-in live e2es boot a stock Minecraft 1.21.1 server (Java 21,
+auto-detected by `vanilla-server.sh`), drive it, and read the world back over RCON to assert the
+blocks actually landed:
+
+```bash
+BLOCKDREAM_E2E=1 bash scripts/verify-all.sh   # runs both live e2es (needs network for the Mojang jar + Java 21 + ffmpeg)
+# or each directly:
+node tools/mineflayer-collector/bridge-e2e.mjs    # no-mod RCON cast: 7/7 sampled wall cells painted (changed from flat-world air)
+node tools/mineflayer-collector/datapack-e2e.mjs  # CLI datapack: loaded + /reload'd + painted (23/23 cells) + animated (15/15 cells), all exact-match
+```
+
+`bridge-e2e` proves the **live no-mod path** (real server + a mineflayer bot + the RCON sidecar
+casting the world model into the running world). `datapack-e2e` proves the **offline build path**
+(the CLI renders a datapack, the server loads and `/reload`s it, then setup + the macro animation
+paint cell-exact blocks). Both pass in ~10-15 s on a cached jar.
