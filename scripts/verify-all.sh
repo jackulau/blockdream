@@ -147,6 +147,9 @@ if command -v ffmpeg >/dev/null 2>&1; then
   ffmpeg -v error -f lavfi -i "testsrc=s=10x6:d=1:r=4" -frames:v 4 "$CAST_ASSET_TMP/v.gif"
   bash scripts/cast-asset.sh --dry-run --build "$CAST_ASSET_TMP/v.gif" --size 10x6 --depth 4 --facing east --origin 30,70,30 --setup >/dev/null
   ok "cast-asset.sh --dry-run --build VIDEO (non-square 10x6 + --facing, real-content live 3D animation composes)"
+  # composition regression net: --animate spin + --facing + a NEGATIVE --origin compose (verified by a 9-combo probe)
+  bash scripts/cast-asset.sh --dry-run --build "$CAST_ASSET_TMP/a.png" --size 16x16 --depth 4 --animate spin --facing west --origin -50,70,-50 --setup >/dev/null
+  ok "cast-asset.sh --dry-run --build --animate spin + --facing west + negative --origin compose"
   rm -rf "$CAST_ASSET_TMP"
 else
   skipped_allowed "cast-asset.sh --dry-run (ffmpeg not present - it decodes the asset)"
