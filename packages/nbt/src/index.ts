@@ -37,7 +37,7 @@ export type NbtValue =
   | { type: typeof TAG.Double; value: number }
   | { type: typeof TAG.ByteArray; value: Uint8Array }
   | { type: typeof TAG.String; value: string }
-  | { type: typeof TAG.List; elementType: TagType; value: NbtValue[] }
+  | { type: typeof TAG.List; elementType: TagType; value: NbtValue[]; ints?: Int32Array }
   | { type: typeof TAG.Compound; value: NbtCompound }
   | { type: typeof TAG.IntArray; value: Int32Array }
   | { type: typeof TAG.LongArray; value: BigInt64Array };
@@ -59,9 +59,20 @@ export const Str = (value: string): NbtValue => ({ type: TAG.String, value });
 export const List = (elementType: TagType, value: NbtValue[]): NbtValue => ({ type: TAG.List, elementType, value });
 export const Compound = (value: NbtCompound): NbtValue => ({ type: TAG.Compound, value });
 export const IntArray = (value: Int32Array): NbtValue => ({ type: TAG.IntArray, value });
+/**
+ * A `List<Int>` backed by a raw `Int32Array` instead of N `Int()` objects - serializes BYTE-IDENTICALLY
+ * to `List(TAG.Int, [...].map(Int))` but skips the per-element wrapper objects (the .mcstructure index
+ * layers are ~12.6M ints each; wrapping them was the 5.6-26s GC-variable cost). readNbt reads it back as
+ * a normal List<Int>.
+ */
+export const IntList = (ints: Int32Array): NbtValue => ({ type: TAG.List, elementType: TAG.Int, value: [], ints });
 export const LongArray = (value: BigInt64Array): NbtValue => ({ type: TAG.LongArray, value });
 
 // Writer -------------------------------------------------------------------
+
+// Host byte order. On a little-endian host an Int32Array's bytes ARE the LE int32 sequence, so writing
+// a little-endian NBT int list is a single bulk copy rather than N writeInt32LE calls.
+const HOST_LE = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
 // One growable buffer written in place. The previous version allocated a tiny Buffer per primitive +
 // pushed to a chunks[] array, then Buffer.concat at the end - ~25M allocations for a large .mcstructure's
@@ -132,6 +143,15 @@ class ByteWriter {
     Buffer.from(v.buffer, v.byteOffset, v.byteLength).copy(this.buf, this.len);
     this.len += v.byteLength;
   }
+  /** Write an Int32Array as NBT int32s. On a little-endian host writing little-endian, the array's raw
+   *  bytes ARE the output - one bulk copy instead of N writeInt32LE calls (the .mcstructure index path). */
+  intArray(arr: Int32Array): void {
+    if (this.le && HOST_LE) {
+      this.bytes(new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength));
+    } else {
+      for (let i = 0; i < arr.length; i++) this.i32(arr[i]!);
+    }
+  }
   str(v: string): void {
     const utf8 = Buffer.from(v, "utf8");
     this.i16(utf8.length);
@@ -171,8 +191,14 @@ function writePayload(w: ByteWriter, tag: NbtValue): void {
       break;
     case TAG.List:
       w.u8(tag.elementType);
-      w.i32(tag.value.length);
-      for (const el of tag.value) writePayload(w, el);
+      if (tag.ints) {
+        // IntList fast path: write the raw ints directly - byte-identical to a List<Int> of Int() objects
+        w.i32(tag.ints.length);
+        w.intArray(tag.ints);
+      } else {
+        w.i32(tag.value.length);
+        for (const el of tag.value) writePayload(w, el);
+      }
       break;
     case TAG.Compound:
       for (const [name, child] of Object.entries(tag.value)) {
@@ -184,7 +210,7 @@ function writePayload(w: ByteWriter, tag: NbtValue): void {
       break;
     case TAG.IntArray:
       w.i32(tag.value.length);
-      for (const n of tag.value) w.i32(n);
+      w.intArray(tag.value);
       break;
     case TAG.LongArray:
       w.i32(tag.value.length);

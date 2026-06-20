@@ -24,4 +24,20 @@ describe("buildVoxelMcStructure (real 3D)", () => {
     expect(parsed.indices[idxAt(1, 0, 0)]).toBe(air); // empty → air
     expect(parsed.blockNames).toContain("minecraft:air");
   });
+
+  it("a larger structure round-trips EVERY index (exercises the IntList Int32Array bulk-copy path)", () => {
+    const W = 16, H = 16, D = 8;
+    const v = createVolume(W, H, D);
+    for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) {
+      if ((x + y + z) % 3 === 0) setVoxel(v, x, y, z, ((x + y + z) % 5) + 1);
+    }
+    const parsed = readMcStructure(buildVoxelMcStructure(v, blockFor));
+    expect(parsed.size).toEqual([W, H, D]);
+    const idxAt = (x: number, y: number, z: number) => (x * H + y) * D + z;
+    const air = parsed.blockNames.indexOf("minecraft:air");
+    for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) {
+      const expected = (x + y + z) % 3 === 0 ? parsed.blockNames.indexOf(`minecraft:c${((x + y + z) % 5) + 1}`) : air;
+      expect(parsed.indices[idxAt(x, y, z)]).toBe(expected); // every cell survives the bulk-copy round-trip
+    }
+  });
 });

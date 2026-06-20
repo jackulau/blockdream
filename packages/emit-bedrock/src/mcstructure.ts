@@ -4,6 +4,7 @@ import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
 import {
   Compound,
   Int,
+  IntList,
   List,
   Str,
   TAG,
@@ -88,8 +89,8 @@ export function buildMcStructure(
   intern(fill); // ensure fill exists (commonly index 0)
 
   // Layer 0 = blocks, layer 1 = -1 (no second layer). Bedrock order: x outer, then y, then z.
-  const layer0: NbtValue[] = new Array(W * H * D);
-  const layer1: NbtValue[] = new Array(W * H * D);
+  const layer0 = new Int32Array(W * H * D);
+  const layer1 = new Int32Array(W * H * D);
   for (let x = 0; x < W; x++) {
     for (let y = 0; y < H; y++) {
       for (let z = 0; z < D; z++) {
@@ -97,8 +98,8 @@ export function buildMcStructure(
         const py = H - 1 - y; // image row 0 at top of the wall
         const mapColorId = frame.mapColorId[py * W + x]!;
         const block = blockFor(mapColorId) ?? fill;
-        layer0[idx] = Int(intern(block));
-        layer1[idx] = Int(-1);
+        layer0[idx] = intern(block);
+        layer1[idx] = -1;
       }
     }
   }
@@ -107,7 +108,7 @@ export function buildMcStructure(
     format_version: Int(1),
     size: List(TAG.Int, [Int(W), Int(H), Int(D)]),
     structure: Compound({
-      block_indices: List(TAG.List, [List(TAG.Int, layer0), List(TAG.Int, layer1)]),
+      block_indices: List(TAG.List, [IntList(layer0), IntList(layer1)]),
       entities: List(TAG.Compound, []),
       palette: Compound({
         default: Compound({
@@ -152,16 +153,16 @@ export function buildVoxelMcStructure(
   };
   intern(fill);
 
-  const layer0: NbtValue[] = new Array(W * H * D);
-  const layer1: NbtValue[] = new Array(W * H * D);
+  const layer0 = new Int32Array(W * H * D);
+  const layer1 = new Int32Array(W * H * D);
   for (let x = 0; x < W; x++) {
     for (let y = 0; y < H; y++) {
       for (let z = 0; z < D; z++) {
         const idx = (x * H + y) * D + z;
         const id = getVoxel(volume, x, y, z);
         const block = id === EMPTY ? fill : (blockFor(id) ?? fill);
-        layer0[idx] = Int(intern(block));
-        layer1[idx] = Int(-1);
+        layer0[idx] = intern(block);
+        layer1[idx] = -1;
       }
     }
   }
@@ -170,7 +171,7 @@ export function buildVoxelMcStructure(
     format_version: Int(1),
     size: List(TAG.Int, [Int(W), Int(H), Int(D)]),
     structure: Compound({
-      block_indices: List(TAG.List, [List(TAG.Int, layer0), List(TAG.Int, layer1)]),
+      block_indices: List(TAG.List, [IntList(layer0), IntList(layer1)]),
       entities: List(TAG.Compound, []),
       palette: Compound({
         default: Compound({ block_palette: List(TAG.Compound, blockPalette), block_position_data: Compound({}) }),
