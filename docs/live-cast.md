@@ -121,6 +121,16 @@ volume sequence (`generateBaked`) and streams it delta-encoded over RCON (each f
 the 3D datapack's per-frame functions), repeating `--loops` times at `--fps`. `--setup` is folded into
 each loop's first frame so a looping animation wraps cleanly.
 
+A **`--build` with a video or GIF** (`.gif`/`.mp4`/`.webm`) is the *real-content* counterpart: every
+decoded frame is inflated into its own 3D build and streamed as a delta-encoded live 3D animation - the
+footage itself, in blocks, instead of a procedural spin. (`--animate` and a multi-frame `--build` are
+mutually exclusive; a video is already its own animation.)
+
+```bash
+# a clip cast as a live 3D animation, looped at 6 fps
+bash scripts/cast-asset.sh --build clip.mp4 --rcon-pass <pass> --depth 8 --fps 6 --loops 0 --setup
+```
+
 This completes the build-delivery matrix: a build reaches Minecraft offline (datapack / `.mcstructure`,
 2D and 3D) and live (a 2D wall via `--image`, a 3D build via `--build`) - all honoring coordinates,
 direction, and animation.
