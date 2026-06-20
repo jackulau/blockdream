@@ -24,3 +24,6 @@ packages = ["src/blockdream_wm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "slow: CPU-heavy decoder/WM-inference tests - excluded by verify-all fast mode (BLOCKDREAM_FAST=1 runs pytest -m 'not slow')",
+]
