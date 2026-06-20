@@ -33,6 +33,7 @@ import {
   buildToLiveFrames,
   videoBuildToLiveFrames,
   castImageFrames,
+  joinDashValues,
   frameToWallCommands,
   isParseError,
   isWallFacing,
@@ -313,11 +314,15 @@ async function detectPlayer(rcon: RconPool): Promise<string> {
 // main
 // ---------------------------------------------------------------------------
 
+// The CLI's no-value flags - so joinDashValues (which lets a negative --origin like -50,70,-50 through
+// node's parseArgs) doesn't try to attach a value to them.
+const BOOLEAN_FLAGS = new Set(["mock-wm", "dry-run", "setup"]);
+
 export async function main(argv: string[]): Promise<number> {
   let values: Record<string, string | boolean | undefined>;
   try {
     ({ values } = parseArgs({
-      args: argv,
+      args: joinDashValues(argv, BOOLEAN_FLAGS),
       options: {
         "rcon-host": { type: "string" },
         "rcon-port": { type: "string" },
