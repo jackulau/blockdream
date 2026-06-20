@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildToLiveCommands, buildToLiveFrames, buildBoxSetupCommands, type WallFrame } from "../src/rcon-bridge";
+import { buildToLiveCommands, buildToLiveFrames, videoBuildToLiveFrames, buildBoxSetupCommands, type WallFrame } from "../src/rcon-bridge";
 
 function solidFrame(w: number, h: number, rgb: [number, number, number]): WallFrame {
   const pixels = new Uint8Array(w * h * 3);
@@ -12,6 +12,19 @@ function solidFrame(w: number, h: number, rgb: [number, number, number]): WallFr
 }
 
 const RED: [number, number, number] = [200, 40, 40];
+const BLUE: [number, number, number] = [40, 40, 200];
+
+function halfFrame(w: number, h: number, left: [number, number, number], right: [number, number, number]): WallFrame {
+  const pixels = new Uint8Array(w * h * 3);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const c = x < w / 2 ? left : right;
+    const i = (y * w + x) * 3;
+    pixels[i] = c[0];
+    pixels[i + 1] = c[1];
+    pixels[i + 2] = c[2];
+  }
+  return { width: w, height: h, pixels };
+}
 
 describe("buildToLiveCommands (cast a 3D build live via RCON)", () => {
   it("turns an image into a depth-bounded 3D build, placed at origin", () => {
@@ -70,5 +83,22 @@ describe("buildToLiveFrames (live 3D animation)", () => {
     const f = solidFrame(8, 8, RED);
     const { frameCommands } = buildToLiveFrames(f, { x: 0, y: 0, z: 0 }, { depth: 2, animate: "spin", animateFrames: 12 });
     expect(frameCommands).toHaveLength(12);
+  });
+});
+
+describe("videoBuildToLiveFrames (real-content live 3D animation: a video as per-frame 3D builds)", () => {
+  it("N video frames → N delta command lists; frame 0 matches the static build keyframe", () => {
+    const frames = [solidFrame(8, 8, RED), halfFrame(8, 8, RED, BLUE), solidFrame(8, 8, BLUE)];
+    const origin = { x: 10, y: 64, z: -5 };
+    const { frameCommands, volume } = videoBuildToLiveFrames(frames, origin, { depth: 4 });
+    expect(frameCommands).toHaveLength(3);
+    // frame 0 is the full keyframe of the first frame's build (same as a static --build of it)
+    expect(frameCommands[0]).toEqual(buildToLiveCommands(frames[0]!, origin, { depth: 4 }).commands);
+    expect(volume.sz).toBeLessThanOrEqual(4);
+    expect(frameCommands.every((f) => Array.isArray(f))).toBe(true); // delta-encode didn't throw → frames share dims
+  });
+
+  it("rejects an empty frame list", () => {
+    expect(() => videoBuildToLiveFrames([], { x: 0, y: 0, z: 0 }, { depth: 2 })).toThrow(/no frames/);
   });
 });
