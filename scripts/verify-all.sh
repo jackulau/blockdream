@@ -132,6 +132,20 @@ ok "bash -n cast-live.sh"
 # The fake-RCON-server pool throughput test runs in the JS suite above (rcon-pipeline.test.ts).
 bash scripts/cast-live.sh --dry-run >/dev/null
 ok "cast-live.sh --dry-run (in-world setup + paint, no datapack/reload)"
+bash -n scripts/cast-asset.sh
+ok "bash -n cast-asset.sh"
+# cast your OWN image/build live (no world model): decode → setblock/fill over RCON. Needs ffmpeg to
+# decode the asset; dry-run prints the commands + contacts no server. The --image/--build/--animate
+# command paths are unit-tested above (cast-image-live + cast-build-live); this is the wrapper end-to-end.
+if command -v ffmpeg >/dev/null 2>&1; then
+  CAST_ASSET_TMP="$(mktemp -d)"
+  ffmpeg -v error -f lavfi -i color=c=red:s=8x8 -frames:v 1 "$CAST_ASSET_TMP/a.png"
+  bash scripts/cast-asset.sh --dry-run --build "$CAST_ASSET_TMP/a.png" --size 8x8 --depth 3 --animate spin --animate-frames 3 >/dev/null
+  ok "cast-asset.sh --dry-run --build --animate spin (your own 3D build, live, no datapack)"
+  rm -rf "$CAST_ASSET_TMP"
+else
+  skipped_allowed "cast-asset.sh --dry-run (ffmpeg not present - it decodes the asset)"
+fi
 node --check tools/mineflayer-collector/bridge-e2e.mjs
 ok "node --check bridge-e2e.mjs"
 node --check tools/mineflayer-collector/datapack-e2e.mjs
