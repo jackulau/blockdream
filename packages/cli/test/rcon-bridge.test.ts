@@ -12,35 +12,11 @@ import {
   frameToWallCommands,
   buildSetupCommands,
   actionMessage,
-  joinDashValues,
   BTN,
   N_BUTTONS,
   type RconPose,
   type WallFrame,
 } from "../src/rcon-bridge";
-
-describe("joinDashValues (negative --origin survives node's parseArgs)", () => {
-  const BOOL = new Set(["dry-run", "setup", "mock-wm"]);
-  it("rewrites --flag -dashvalue → --flag=-dashvalue (a negative --origin)", () => {
-    expect(joinDashValues(["--build", "x.png", "--origin", "-50,70,-50", "--setup"], BOOL)).toEqual([
-      "--build",
-      "x.png",
-      "--origin=-50,70,-50",
-      "--setup",
-    ]);
-  });
-  it("leaves positive values, boolean flags, and a following --option alone", () => {
-    expect(joinDashValues(["--size", "16x16", "--dry-run", "--origin", "10,64,10"], BOOL)).toEqual([
-      "--size",
-      "16x16",
-      "--dry-run",
-      "--origin",
-      "10,64,10",
-    ]);
-    expect(joinDashValues(["--setup", "-5"], BOOL)).toEqual(["--setup", "-5"]); // boolean flag gets no value
-    expect(joinDashValues(["--origin", "--size"], BOOL)).toEqual(["--origin", "--size"]); // --opt is not a value
-  });
-});
 import { makeBlockResolver, FALLBACK_BLOCK } from "@blockdream/emit-commands";
 import { getSolidBlockMapPalette } from "@blockdream/palette";
 import { runFunction, expectedWall2D, expectGridsEqual, at, type Grid } from "../../emit-commands/test/sim";

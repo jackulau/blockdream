@@ -150,6 +150,10 @@ if command -v ffmpeg >/dev/null 2>&1; then
   # composition regression net: --animate spin + --facing + a NEGATIVE --origin compose (verified by a 9-combo probe)
   bash scripts/cast-asset.sh --dry-run --build "$CAST_ASSET_TMP/a.png" --size 16x16 --depth 4 --animate spin --facing west --origin -50,70,-50 --setup >/dev/null
   ok "cast-asset.sh --dry-run --build --animate spin + --facing west + negative --origin compose"
+  # the OFFLINE render CLI (the primary build path) must ALSO accept a negative --origin (same parseArgs bug class)
+  ffmpeg -v error -f lavfi -i "testsrc=s=16x16" -frames:v 1 "$CAST_ASSET_TMP/t.png"
+  npx tsx packages/cli/src/index.ts render "$CAST_ASSET_TMP/t.png" --target voxel3d --grid 16x16 --origin -50,70,-50 --out "$CAST_ASSET_TMP/dp" >/dev/null
+  ok "render CLI --target voxel3d at a NEGATIVE --origin (-50,70,-50) builds a datapack (offline coords)"
   rm -rf "$CAST_ASSET_TMP"
 else
   skipped_allowed "cast-asset.sh --dry-run (ffmpeg not present - it decodes the asset)"

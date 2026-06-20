@@ -24,6 +24,7 @@ import { parseArgs } from "node:util";
 import WebSocket from "ws";
 import { readFileSync } from "node:fs";
 import { BAKEABLE_ANIMS, type BakeableAnimName } from "@blockdream/voxel";
+import { joinDashValues } from "./argv";
 import { runFfmpeg, ffmpegMissingMessage } from "@blockdream/video";
 import type { RgbImage } from "@blockdream/color-core";
 import {
@@ -33,7 +34,6 @@ import {
   buildToLiveFrames,
   videoBuildToLiveFrames,
   castImageFrames,
-  joinDashValues,
   frameToWallCommands,
   isParseError,
   isWallFacing,

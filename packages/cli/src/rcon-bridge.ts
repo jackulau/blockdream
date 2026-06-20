@@ -533,28 +533,6 @@ export function videoBuildToLiveFrames(
   return { frameCommands, volume: volumes[0]! };
 }
 
-/**
- * Rewrite `--flag -val` → `--flag=-val` for value-taking flags so a value that starts with `-` is not
- * mis-read as another option. node's `parseArgs` otherwise throws "Option '--origin' argument is
- * ambiguous" on a negative `--origin` like `-50,70,-50` (common Minecraft coords). `booleanFlags` (the
- * caller's no-value flags) are left untouched. Pure - the CLI runs it on argv before parsing.
- */
-export function joinDashValues(args: string[], booleanFlags: ReadonlySet<string>): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    const m = /^--([a-z][a-z-]*)$/.exec(a);
-    const next = args[i + 1];
-    if (m && !booleanFlags.has(m[1]!) && next !== undefined && next.startsWith("-") && !next.startsWith("--")) {
-      out.push(`${a}=${next}`);
-      i++;
-    } else {
-      out.push(a);
-    }
-  }
-  return out;
-}
-
 /** `/fill … air` commands that clear a build's W×H×D box at `origin` (split at the 32768 cap) -
  *  the 3D analogue of {@link buildSetupCommands}, run once before casting a build live. */
 export function buildBoxSetupCommands(

@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { joinDashValues } from "./argv";
 import { render, BAKEABLE_ANIMS, isFacing, type RenderOptions, type RenderTarget, type Edition, type Facing } from "./render";
 import { previewPng } from "./preview";
 import type { DitherMethod } from "@blockdream/color-core";
@@ -59,7 +60,8 @@ const DITHERS = new Set<DitherMethod>(["floyd-steinberg", "bayer", "none"]);
 
 export function runCli(argv: string[]): number {
   const { values, positionals } = parseArgs({
-    args: argv,
+    // let a negative --origin (e.g. -50,70,-50) through node's parseArgs (it else errors "ambiguous")
+    args: joinDashValues(argv, new Set(["flat", "help"])),
     allowPositionals: true,
     options: {
       target: { type: "string" },
