@@ -406,7 +406,10 @@ export async function main(argv: string[]): Promise<number> {
   const sizeW = parseInt(sm[1]!, 10);
   const sizeH = parseInt(sm[2]!, 10);
   if (sizeW < 1 || sizeH < 1) return fail(`--size must be ≥ 1x1`);
-  if (mockWm && sizeW !== sizeH) return fail(`--mock-wm frames are square - use --size NxN`);
+  // The square requirement is the WM/mock pump's (the model emits square frames). --image/--build decode
+  // arbitrary-aspect images, so they are exempt - and since mockWm includes --dry-run, without this guard
+  // a non-square --image/--build dry-run was falsely rejected.
+  if (mockWm && !imagePath && !buildPath && sizeW !== sizeH) return fail(`--mock-wm frames are square - use --size NxN`);
 
   log(
     `wall ${sizeW}×${sizeH} at (${origin.x},${origin.y},${origin.z}) skill=${skill} fps≤${fps} budget=${maxCommands} cmds/frame` +
