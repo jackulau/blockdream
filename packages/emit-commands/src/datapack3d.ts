@@ -88,16 +88,32 @@ export function voxelToLiveCommands(
   resolveBlock: (id: number) => string | undefined,
   opts: VoxelLiveOptions = {},
 ): string[] {
+  return voxelFramesToLiveCommands([volume], origin, resolveBlock, opts)[0] ?? [];
+}
+
+/**
+ * The per-frame LIVE counterpart of {@link generateVoxelDatapack}: delta-encode a sequence of equal-
+ * sized volumes ({@link computeVoxelDeltas} - frame 0 is the full keyframe, later frames only the
+ * changed voxels incl. solid→air) and emit each frame's `setblock`/`fill` commands at `origin`. Frame
+ * f's list is byte-identical to the datapack's `frames/f` function body (same cells, offset, and
+ * `greedyBoxes` merge), so streaming these over RCON in order IS the 3D animation the datapack bakes.
+ * One list per input volume; a single volume yields one keyframe list (== {@link voxelToLiveCommands}).
+ */
+export function voxelFramesToLiveCommands(
+  volumes: VoxelVolume[],
+  origin: { x: number; y: number; z: number },
+  resolveBlock: (id: number) => string | undefined,
+  opts: VoxelLiveOptions = {},
+): string[][] {
   const fallback = opts.fallbackBlock ?? "minecraft:air";
   const air = "minecraft:air";
   const resolve = (id: number) => blockOf(id, resolveBlock, fallback, air);
-  const cells = computeVoxelDeltas([volume])[0]!.cells.map((c) => ({
-    x: origin.x + c.x,
-    y: origin.y + c.y,
-    z: origin.z + c.z,
-    mapColorId: c.mapColorId,
-  }));
-  return greedyBoxes(cells, resolve);
+  return computeVoxelDeltas(volumes).map((d) =>
+    greedyBoxes(
+      d.cells.map((c) => ({ x: origin.x + c.x, y: origin.y + c.y, z: origin.z + c.z, mapColorId: c.mapColorId })),
+      resolve,
+    ),
+  );
 }
 
 /** Generate a vanilla Java datapack that builds (and animates) a 3D voxel volume. */

@@ -105,7 +105,17 @@ equals baking + loading). `--setup` here clears the build's full W×H×D box, no
 # a 3D build from an image, 12 voxels deep, placed and facing east, clearing the box first
 npx tsx packages/cli/src/rcon-bridge-cli.ts --rcon-pass <pass> \
   --build photo.png --size 64x64 --depth 12 --origin 100,70,-20 --facing east --setup
+
+# a SPINNING 3D build, live - a delta-encoded animation looped endlessly at 4 fps
+npx tsx packages/cli/src/rcon-bridge-cli.ts --rcon-pass <pass> \
+  --build logo.png --size 48x48 --depth 8 --origin 100,70,-20 --setup \
+  --animate spin --animate-frames 24 --fps 4 --loops 0
 ```
+
+`--animate <spin|explode|wave|buildup|...>` makes the live 3D build **move**: it bakes the build into a
+volume sequence (`generateBaked`) and streams it delta-encoded over RCON (each frame byte-identical to
+the 3D datapack's per-frame functions), repeating `--loops` times at `--fps`. `--setup` is folded into
+each loop's first frame so a looping animation wraps cleanly.
 
 This completes the build-delivery matrix: a build reaches Minecraft offline (datapack / `.mcstructure`,
 2D and 3D) and live (a 2D wall via `--image`, a 3D build via `--build`) - all honoring coordinates,
