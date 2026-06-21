@@ -21,27 +21,60 @@ export interface PreparedPalette {
   entries: PreparedColor[];
   version: string;
   edition: string;
+  /**
+   * Entries sorted ascending by OKLab L, as flat interleaved coords (L,a,b) plus the original
+   * `entries` index of each. Lets nearestBy* binary-search to the query's L and walk outward,
+   * pruning a side once its (dL*dL) exceeds the running best — exact because L is monotone here.
+   */
+  sortedLab: Float64Array;
+  sortedOrigIdx: Int32Array;
 }
 
 export function preparePalette(p: MapPalette): PreparedPalette {
-  return {
-    version: p.version,
-    edition: p.edition,
-    entries: p.colors.map((color) => {
-      const lab = srgbToOklab(color.r, color.g, color.b);
-      return {
-        color,
-        lab,
-        lin: [
-          srgbChannelToLinear(color.r),
-          srgbChannelToLinear(color.g),
-          srgbChannelToLinear(color.b),
-        ],
-        chroma: Math.hypot(lab.a, lab.b),
-        hue: Math.atan2(lab.b, lab.a),
-      };
-    }),
-  };
+  const entries: PreparedColor[] = p.colors.map((color) => {
+    const lab = srgbToOklab(color.r, color.g, color.b);
+    return {
+      color,
+      lab,
+      lin: [
+        srgbChannelToLinear(color.r),
+        srgbChannelToLinear(color.g),
+        srgbChannelToLinear(color.b),
+      ],
+      chroma: Math.hypot(lab.a, lab.b),
+      hue: Math.atan2(lab.b, lab.a),
+    };
+  });
+
+  // Build the L-sorted acceleration structure. Sort by L; on ties keep the lower original index so
+  // the walk visits equal-L entries in original order (the matchers also tie-break by lowest index,
+  // so the chosen index is identical to a plain index-order brute force).
+  const order = entries.map((_, i) => i).sort((a, b) => entries[a]!.lab.L - entries[b]!.lab.L || a - b);
+  const sortedLab = new Float64Array(entries.length * 3);
+  const sortedOrigIdx = new Int32Array(entries.length);
+  for (let p2 = 0; p2 < order.length; p2++) {
+    const k = order[p2]!;
+    const lab = entries[k]!.lab;
+    sortedLab[p2 * 3] = lab.L;
+    sortedLab[p2 * 3 + 1] = lab.a;
+    sortedLab[p2 * 3 + 2] = lab.b;
+    sortedOrigIdx[p2] = k;
+  }
+
+  return { version: p.version, edition: p.edition, entries, sortedLab, sortedOrigIdx };
+}
+
+/** Insertion point for `L` in the L-sorted entries: lowest index p with sortedLab[3p] >= L. */
+function lowerBoundL(pal: PreparedPalette, L: number): number {
+  const lab = pal.sortedLab;
+  let lo = 0;
+  let hi = pal.sortedOrigIdx.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (lab[mid * 3]! < L) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 /** Shortest angular distance between two hues (radians, 0..π). */
@@ -51,28 +84,48 @@ export function hueDistance(h1: number, h2: number): number {
   return d;
 }
 
-function labDist2(a: Lab, b: Lab): number {
-  const dL = a.L - b.L;
-  const da = a.a - b.a;
-  const db = a.b - b.b;
-  return dL * dL + da * da + db * db;
-}
-
 export interface Match {
   index: number;
   color: MapColor;
   dist2: number;
 }
 
-/** Nearest palette color to an OKLab query (brute force over the palette). */
+/**
+ * Nearest palette color to an OKLab query. Exact, but accelerated by the L-sorted band prune:
+ * binary-search to the query's L, walk both ways, stop a side once (dL*dL) >= best (any further
+ * entry on that side is at least that far in L alone). Byte-identical to a plain index-order brute
+ * force — the prune never skips a closer-or-equal entry, and ties resolve to the lowest original
+ * index (so the result matches scanning entries[0..n) and keeping the first minimum).
+ */
 export function nearestByLab(query: Lab, pal: PreparedPalette): Match {
+  const lab = pal.sortedLab;
+  const oi = pal.sortedOrigIdx;
+  const n = oi.length;
+  const start = lowerBoundL(pal, query.L);
   let bestIdx = 0;
   let best = Infinity;
-  for (let i = 0; i < pal.entries.length; i++) {
-    const d = labDist2(query, pal.entries[i]!.lab);
-    if (d < best) {
+  for (let p = start; p < n; p++) {
+    const dL = lab[p * 3]! - query.L;
+    if (dL * dL >= best) break;
+    const da = lab[p * 3 + 1]! - query.a;
+    const db = lab[p * 3 + 2]! - query.b;
+    const d = dL * dL + da * da + db * db;
+    const k = oi[p]!;
+    if (d < best || (d === best && k < bestIdx)) {
       best = d;
-      bestIdx = i;
+      bestIdx = k;
+    }
+  }
+  for (let p = start - 1; p >= 0; p--) {
+    const dL = query.L - lab[p * 3]!;
+    if (dL * dL >= best) break;
+    const da = lab[p * 3 + 1]! - query.a;
+    const db = lab[p * 3 + 2]! - query.b;
+    const d = dL * dL + da * da + db * db;
+    const k = oi[p]!;
+    if (d < best || (d === best && k < bestIdx)) {
+      best = d;
+      bestIdx = k;
     }
   }
   return { index: bestIdx, color: pal.entries[bestIdx]!.color, dist2: best };
@@ -93,20 +146,43 @@ export function nearestSrgb(r: number, g: number, b: number, pal: PreparedPalett
 export function nearestByLabHue(query: Lab, pal: PreparedPalette, lambda = 0.6): Match {
   const cT = Math.hypot(query.a, query.b);
   const hT = Math.atan2(query.b, query.a);
+  const lab = pal.sortedLab;
+  const oi = pal.sortedOrigIdx;
+  const n = oi.length;
+  const start = lowerBoundL(pal, query.L);
   let bestIdx = 0;
   let bestPenalty = Infinity;
   let bestDist2 = Infinity;
-  for (let i = 0; i < pal.entries.length; i++) {
-    const e = pal.entries[i]!;
-    const dL = query.L - e.lab.L;
-    const da = query.a - e.lab.a;
-    const db = query.b - e.lab.b;
+  // The L-band prune is exact here too: penalty = dist2 + (>=0) >= dist2 >= dL*dL, so once
+  // dL*dL >= bestPenalty no further same-side entry can lower the penalty. Tie-break to the lowest
+  // original index, matching a plain index-order brute force.
+  for (let p = start; p < n; p++) {
+    const dL = lab[p * 3]! - query.L;
+    if (dL * dL >= bestPenalty) break;
+    const da = lab[p * 3 + 1]! - query.a;
+    const db = lab[p * 3 + 2]! - query.b;
     const dist2 = dL * dL + da * da + db * db;
-    const hd = hueDistance(hT, e.hue);
+    const k = oi[p]!;
+    const hd = hueDistance(hT, pal.entries[k]!.hue);
     const penalty = dist2 + lambda * cT * hd * hd;
-    if (penalty < bestPenalty) {
+    if (penalty < bestPenalty || (penalty === bestPenalty && k < bestIdx)) {
       bestPenalty = penalty;
-      bestIdx = i;
+      bestIdx = k;
+      bestDist2 = dist2;
+    }
+  }
+  for (let p = start - 1; p >= 0; p--) {
+    const dL = query.L - lab[p * 3]!;
+    if (dL * dL >= bestPenalty) break;
+    const da = lab[p * 3 + 1]! - query.a;
+    const db = lab[p * 3 + 2]! - query.b;
+    const dist2 = dL * dL + da * da + db * db;
+    const k = oi[p]!;
+    const hd = hueDistance(hT, pal.entries[k]!.hue);
+    const penalty = dist2 + lambda * cT * hd * hd;
+    if (penalty < bestPenalty || (penalty === bestPenalty && k < bestIdx)) {
+      bestPenalty = penalty;
+      bestIdx = k;
       bestDist2 = dist2;
     }
   }
