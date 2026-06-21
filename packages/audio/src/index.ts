@@ -95,6 +95,14 @@ export function detectPitchHz(
   sampleRate: number,
   minHz: number,
   maxHz: number,
+  /**
+   * RMS amplitude below which the window is unvoiced - return immediately with `hz: 0`
+   * BEFORE the O(n·maxLag) autocorrelation. Callers that gate on RMS anyway (see
+   * {@link analyzeAudio}) pass their gate here so silent/quiet windows cost only the O(n)
+   * energy pass, not the full pitch search. Default 0 = never short-circuit (the returned
+   * `rms` is identical either way, so this is purely a speedup, never a behaviour change).
+   */
+  rmsGate = 0,
 ): PitchResult {
   const n = window.length;
   if (n < 4) return { hz: 0, clarity: 0, rms: 0 };
@@ -104,6 +112,9 @@ export function detectPitchHz(
   for (let i = 0; i < n; i++) sq[i + 1] = sq[i]! + window[i]! * window[i]!;
   const totalEnergy = sq[n]!;
   const rms = Math.sqrt(totalEnergy / n);
+  // Bail before the O(n·maxLag) autocorrelation for windows the caller will gate out anyway
+  // (the returned rms is the same value the caller compares, so the result is unchanged).
+  if (rms < rmsGate) return { hz: 0, clarity: 0, rms };
   if (rms < 1e-7) return { hz: 0, clarity: 0, rms };
 
   const minLag = Math.max(2, Math.floor(sampleRate / maxHz));
@@ -205,7 +216,8 @@ export function analyzeAudio(
   let lastNote = -1;
   for (let start = 0; start + winLen <= pcm.length; start += hop) {
     const win = pcm.subarray(start, start + winLen);
-    const { hz, clarity, rms } = detectPitchHz(win, sampleRate, minHz, maxHz);
+    // pass rmsGate so quiet windows (gated out just below) skip the autocorrelation entirely
+    const { hz, clarity, rms } = detectPitchHz(win, sampleRate, minHz, maxHz, rmsGate);
     if (rms < rmsGate || clarity < minClarity || hz <= 0) {
       lastNote = -1; // a gap re-arms the next identical pitch as a fresh onset
       continue;

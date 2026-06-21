@@ -67,6 +67,21 @@ describe("detectPitchHz", () => {
     expect(rms).toBeLessThan(1e-6);
     expect(clarity).toBe(0);
   });
+
+  it("rmsGate short-circuits a sub-gate window to hz:0 without changing the reported rms", () => {
+    const win = sine(440, 60, SR, 0.1); // quiet but clearly voiced; rms ≈ 0.07
+    const open = detectPitchHz(win, SR, 110, 1200); // no gate → full pitch search
+    const gated = detectPitchHz(win, SR, 110, 1200, 0.2); // gate above this window's rms → bail early
+    expect(open.hz).toBeGreaterThan(435);
+    expect(open.hz).toBeLessThan(445);
+    expect(gated.hz).toBe(0);
+    expect(gated.clarity).toBe(0);
+    expect(gated.rms).toBe(open.rms); // identical rms → caller gates identically (output unchanged)
+    // a gate below the window's rms must NOT short-circuit — full result, identical to ungated
+    const below = detectPitchHz(win, SR, 110, 1200, 0.01);
+    expect(below.hz).toBe(open.hz);
+    expect(below.clarity).toBe(open.clarity);
+  });
 });
 
 describe("analyzeAudio", () => {
@@ -101,6 +116,15 @@ describe("analyzeAudio", () => {
 
   it("emits nothing for silence", () => {
     expect(analyzeAudio(silence(500), SR)).toEqual([]);
+  });
+
+  it("drops a tone whose RMS is below the gate (skip boundary == discard boundary)", () => {
+    // the loud tone sets peak → gate = 0.04·peak; the ~40× quieter tone falls below it and is
+    // gated out — exactly as before the autocorrelation skip (the skip never changes which fire)
+    const loud = sine(440, 250, SR, 0.8);
+    const quiet = sine(660, 250, SR, 0.02);
+    const events = analyzeAudio(concat(loud, silence(80), quiet), SR);
+    expect(events.map((e) => e.note)).toEqual([15]); // only A4; the quiet tone never onsets
   });
 
   it("emits nothing for an empty or zero-rate signal", () => {
