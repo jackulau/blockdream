@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { mkdtempSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -100,5 +100,23 @@ d("CLI flag plumbing", () => {
   it("rejects an unknown --music mode", () => {
     const code = runCli(["render", avClip, "--target", "voxel3d", "--music", "loud", "--out", join(dir, "bad2")]);
     expect(code).toBe(2);
+  });
+
+  it("rejects an EMPTY --instrument (else it emits a broken block.note_block. / instrument= datapack)", () => {
+    const code = runCli(["render", avClip, "--target", "voxel3d", "--instrument", "", "--out", join(dir, "empty-instr")]);
+    expect(code).toBe(2);
+  });
+
+  it("warns that --music is ignored on a non-voxel3d target (no silent no-op)", () => {
+    const errs: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation(((s: string | Uint8Array) => {
+      errs.push(String(s));
+      return true;
+    }) as typeof process.stderr.write);
+    const out = vi.spyOn(process.stdout, "write").mockImplementation((() => true) as typeof process.stdout.write);
+    runCli(["render", avClip, "--target", "datapack", "--grid", "16x16", "--max-frames", "2", "--music", "on", "--out", join(dir, "wrong-target")]);
+    spy.mockRestore();
+    out.mockRestore();
+    expect(errs.join("")).toContain("apply only to --target voxel3d");
   });
 });

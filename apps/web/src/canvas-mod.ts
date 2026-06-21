@@ -114,21 +114,35 @@ export interface DatapackPlacement {
 }
 
 /**
+ * Half-extents (in blocks) of the on-screen objects. The viewer renders each object CENTERED on its
+ * group position, but the datapack origin is the object's min-XZ CORNER — so the export must shift the
+ * dragged center by the half-extent to land the build/music where the user actually sees it (WYSIWYG).
+ */
+export interface PlacementExtents {
+  buildHalf?: GroundVec; // (sx/2, sz/2) — the build box's half-extent
+  musicHalf?: GroundVec; // ((distinctNotes-1)/2, 0) — half the centered note-block row's width
+}
+
+/**
  * Turn the on-screen arrangement + analyzed notes into datapack placement opts: the build origin =
- * the animation's dragged position, and — ONLY when notes exist AND the note-block toggle is on — the
- * note timeline placed at the music area's dragged position. Toggle off or no notes ⇒ no music fields
- * at all, so the export is byte-identical to a music-less build (the additive contract from D3).
+ * the animation's dragged CENTER shifted to its corner, and — ONLY when notes exist AND the note-block
+ * toggle is on — the note timeline placed at the music area's dragged center (also corner-shifted).
+ * Toggle off or no notes ⇒ no music fields at all, so the export is byte-identical to a music-less
+ * build (the additive contract from D3).
  */
 export function planDatapackPlacement(
   notes: ReadonlyArray<NoteEvent>,
   state: ArrangeState,
   base: Vec3,
+  extents: PlacementExtents = {},
 ): DatapackPlacement {
-  const origin = groundToWorldOrigin(state.positions.build, base);
+  const bh = extents.buildHalf ?? { x: 0, z: 0 };
+  const origin = groundToWorldOrigin({ x: state.positions.build.x - bh.x, z: state.positions.build.z - bh.z }, base);
   if (notes.length === 0 || !state.showMusic) return { origin };
+  const mh = extents.musicHalf ?? { x: 0, z: 0 };
   return {
     origin,
     music: notes.slice(),
-    musicOrigin: groundToWorldOrigin(state.positions.music, base),
+    musicOrigin: groundToWorldOrigin({ x: state.positions.music.x - mh.x, z: state.positions.music.z - mh.z }, base),
   };
 }

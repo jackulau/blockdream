@@ -18,7 +18,7 @@ import {
   type QuantizedFrame,
   type PreparedPalette,
 } from "@blockdream/color-core";
-import { extractFrames, extractAudioPcm, hasAudioTrack } from "@blockdream/video";
+import { extractFrames, extractAudioPcm } from "@blockdream/video";
 import { analyzeAudio, type NoteEvent } from "@blockdream/audio";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
@@ -81,11 +81,14 @@ export type MusicMode = "auto" | "on" | "off";
 function analyzeMusicForInput(opts: RenderOptions): NoteEvent[] | undefined {
   const mode: MusicMode = opts.music ?? "auto";
   if (mode === "off") return undefined;
-  const want = mode === "on" || (mode === "auto" && hasAudioTrack(opts.input));
-  if (!want) return undefined;
+  // extractAudioPcm returns empty PCM when the input has no audio track, so a single extract serves
+  // BOTH `auto` (include iff audio present) and `on` (force; an audio-less input simply yields none) —
+  // no separate hasAudioTrack probe needed (avoids a redundant ffmpeg shell-out).
   const { pcm, sampleRate } = extractAudioPcm(opts.input);
   if (pcm.length === 0) return undefined;
-  const events = analyzeAudio(pcm, sampleRate, { instrument: opts.musicInstrument ?? "harp" });
+  // `|| "harp"` (not `??`) so an empty-string instrument also falls back, never emitting a broken
+  // `block.note_block.` / `instrument=` into the datapack.
+  const events = analyzeAudio(pcm, sampleRate, { instrument: opts.musicInstrument || "harp" });
   return events.length ? events : undefined;
 }
 

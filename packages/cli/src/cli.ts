@@ -182,8 +182,10 @@ export function runCli(argv: string[]): number {
   }
 
   const instrument = values.instrument;
-  if (instrument && !(NOTE_BLOCK_INSTRUMENTS as ReadonlyArray<string>).includes(instrument)) {
-    process.stderr.write(`unknown --instrument ${instrument} (valid: ${NOTE_BLOCK_INSTRUMENTS.join(" ")})\n`);
+  // `!== undefined` (not a truthiness check) so an empty `--instrument=` is rejected too — otherwise
+  // it would slip past and emit a broken `block.note_block.` / `instrument=` into the datapack.
+  if (instrument !== undefined && !(NOTE_BLOCK_INSTRUMENTS as ReadonlyArray<string>).includes(instrument)) {
+    process.stderr.write(`unknown --instrument "${instrument}" (valid: ${NOTE_BLOCK_INSTRUMENTS.join(" ")})\n`);
     return 2;
   }
 
@@ -195,6 +197,12 @@ export function runCli(argv: string[]): number {
       return 2;
     }
     musicOrigin = { x: parseInt(m[1]!, 10), y: parseInt(m[2]!, 10), z: parseInt(m[3]!, 10) };
+  }
+
+  // Note-block music only attaches to the voxel3d datapack (where generateVoxelDatapack's music lives).
+  // Warn rather than silently no-op so the music flags can't mislead on another target.
+  if ((values.music || values.instrument || values["music-origin"]) && target !== "voxel3d") {
+    process.stderr.write(`note: --music/--instrument/--music-origin apply only to --target voxel3d (ignored for ${target})\n`);
   }
 
   const opts: RenderOptions = {

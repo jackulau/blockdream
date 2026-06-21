@@ -92,6 +92,9 @@ export class Viewer3D {
     cfg.canvas.addEventListener("pointerdown", this.onPointerDown);
     cfg.canvas.addEventListener("pointermove", this.onPointerDrag);
     window.addEventListener("pointerup", this.onPointerUp);
+    // a touch interaction can end with pointercancel (palm rejection / system gesture) and no
+    // pointerup — without this, a drag could leave OrbitControls stuck disabled.
+    window.addEventListener("pointercancel", this.onPointerUp);
     this.loop(0);
   }
 
@@ -402,6 +405,7 @@ export class Viewer3D {
     this.cfg.canvas.removeEventListener("pointerdown", this.onPointerDown);
     this.cfg.canvas.removeEventListener("pointermove", this.onPointerDrag);
     window.removeEventListener("pointerup", this.onPointerUp);
+    window.removeEventListener("pointercancel", this.onPointerUp);
     this.clearMusicGroup();
     this.disposeGroups();
     for (const m of this.matCache.values()) m.dispose();

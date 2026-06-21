@@ -526,7 +526,14 @@ async function setup3dViewer(): Promise<void> {
   // AND the note-block toggle is on — the note-block music area + sequencer at ITS dragged origin.
   $<HTMLButtonElement>("v3-download").addEventListener("click", () => {
     if (!current3d.length) return;
-    const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 });
+    // the viewer centers the build + the note-block row on their group positions; pass each object's
+    // half-extent so the export lands them centered where they sit on screen (not corner-offset).
+    const v0 = current3d[0];
+    const distinctNotes = new Set(current3dMusic.map((n) => n.note)).size;
+    const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 }, {
+      buildHalf: v0 ? { x: v0.sx / 2, z: v0.sz / 2 } : undefined,
+      musicHalf: { x: (distinctNotes - 1) / 2, z: 0 },
+    });
     const pack = generateVoxelDatapack(current3d, resolveBlock, {
       namespace: "blockdream_3d",
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
