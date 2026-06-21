@@ -8,6 +8,15 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EMPTY, getVoxel, poseAt, type VoxelVolume } from "@blockdream/voxel";
 import { meshByMaterial, type FaceDir } from "./mesh3d";
 import { buildSchedule, uniformSchedule, frameAtElapsed, startOfFrame, type FrameSchedule } from "./anim";
+import { rayGroundHit, dragTo, type SceneObjectId, type GroundVec, type DragSession } from "./canvas-mod";
+
+/** A snapshot of the arrange state emitted to the host UI after a drag (positions in ground XZ). */
+export interface ArrangeSnapshot {
+  selected: SceneObjectId;
+  build: GroundVec;
+  music: GroundVec;
+  showMusic: boolean;
+}
 
 export interface Viewer3DConfig {
   canvas: HTMLCanvasElement;
@@ -48,13 +57,24 @@ export class Viewer3D {
   private playStart = 0;
   private readonly fps: number;
   private raf = 0;
+  // canvas mod: the build sits under an arrange anchor (drag offset) so the live animation pose on
+  // `root` and the drag translation never fight; the music area is its own draggable group.
+  private readonly buildAnchor = new THREE.Group();
+  private readonly musicGroup = new THREE.Group();
+  private arrangeMode = false;
+  private selected: SceneObjectId = "build";
+  private drag: DragSession | null = null;
+  private showMusicFlag = true;
+  private onArrangeChange?: (s: ArrangeSnapshot) => void;
 
   constructor(private cfg: Viewer3DConfig) {
     this.fps = cfg.fps ?? 8;
     this.renderer = new THREE.WebGLRenderer({ canvas: cfg.canvas, antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
     this.scene.background = null;
-    this.scene.add(this.root);
+    this.buildAnchor.add(this.root); // root carries the animation pose; the anchor carries the drag offset
+    this.scene.add(this.buildAnchor);
+    this.scene.add(this.musicGroup);
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.75));
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
     dir.position.set(1, 2, 1.5);
@@ -68,6 +88,10 @@ export class Viewer3D {
       cfg.canvas.addEventListener("mousemove", this.onMouseMove);
       cfg.canvas.addEventListener("mouseleave", this.onMouseLeave);
     }
+    // arrange-mode drag (gated by this.arrangeMode inside the handlers, so they're inert otherwise)
+    cfg.canvas.addEventListener("pointerdown", this.onPointerDown);
+    cfg.canvas.addEventListener("pointermove", this.onPointerDrag);
+    window.addEventListener("pointerup", this.onPointerUp);
     this.loop(0);
   }
 
@@ -240,6 +264,112 @@ export class Viewer3D {
     return this.frames.length;
   }
 
+  // --- canvas mod: drag the build (animation) + the note-block "music area" on the ground plane ---
+
+  /** (Re)build the visible note-block "music area": one small coloured cube per distinct pitch. */
+  setMusicArea(notes: ReadonlyArray<{ note: number }>): void {
+    this.clearMusicGroup();
+    const distinct = [...new Set(notes.map((n) => n.note))].sort((a, b) => a - b);
+    const geo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+    distinct.forEach((note, i) => {
+      const hue = (Math.max(0, Math.min(24, note)) / 24) * 0.8; // pitch → hue (low=red, high=violet)
+      const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: new THREE.Color().setHSL(hue, 0.65, 0.55) }));
+      mesh.position.set(i - (distinct.length - 1) / 2, 0, 0); // a centered row of note blocks
+      this.musicGroup.add(mesh);
+    });
+    this.musicGroup.visible = this.showMusicFlag && distinct.length > 0;
+  }
+
+  /** Show/hide (include/exclude) the note-block music area. */
+  setShowMusic(on: boolean): void {
+    this.showMusicFlag = on;
+    this.musicGroup.visible = on && this.musicGroup.children.length > 0;
+  }
+  get showsMusic(): boolean {
+    return this.showMusicFlag;
+  }
+
+  /** Toggle "Arrange" mode. While on, an object drag suspends OrbitControls; release restores it. */
+  setArrangeEnabled(on: boolean): void {
+    this.arrangeMode = on;
+    if (!on) this.endDrag();
+  }
+  get isArranging(): boolean {
+    return this.arrangeMode;
+  }
+
+  /** Which object a drag moves ("build" = the animation, "music" = the note blocks). */
+  selectObject(id: SceneObjectId): void {
+    this.selected = id;
+  }
+
+  /** Set an object's ground position (XZ). build → the arrange anchor (kept ⊥ the animation pose). */
+  setObjectPosition(id: SceneObjectId, x: number, z: number): void {
+    const g = id === "build" ? this.buildAnchor : this.musicGroup;
+    g.position.x = x;
+    g.position.z = z;
+  }
+
+  /** Subscribe to arrange changes (fired while dragging) — the host UI mirrors positions into export. */
+  onArrange(cb: (s: ArrangeSnapshot) => void): void {
+    this.onArrangeChange = cb;
+  }
+
+  private clearMusicGroup(): void {
+    this.musicGroup.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.geometry.dispose();
+        const mat = m.material as THREE.Material | THREE.Material[];
+        (Array.isArray(mat) ? mat : [mat]).forEach((x) => x.dispose());
+      }
+    });
+    this.musicGroup.clear();
+  }
+
+  /** The ground-plane (y=0) point under a pointer event, via the same raycaster as picking. */
+  private groundHit(ev: PointerEvent): GroundVec | null {
+    const r = this.cfg.canvas.getBoundingClientRect();
+    this.pointer.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const o = this.raycaster.ray.origin;
+    const d = this.raycaster.ray.direction;
+    return rayGroundHit({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z }, 0);
+  }
+
+  private onPointerDown = (ev: PointerEvent): void => {
+    if (!this.arrangeMode) return;
+    const hit = this.groundHit(ev);
+    if (!hit) return;
+    const g = this.selected === "build" ? this.buildAnchor : this.musicGroup;
+    this.drag = { id: this.selected, grab: hit, origin: { x: g.position.x, z: g.position.z } };
+    this.controls.enabled = false; // suspend orbit while dragging the object
+  };
+  private onPointerDrag = (ev: PointerEvent): void => {
+    if (!this.drag) return;
+    const hit = this.groundHit(ev);
+    if (!hit) return;
+    const to = dragTo(this.drag, hit);
+    this.setObjectPosition(this.drag.id, to.x, to.z);
+    this.emitArrange();
+  };
+  private onPointerUp = (): void => {
+    this.endDrag();
+  };
+  private endDrag(): void {
+    if (!this.drag) return;
+    this.drag = null;
+    this.controls.enabled = true; // restore orbit
+  }
+  private emitArrange(): void {
+    this.onArrangeChange?.({
+      selected: this.selected,
+      build: { x: this.buildAnchor.position.x, z: this.buildAnchor.position.z },
+      music: { x: this.musicGroup.position.x, z: this.musicGroup.position.z },
+      showMusic: this.showMusicFlag,
+    });
+  }
+
   private loop = (t: number): void => {
     this.raf = requestAnimationFrame(this.loop);
     // apply the live transform animation as an ABSOLUTE pose (refresh-rate independent - no accumulator)
@@ -269,6 +399,10 @@ export class Viewer3D {
     window.removeEventListener("resize", this.resize);
     this.cfg.canvas.removeEventListener("mousemove", this.onMouseMove);
     this.cfg.canvas.removeEventListener("mouseleave", this.onMouseLeave);
+    this.cfg.canvas.removeEventListener("pointerdown", this.onPointerDown);
+    this.cfg.canvas.removeEventListener("pointermove", this.onPointerDrag);
+    window.removeEventListener("pointerup", this.onPointerUp);
+    this.clearMusicGroup();
     this.disposeGroups();
     for (const m of this.matCache.values()) m.dispose();
     for (const t of this.texCache.values()) t.dispose();

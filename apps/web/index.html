@@ -245,6 +245,20 @@
             <button id="v3-rebuild" class="ui">build 3D from image</button>
             <button id="v3-download" class="ui" disabled>Download 3D datapack</button>
           </div>
+          <div class="row" id="v3-arrange-row">
+            <label style="font-size:.78rem;color:var(--dim);cursor:pointer" title="Drag the build or the note-block music area on the ground; orbit is suspended mid-drag">
+              <input id="v3-arrange" type="checkbox" /> Arrange (drag on canvas)
+            </label>
+            <label style="font-size:.78rem;color:var(--dim)">move
+              <select id="v3-arrange-target">
+                <option value="build" selected>animation</option>
+                <option value="music">music area</option>
+              </select>
+            </label>
+            <label style="font-size:.78rem;color:var(--dim);cursor:pointer" title="Include the note blocks that play the imported video's audio">
+              <input id="v3-music-toggle" type="checkbox" checked disabled /> Note blocks
+            </label>
+          </div>
           <div class="row">
             <label class="ui" style="cursor:pointer">import .gltf / .glb / .obj / .gif / video → blocks
               <input id="v3-import" type="file" multiple accept=".gltf,.glb,.obj,.gif,.mp4,.webm,.mov,.m4v,image/gif,video/*,model/gltf+json,model/gltf-binary" style="display:none" />

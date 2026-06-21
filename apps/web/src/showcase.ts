@@ -25,6 +25,7 @@ import { rgbFramesToAnimated3d } from "./video3d";
 import { isVideoFile, decodeVideo } from "./video";
 import { analyzeFileAudio } from "./audio";
 import type { NoteEvent } from "@blockdream/audio";
+import { initialArrangeState, arrangeReducer, groundToWorldOrigin } from "./canvas-mod";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
@@ -347,6 +348,29 @@ async function setup3dViewer(): Promise<void> {
   let current3d: VoxelVolume[] = [];
   let current3dMusic: NoteEvent[] = []; // note-block music transcribed from an imported video's audio
   let baseVolume: VoxelVolume | null = null; // the single built solid (source for block-motion anims)
+
+  // --- canvas mod: Arrange mode (drag the build + the note-block music area) + a note-block toggle ---
+  const arrangeChk = $<HTMLInputElement>("v3-arrange");
+  const arrangeTarget = $<HTMLSelectElement>("v3-arrange-target");
+  const musicToggle = $<HTMLInputElement>("v3-music-toggle");
+  let arrange = initialArrangeState(0);
+  viewer.onArrange((s) => {
+    arrange = { ...arrange, selected: s.selected, positions: { build: s.build, music: s.music }, showMusic: s.showMusic };
+  });
+  arrangeChk.addEventListener("change", () => {
+    viewer.setArrangeEnabled(arrangeChk.checked);
+    arrange = arrangeReducer(arrange, { type: "setEnabled", enabled: arrangeChk.checked });
+    canvas.style.cursor = arrangeChk.checked ? "move" : "crosshair";
+  });
+  arrangeTarget.addEventListener("change", () => {
+    const id = arrangeTarget.value === "music" ? "music" : "build";
+    viewer.selectObject(id);
+    arrange = arrangeReducer(arrange, { type: "select", id });
+  });
+  musicToggle.addEventListener("change", () => {
+    viewer.setShowMusic(musicToggle.checked);
+    arrange = arrangeReducer(arrange, { type: "setShowMusic", show: musicToggle.checked });
+  });
   let lastSource: ReturnType<typeof quantizeFrame> | null = null;
   let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
   const isTransformAnim = (s: string) => (TRANSFORM_ANIMS as readonly string[]).includes(s);
@@ -436,6 +460,8 @@ async function setup3dViewer(): Promise<void> {
     if (!files.length) return;
     viewer.pause(); // stop the render loop overwriting the status line
     current3dMusic = []; // a fresh import drops any prior video's note-block music
+    viewer.setMusicArea([]);
+    musicToggle.disabled = true;
     playBtn.textContent = "play";
     hud.textContent = `importing ${files.length > 1 ? `${files.length} files` : files[0]!.name}…`;
     try {
@@ -466,12 +492,22 @@ async function setup3dViewer(): Promise<void> {
         const rgb = canvases.map((c) => rgbImageFromCanvas(c, 40));
         const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
         showFrames(frames, `video ${video.name} · 3D`, durationsMs);
-        // If the clip carries audio, transcribe it to a note-block music timeline (kept on builder
-        // state for the canvas-mod toggle + datapack export). Audio never blocks the visual import.
+        // If the clip carries audio, transcribe it to a note-block music timeline + a draggable music
+        // area beside the build (kept on builder state for the toggle + datapack export). Audio never
+        // blocks the visual import.
         try {
           current3dMusic = await analyzeFileAudio(video);
           if (current3dMusic.length) {
-            hud.textContent = `video ${video.name} · 3D · ${current3dMusic.length} note-block notes from audio`;
+            const v0 = frames[0];
+            const offset = v0 ? Math.max(v0.sx, v0.sy, v0.sz) : 12; // park the music area clear of the build
+            viewer.setMusicArea(current3dMusic);
+            viewer.setObjectPosition("music", offset, 0);
+            viewer.setShowMusic(true);
+            musicToggle.disabled = false;
+            musicToggle.checked = true;
+            arrange = arrangeReducer(arrange, { type: "move", id: "music", to: { x: offset, z: 0 } });
+            arrange = arrangeReducer(arrange, { type: "setShowMusic", show: true });
+            hud.textContent = `video ${video.name} · 3D · ${current3dMusic.length} note-block notes from audio · Arrange to move`;
           }
         } catch (err) {
           log.warn("audio analysis failed", err);
