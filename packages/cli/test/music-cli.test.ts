@@ -16,12 +16,14 @@ const d = ff ? describe : describe.skip;
 let dir: string;
 let avClip: string; // video + 440 Hz audio
 let silentClip: string; // video, no audio
+let stillImg: string; // a single still frame — no audio STREAM at all (distinct from an audio-less video)
 
 beforeAll(() => {
   if (!ff) return;
   dir = mkdtempSync(join(tmpdir(), "mw-music-cli-"));
   avClip = join(dir, "av.mp4");
   silentClip = join(dir, "silent.mp4");
+  stillImg = join(dir, "still.png");
 
   let r = runFfmpeg([
     "-v", "error",
@@ -37,6 +39,13 @@ beforeAll(() => {
     "-pix_fmt", "yuv420p", "-y", silentClip,
   ]);
   if (r.status !== 0) throw new Error("ffmpeg silent gen failed: " + r.stderr);
+
+  r = runFfmpeg([
+    "-v", "error",
+    "-f", "lavfi", "-i", "testsrc2=size=48x48:rate=1:duration=1",
+    "-frames:v", "1", "-y", stillImg,
+  ]);
+  if (r.status !== 0) throw new Error("ffmpeg still gen failed: " + r.stderr);
 });
 
 function musicPath(out: string): string {
@@ -118,5 +127,42 @@ d("CLI flag plumbing", () => {
     spy.mockRestore();
     out.mockRestore();
     expect(errs.join("")).toContain("apply only to --target voxel3d");
+  });
+
+  // --music on is a FORCE, not auto: when the input carries no audio it must degrade to no music
+  // (an explicit contract in render.ts analyzeMusicForInput), NOT crash on the ffmpeg audio decode.
+  // The existing coverage only exercises --music AUTO + silent; these lock the FORCE path, and a
+  // still IMAGE (no audio STREAM) is a distinct input from an audio-less VIDEO container.
+  it("--music on on a still image (no audio stream) degrades cleanly: exit 0, no music, no crash", () => {
+    const out = join(dir, "force-still");
+    const code = runCli(["render", stillImg, "--target", "voxel3d", "--grid", "24x24", "--music", "on", "--out", out]);
+    expect(code).toBe(0);
+    expect(existsSync(musicPath(out))).toBe(false);
+    expect(setupText(out)).not.toContain("note_block");
+  });
+
+  it("--music on on a silent video degrades cleanly: no music emitted", () => {
+    const out = join(dir, "force-silent");
+    const res = render({ input: silentClip, out, target: "voxel3d", width: 24, height: 24, maxFrames: 3, depth: 6, music: "on" });
+    expect(existsSync(musicPath(out))).toBe(false);
+    expect(setupText(out)).not.toContain("note_block");
+    expect(res.notes.some((n) => /note-block music/.test(n))).toBe(false);
+  });
+
+  // A negative --music-origin designates the music area at common in-world coords (e.g. below y or
+  // behind spawn). node's parseArgs rejects a dash-leading value as "ambiguous"; joinDashValues
+  // rewrites `--flag -v` → `--flag=-v` to let it through. This is the coordinate-bug class that
+  // recurred on --origin (goals 055/056) — lock it on the MUSIC path so a regression can't silently
+  // return to mangling negative coords.
+  it("accepts a negative --music-origin and stamps the negative coords into setup", () => {
+    const out = join(dir, "neg-music-origin");
+    const code = runCli(["render", avClip, "--target", "voxel3d", "--grid", "24x24", "--max-frames", "3", "--depth", "6", "--music", "on", "--music-origin", "-20,70,-30", "--out", out]);
+    expect(code).toBe(0);
+    expect(existsSync(musicPath(out))).toBe(true);
+    const setup = setupText(out);
+    // the music note blocks land at the negative origin (x=-20, y=70) — proves the negative value
+    // reached the emitter verbatim instead of being rejected or zeroed.
+    expect(setup).toContain("setblock -20 70");
+    expect(setup).toContain("minecraft:note_block[note=");
   });
 });
