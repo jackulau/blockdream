@@ -4,6 +4,8 @@
 // calls these helpers; ALL the projection + reducer logic lives here so it is unit-testable without
 // a WebGL context (the viewer itself can't run in node/jsdom).
 
+import type { NoteEvent } from "@blockdream/audio";
+
 export type SceneObjectId = "build" | "music";
 
 /** A point on the ground plane (world XZ). Y is fixed per object, so arranging is a 2D problem. */
@@ -102,4 +104,31 @@ export function arrangeReducer(state: ArrangeState, action: ArrangeAction): Arra
  */
 export function groundToWorldOrigin(pos: GroundVec, base: Vec3): Vec3 {
   return { x: base.x + Math.round(pos.x), y: base.y, z: base.z + Math.round(pos.z) };
+}
+
+/** generateVoxelDatapack placement opts derived from the on-screen arrangement. */
+export interface DatapackPlacement {
+  origin: Vec3; // build (animation) origin
+  music?: NoteEvent[]; // note timeline — present only when included
+  musicOrigin?: Vec3; // music-area origin — present only when included
+}
+
+/**
+ * Turn the on-screen arrangement + analyzed notes into datapack placement opts: the build origin =
+ * the animation's dragged position, and — ONLY when notes exist AND the note-block toggle is on — the
+ * note timeline placed at the music area's dragged position. Toggle off or no notes ⇒ no music fields
+ * at all, so the export is byte-identical to a music-less build (the additive contract from D3).
+ */
+export function planDatapackPlacement(
+  notes: ReadonlyArray<NoteEvent>,
+  state: ArrangeState,
+  base: Vec3,
+): DatapackPlacement {
+  const origin = groundToWorldOrigin(state.positions.build, base);
+  if (notes.length === 0 || !state.showMusic) return { origin };
+  return {
+    origin,
+    music: notes.slice(),
+    musicOrigin: groundToWorldOrigin(state.positions.music, base),
+  };
 }

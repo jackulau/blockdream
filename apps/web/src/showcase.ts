@@ -25,7 +25,7 @@ import { rgbFramesToAnimated3d } from "./video3d";
 import { isVideoFile, decodeVideo } from "./video";
 import { analyzeFileAudio } from "./audio";
 import type { NoteEvent } from "@blockdream/audio";
-import { initialArrangeState, arrangeReducer, groundToWorldOrigin } from "./canvas-mod";
+import { initialArrangeState, arrangeReducer, planDatapackPlacement } from "./canvas-mod";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
@@ -521,17 +521,24 @@ async function setup3dViewer(): Promise<void> {
     }
   });
 
-  // Download a vanilla datapack that builds the 3D spin animation (fill-batched)
+  // Download a vanilla datapack that builds the 3D spin animation (fill-batched). The export carries
+  // the on-screen arrangement: the build spawns at its dragged origin, and — when the video had audio
+  // AND the note-block toggle is on — the note-block music area + sequencer at ITS dragged origin.
   $<HTMLButtonElement>("v3-download").addEventListener("click", () => {
     if (!current3d.length) return;
+    const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 });
     const pack = generateVoxelDatapack(current3d, resolveBlock, {
       namespace: "blockdream_3d",
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
+      origin: placement.origin,
+      music: placement.music,
+      musicOrigin: placement.musicOrigin,
     });
     const cmds = pack.totalCommands ?? pack.totalSetblocks;
+    const musicNote = placement.music ? ` · ${placement.music.length} note-block notes` : "";
     $<HTMLDivElement>("v3-export").textContent =
-      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames · /function blockdream_3d:setup`;
+      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote} · /function blockdream_3d:setup`;
     downloadDatapack("blockdream-3d-datapack", pack.files);
   });
 
