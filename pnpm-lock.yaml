@@ -23,6 +23,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@blockdream/audio':
+        specifier: workspace:*
+        version: link:../../packages/audio
       '@blockdream/color-core':
         specifier: workspace:*
         version: link:../../packages/color-core
@@ -55,8 +58,13 @@ importers:
         specifier: ^5.4.11
         version: 5.4.21(@types/node@22.19.19)
 
+  packages/audio: {}
+
   packages/cli:
     dependencies:
+      '@blockdream/audio':
+        specifier: workspace:*
+        version: link:../audio
       '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core
@@ -112,6 +120,9 @@ importers:
 
   packages/emit-commands:
     dependencies:
+      '@blockdream/audio':
+        specifier: workspace:*
+        version: link:../audio
       '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core

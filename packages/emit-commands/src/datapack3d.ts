@@ -5,8 +5,10 @@
 // places the solids and later frames place only changed voxels (air transitions included).
 
 import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
+import type { NoteEvent } from "@blockdream/audio";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
 import { fillLines, greedyBoxes } from "./fill";
+import { noteSequencer, type Vec3 } from "./note-sequencer";
 import type { DatapackOptions, GeneratedPack } from "./datapack";
 
 const RESERVED = new Set(["minecraft"]);
@@ -63,6 +65,15 @@ export function computeVoxelDeltas(volumes: VoxelVolume[]): VoxelFrameDelta[] {
 export interface VoxelDatapackOptions extends DatapackOptions {
   /** optional fill optimizer applied to each frame's cells (see fill.ts). */
   optimize?: (cells: VoxelCell[], resolve: (id: number) => string) => string[];
+  /**
+   * Optional note-block music: an analyzed audio timeline (@blockdream/audio).
+   * When present and non-empty, the pack gains a physical tuned note-block "music
+   * area" and a tick-driven `playsound` sequencer that shares the build's #play
+   * clock. Absent or empty ⇒ the pack is byte-identical to a music-less build.
+   */
+  music?: NoteEvent[];
+  /** World position of the music area. Default: just past the build along +X. */
+  musicOrigin?: Vec3;
 }
 
 function blockOf(id: number, resolveBlock: (id: number) => string | undefined, fallback: string, air: string): string {
@@ -166,6 +177,17 @@ export function generateVoxelDatapack(
   const x1 = origin.x + sx - 1;
   const y1 = origin.y + sy - 1;
   const z1 = origin.z + sz - 1;
+
+  // Optional note-block music. Additive by construction: when there are no notes,
+  // `seq` is undefined and every music-conditioned spread below is empty, so the
+  // emitted pack is byte-identical to a music-less build.
+  const music = opts.music && opts.music.length ? opts.music : undefined;
+  const seq = music
+    ? noteSequencer(music, {
+        musicOrigin: opts.musicOrigin ?? { x: origin.x + sx + 2, y: origin.y, z: origin.z },
+      })
+    : undefined;
+
   files.set(
     `${fnDir}/setup.mcfunction`,
     [
@@ -176,12 +198,15 @@ export function generateVoxelDatapack(
       `scoreboard players set #f ma 0`,
       `scoreboard players set #speed ma ${speed}`,
       `scoreboard players set #count ma ${volumes.length}`,
+      ...(seq ? seq.setupScores : []),
       `forceload add ${x0} ${z0} ${x1} ${z1}`,
       ...fillLines(x0, y0, z0, x1, y1, z1, air, "replace"), // clear the build box (split at the 32768 /fill cap)
+      ...(seq ? seq.keyboard : []), // place the physical tuned note-block music area
       `function ${ns}:frames/0`,
       "",
     ].join("\n"),
   );
+  if (seq) files.set(`${fnDir}/music.mcfunction`, seq.musicLines.join("\n"));
 
   // start re-acquires the forceload that stop releases - stop fully frees the chunks
   // (server-friendly: a paused animation keeps nothing loaded), start gets them back.
@@ -208,7 +233,10 @@ export function generateVoxelDatapack(
       "",
     ].join("\n"),
   );
-  files.set(`data/minecraft/tags/function/tick.json`, JSON.stringify({ values: [`${ns}:driver`] }, null, 2) + "\n");
+  files.set(
+    `data/minecraft/tags/function/tick.json`,
+    JSON.stringify({ values: seq ? [`${ns}:driver`, `${ns}:music`] : [`${ns}:driver`] }, null, 2) + "\n",
+  );
   const packMeta: {
     pack_format: number;
     description: string;

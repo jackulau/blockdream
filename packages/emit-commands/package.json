@@ -15,7 +15,8 @@
   "dependencies": {
     "@blockdream/palette": "workspace:*",
     "@blockdream/color-core": "workspace:*",
-    "@blockdream/voxel": "workspace:*"
+    "@blockdream/voxel": "workspace:*",
+    "@blockdream/audio": "workspace:*"
   },
   "files": [
     "src"

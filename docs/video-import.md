@@ -61,3 +61,45 @@ Tests: `apps/web/test/video3d.test.ts` (temporal stability, motion-following),
 `apps/web/test/video-decode.test.ts` (frame-time sampling, format detection),
 `packages/cli/test/video3d-e2e.test.ts` (volumes move between frames, full product assertion),
 and `packages/cli/test/animate-cli.test.ts` (explode/wave/buildup wired to voxel3d/mcstructure3d/model3d).
+
+## Audio → note blocks
+
+When the imported video **has an audio track**, the build can come with **Minecraft note blocks that
+play that audio**. The audio is transcribed to a melodic note-block line (monophonic — the dominant
+pitch per ~50 ms hop) and emitted two ways into the 3D voxel datapack:
+
+- a **physical "music area"**: one tuned `note_block[note=N,instrument=…]` per distinct pitch, placed
+  on its instrument base block, so the notes are visible and editable in-world;
+- a **tick-driven sequencer** (`music.mcfunction`) that plays the melody with positional `playsound`
+  on the same scoreboard clock as the build animation — robust vanilla audio, no redstone wiring.
+
+The analysis core is `@blockdream/audio` (`analyzeAudio(pcm, sampleRate, opts) → NoteEvent[]`):
+autocorrelation pitch detection with YIN-style octave correction, RMS-gated onsets (silence yields no
+note), folded into the note block's two-octave range (F#3..F#5, indices 0..24). It is pure and
+DOM-free, shared by both the CLI and the browser.
+
+- **CLI:** `blockdream render <video> --target voxel3d --music auto|on|off`
+  - `--music auto` (default) — include note blocks **iff** the video carries an audio track
+  - `--music on` / `--music off` — force or suppress; an audio-less video is always music-free
+  - `--instrument <name>` — note-block instrument (default `harp`; `bass`, `bell`, `flute`, `chime`,
+    `guitar`, `xylophone`, `pling`, …)
+  - `--music-origin x,y,z` — where the music area spawns (default: beside the build)
+
+  ```bash
+  blockdream render clip.mp4 --target voxel3d --music on --instrument bell --out ./build-with-music
+  ```
+
+- **Web (builder canvas mod):** importing a video auto-decodes its audio (Web Audio
+  `decodeAudioData`, no ffmpeg) and drops the note-block **music area** next to the build. An
+  **Arrange** mode lets you drag the build (the animation) and the music area **independently** on the
+  ground plane (orbit is suspended mid-drag), and a **Note blocks** checkbox toggles them on/off. The
+  datapack download carries whatever you arranged: build origin = the animation's position, music
+  origin = the music area's position, and note blocks are included only when the toggle is on (off ⇒
+  byte-identical to a music-less build).
+
+Tests: `packages/audio/test/analyze.test.ts` (pitch detection on synthesized sines/scales),
+`packages/video/test/audio.test.ts` (ffmpeg PCM extraction), `packages/emit-commands/test/note-sequencer.test.ts`
+(note-block placement + playsound + additive datapack), `packages/cli/test/music-cli.test.ts`
+(`--music` end-to-end), `apps/web/test/audio.test.ts` (browser decode→analyze glue),
+`apps/web/test/canvas-mod.test.ts` (drag/projection/toggle math), and
+`apps/web/test/datapack-export.test.ts` (the arranged music carried into the export).

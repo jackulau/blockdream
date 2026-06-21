@@ -12,6 +12,7 @@
     "prebuild": "node scripts/check-emit-browser-safe.mjs && node scripts/check-render-loop.mjs"
   },
   "dependencies": {
+    "@blockdream/audio": "workspace:*",
     "@blockdream/color-core": "workspace:*",
     "@blockdream/palette": "workspace:*",
     "@blockdream/voxel": "workspace:*",

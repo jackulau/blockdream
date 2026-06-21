@@ -1,10 +1,11 @@
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { joinDashValues } from "./argv";
-import { render, BAKEABLE_ANIMS, isFacing, type RenderOptions, type RenderTarget, type Edition, type Facing } from "./render";
+import { render, BAKEABLE_ANIMS, isFacing, type RenderOptions, type RenderTarget, type Edition, type Facing, type MusicMode } from "./render";
 import { previewPng } from "./preview";
 import type { DitherMethod } from "@blockdream/color-core";
 import type { BakeableAnimName } from "@blockdream/voxel";
+import { NOTE_BLOCK_INSTRUMENTS } from "@blockdream/audio";
 
 const USAGE = `blockdream render <input> [options]
 blockdream preview <input> --out preview.png   (side-by-side source | block-art PNG)
@@ -37,6 +38,12 @@ Options:
   --animate-frames <n>  frame count for --animate (default: 24)
   --origin <x,y,z>   where the 3D build spawns in-world (voxel3d/model3d datapack; default 0,64,0)
   --facing <dir>     which way the 3D build faces: north | south | east | west (default: south/+Z)
+  --music <mode>     voxel3d: video audio → note-block music. auto | on | off (default: auto =
+                       include note blocks iff the input video has an audio track)
+  --instrument <i>   note-block instrument for the music (default: harp). One of:
+                       harp bass basedrum snare hat bell flute chime guitar xylophone
+                       iron_xylophone cow_bell didgeridoo bit banjo pling
+  --music-origin <x,y,z>  where the note-block music area spawns (default: beside the build)
   --version <ver>    target Minecraft version: 1.21 .. 1.21.10 (default: 1.21).
                        Sets pack_format / DataVersion / block stamps. Java datapacks
                        also declare supported_formats so one pack loads across the
@@ -81,6 +88,9 @@ export function runCli(argv: string[]): number {
       "animate-frames": { type: "string" },
       origin: { type: "string" },
       facing: { type: "string" },
+      music: { type: "string" },
+      instrument: { type: "string" },
+      "music-origin": { type: "string" },
       version: { type: "string" },
       out: { type: "string" },
       palette: { type: "string" },
@@ -165,6 +175,36 @@ export function runCli(argv: string[]): number {
     return 2;
   }
 
+  const music = values.music as MusicMode | undefined;
+  if (music && music !== "auto" && music !== "on" && music !== "off") {
+    process.stderr.write(`unknown --music ${music} (valid: auto | on | off)\n`);
+    return 2;
+  }
+
+  const instrument = values.instrument;
+  // `!== undefined` (not a truthiness check) so an empty `--instrument=` is rejected too — otherwise
+  // it would slip past and emit a broken `block.note_block.` / `instrument=` into the datapack.
+  if (instrument !== undefined && !(NOTE_BLOCK_INSTRUMENTS as ReadonlyArray<string>).includes(instrument)) {
+    process.stderr.write(`unknown --instrument "${instrument}" (valid: ${NOTE_BLOCK_INSTRUMENTS.join(" ")})\n`);
+    return 2;
+  }
+
+  let musicOrigin: { x: number; y: number; z: number } | undefined;
+  if (values["music-origin"]) {
+    const m = /^(-?\d+),(-?\d+),(-?\d+)$/.exec(values["music-origin"]);
+    if (!m) {
+      process.stderr.write(`--music-origin must be x,y,z integers (e.g. 10,64,-20)\n`);
+      return 2;
+    }
+    musicOrigin = { x: parseInt(m[1]!, 10), y: parseInt(m[2]!, 10), z: parseInt(m[3]!, 10) };
+  }
+
+  // Note-block music only attaches to the voxel3d datapack (where generateVoxelDatapack's music lives).
+  // Warn rather than silently no-op so the music flags can't mislead on another target.
+  if ((values.music || values.instrument || values["music-origin"]) && target !== "voxel3d") {
+    process.stderr.write(`note: --music/--instrument/--music-origin apply only to --target voxel3d (ignored for ${target})\n`);
+  }
+
   const opts: RenderOptions = {
     input,
     out: values.out ?? `./out/${target}`,
@@ -188,6 +228,9 @@ export function runCli(argv: string[]): number {
     animateFrames: values["animate-frames"] ? Number(values["animate-frames"]) : undefined,
     origin,
     facing,
+    music,
+    musicInstrument: instrument,
+    musicOrigin,
   };
 
   try {

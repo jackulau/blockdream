@@ -23,6 +23,9 @@ import {
 } from "@blockdream/voxel";
 import { rgbFramesToAnimated3d } from "./video3d";
 import { isVideoFile, decodeVideo } from "./video";
+import { analyzeFileAudio } from "./audio";
+import type { NoteEvent } from "@blockdream/audio";
+import { initialArrangeState, arrangeReducer, planDatapackPlacement } from "./canvas-mod";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
@@ -343,7 +346,31 @@ async function setup3dViewer(): Promise<void> {
 
   const depth = $<HTMLInputElement>("v3-depth");
   let current3d: VoxelVolume[] = [];
+  let current3dMusic: NoteEvent[] = []; // note-block music transcribed from an imported video's audio
   let baseVolume: VoxelVolume | null = null; // the single built solid (source for block-motion anims)
+
+  // --- canvas mod: Arrange mode (drag the build + the note-block music area) + a note-block toggle ---
+  const arrangeChk = $<HTMLInputElement>("v3-arrange");
+  const arrangeTarget = $<HTMLSelectElement>("v3-arrange-target");
+  const musicToggle = $<HTMLInputElement>("v3-music-toggle");
+  let arrange = initialArrangeState(0);
+  viewer.onArrange((s) => {
+    arrange = { ...arrange, selected: s.selected, positions: { build: s.build, music: s.music }, showMusic: s.showMusic };
+  });
+  arrangeChk.addEventListener("change", () => {
+    viewer.setArrangeEnabled(arrangeChk.checked);
+    arrange = arrangeReducer(arrange, { type: "setEnabled", enabled: arrangeChk.checked });
+    canvas.style.cursor = arrangeChk.checked ? "move" : "crosshair";
+  });
+  arrangeTarget.addEventListener("change", () => {
+    const id = arrangeTarget.value === "music" ? "music" : "build";
+    viewer.selectObject(id);
+    arrange = arrangeReducer(arrange, { type: "select", id });
+  });
+  musicToggle.addEventListener("change", () => {
+    viewer.setShowMusic(musicToggle.checked);
+    arrange = arrangeReducer(arrange, { type: "setShowMusic", show: musicToggle.checked });
+  });
   let lastSource: ReturnType<typeof quantizeFrame> | null = null;
   let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
   const isTransformAnim = (s: string) => (TRANSFORM_ANIMS as readonly string[]).includes(s);
@@ -432,6 +459,9 @@ async function setup3dViewer(): Promise<void> {
     const files = Array.from((ev.target as HTMLInputElement).files ?? []);
     if (!files.length) return;
     viewer.pause(); // stop the render loop overwriting the status line
+    current3dMusic = []; // a fresh import drops any prior video's note-block music
+    viewer.setMusicArea([]);
+    musicToggle.disabled = true;
     playBtn.textContent = "play";
     hud.textContent = `importing ${files.length > 1 ? `${files.length} files` : files[0]!.name}…`;
     try {
@@ -462,6 +492,26 @@ async function setup3dViewer(): Promise<void> {
         const rgb = canvases.map((c) => rgbImageFromCanvas(c, 40));
         const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
         showFrames(frames, `video ${video.name} · 3D`, durationsMs);
+        // If the clip carries audio, transcribe it to a note-block music timeline + a draggable music
+        // area beside the build (kept on builder state for the toggle + datapack export). Audio never
+        // blocks the visual import.
+        try {
+          current3dMusic = await analyzeFileAudio(video);
+          if (current3dMusic.length) {
+            const v0 = frames[0];
+            const offset = v0 ? Math.max(v0.sx, v0.sy, v0.sz) : 12; // park the music area clear of the build
+            viewer.setMusicArea(current3dMusic);
+            viewer.setObjectPosition("music", offset, 0);
+            viewer.setShowMusic(true);
+            musicToggle.disabled = false;
+            musicToggle.checked = true;
+            arrange = arrangeReducer(arrange, { type: "move", id: "music", to: { x: offset, z: 0 } });
+            arrange = arrangeReducer(arrange, { type: "setShowMusic", show: true });
+            hud.textContent = `video ${video.name} · 3D · ${current3dMusic.length} note-block notes from audio · Arrange to move`;
+          }
+        } catch (err) {
+          log.warn("audio analysis failed", err);
+        }
       } else {
         hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), .gif, or a video (.mp4/.webm/.mov)";
       }
@@ -471,17 +521,31 @@ async function setup3dViewer(): Promise<void> {
     }
   });
 
-  // Download a vanilla datapack that builds the 3D spin animation (fill-batched)
+  // Download a vanilla datapack that builds the 3D spin animation (fill-batched). The export carries
+  // the on-screen arrangement: the build spawns at its dragged origin, and — when the video had audio
+  // AND the note-block toggle is on — the note-block music area + sequencer at ITS dragged origin.
   $<HTMLButtonElement>("v3-download").addEventListener("click", () => {
     if (!current3d.length) return;
+    // the viewer centers the build + the note-block row on their group positions; pass each object's
+    // half-extent so the export lands them centered where they sit on screen (not corner-offset).
+    const v0 = current3d[0];
+    const distinctNotes = new Set(current3dMusic.map((n) => n.note)).size;
+    const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 }, {
+      buildHalf: v0 ? { x: v0.sx / 2, z: v0.sz / 2 } : undefined,
+      musicHalf: { x: (distinctNotes - 1) / 2, z: 0 },
+    });
     const pack = generateVoxelDatapack(current3d, resolveBlock, {
       namespace: "blockdream_3d",
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
+      origin: placement.origin,
+      music: placement.music,
+      musicOrigin: placement.musicOrigin,
     });
     const cmds = pack.totalCommands ?? pack.totalSetblocks;
+    const musicNote = placement.music ? ` · ${placement.music.length} note-block notes` : "";
     $<HTMLDivElement>("v3-export").textContent =
-      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames · /function blockdream_3d:setup`;
+      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote} · /function blockdream_3d:setup`;
     downloadDatapack("blockdream-3d-datapack", pack.files);
   });
 

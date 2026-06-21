@@ -4,6 +4,5 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "references": [{ "path": "../palette" }, { "path": "../color-core" }, { "path": "../audio" }],
   "include": ["src/**/*"]
 }
