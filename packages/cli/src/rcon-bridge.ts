@@ -220,6 +220,14 @@ export interface WallCommandOptions {
   dither?: DitherMethod;
   /** Direction the wall faces (orients its plane). Default "south" (XY plane at z=origin.z). */
   facing?: WallFacing;
+  /**
+   * The previous frame ALREADY quantized - pass back the prior call's `quantized` result to
+   * skip re-quantizing `prevFrame` from scratch (the live paint loop quantizes each frame
+   * exactly once this way). Must be the quantization of `prevFrame` under the SAME dither +
+   * palette as this call; its dimensions are checked against `prevFrame`. Ignored without
+   * `prevFrame`, or if its dimensions don't match (falls back to re-quantizing).
+   */
+  prevQuantized?: QuantizedFrame;
 }
 
 export interface WallCommands {
@@ -300,7 +308,13 @@ export function frameToWallCommands(
     if (prevFrame.width !== frame.width || prevFrame.height !== frame.height) {
       throw new Error(`prevFrame ${prevFrame.width}×${prevFrame.height} != frame ${frame.width}×${frame.height}`);
     }
-    const prevQ = quantizeFrame(toRgb(prevFrame), pal, { method: dither });
+    // reuse the caller's prior `quantized` for prevFrame when its dimensions match (the live
+    // loop threads it back so each frame is quantized exactly once); else quantize fresh.
+    const reuse =
+      opts.prevQuantized &&
+      opts.prevQuantized.width === prevFrame.width &&
+      opts.prevQuantized.height === prevFrame.height;
+    const prevQ = reuse ? opts.prevQuantized! : quantizeFrame(toRgb(prevFrame), pal, { method: dither });
     cells = computeDeltas([prevQ, curQ])[1]!.cells;
   } else {
     cells = computeDeltas([curQ])[0]!.cells; // full keyframe

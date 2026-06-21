@@ -240,6 +240,39 @@ describe("frameToWallCommands: delta", () => {
   });
 });
 
+describe("frameToWallCommands: prevQuantized cache (live loop quantizes each frame once)", () => {
+  const patched = rgbFrame(W, H, (x, y) =>
+    x >= 4 && x < 8 && y >= 4 && y < 7 ? GREEN : x < W / 2 ? RED : BLUE,
+  );
+  // keyframe → delta → delta-back, exactly how the live paint loop drives it
+  const stream = [halves, patched, halves];
+
+  it("threading the prior .quantized back is byte-identical to re-quantizing prevFrame", () => {
+    // pass A: prevQuantized omitted → prevFrame re-quantized every call (old behaviour)
+    // pass B: thread the prior call's .quantized back (the live paint-loop optimization)
+    let prevA: WallFrame | undefined;
+    let prevB: WallFrame | undefined;
+    let prevQ: WallCommands["quantized"] | undefined;
+    for (const f of stream) {
+      const a = frameToWallCommands(f, ORIGIN, prevA); // default opts = production path (bayer)
+      const b = frameToWallCommands(f, ORIGIN, prevB, { prevQuantized: prevQ });
+      expect(b.commands).toEqual(a.commands);
+      expect(b.remainder).toEqual(a.remainder);
+      expect([...b.quantized.mapColorId]).toEqual([...a.quantized.mapColorId]);
+      prevA = f;
+      prevB = f;
+      prevQ = b.quantized;
+    }
+  });
+
+  it("ignores a dimension-mismatched prevQuantized and re-quantizes (no stale cache)", () => {
+    const stale = frameToWallCommands(rgbFrame(8, 8, () => RED), { x: 0, y: 0, z: 0 }, undefined).quantized; // 8×8
+    const recompute = frameToWallCommands(patched, ORIGIN, halves); // 32×16 prevFrame, no cache
+    const withStale = frameToWallCommands(patched, ORIGIN, halves, { prevQuantized: stale });
+    expect(withStale.commands).toEqual(recompute.commands);
+  });
+});
+
 describe("frameToWallCommands: per-frame command cap", () => {
   // delta = the whole blue half turns yellow (1 big fill) + 3 scattered single pixels
   const dots: Array<[number, number]> = [[1, 1], [10, 3], [3, 12]];
