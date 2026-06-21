@@ -8,6 +8,12 @@ import type { RgbImage, QuantizedFrame } from "./image";
 
 export type DitherMethod = "none" | "floyd-steinberg" | "bayer";
 
+// Match-memo warmup: after this many memoized pixels, if fewer than a quarter were repeats,
+// the frame is too high-entropy for the cache to pay off, so we drop it and match directly for
+// the rest. Purely a perf knob — both the memoized and direct paths return the same index, so
+// any value here is byte-identical.
+const MEMO_WARMUP = 1 << 12; // 4096 pixels
+
 export interface QuantizeOptions {
   method?: DitherMethod;
   /** Bayer ordered-dither amplitude in linear light (default 0.06). */
@@ -64,18 +70,43 @@ function writePixel(frame: QuantizedFrame, p: number, entryIndex: number, mapCol
 export function quantizeNearest(img: RgbImage, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): QuantizedFrame {
   const frame = emptyFrame(img);
   const px = img.width * img.height;
+  // Exact memo for the brute-force path: with no LUT the match is a pure function of (r,g,b)
+  // (gamutMap is frame-constant), so repeated colors reuse the result and skip the O(palette)
+  // OKLab search. Byte-identical. The LUT path is already O(1)/pixel, so it skips the memo.
+  const useLut = gamutMap === undefined && !!lut;
+  // exact brute-force match — a pure function of (r,g,b) since gamutMap is frame-constant
+  const match = (r: number, g: number, b: number): number => {
+    const lab = linearRgbToOklab(srgbChannelToLinear(r), srgbChannelToLinear(g), srgbChannelToLinear(b));
+    return gamutMap === undefined ? nearestByLab(lab, pal).index : nearestByLabHue(lab, pal, gamutMap).index;
+  };
+  // Memo: repeated colors reuse the result and skip the O(palette) OKLab search (byte-identical).
+  // Adaptive — if a warmup window shows few repeats, drop the memo so a high-entropy frame pays
+  // no Map overhead. The LUT path is already O(1)/pixel and skips the memo entirely.
+  const memo = useLut ? null : new Map<number, number>();
+  let memoOn = memo !== null;
+  let tried = 0;
+  let hits = 0;
   for (let p = 0; p < px; p++) {
     const i = p * 3;
+    const r = img.data[i]!;
+    const g = img.data[i + 1]!;
+    const b = img.data[i + 2]!;
     let index: number;
-    if (gamutMap === undefined && lut) {
-      index = lutNearest(lut, img.data[i]!, img.data[i + 1]!, img.data[i + 2]!);
+    if (useLut) {
+      index = lutNearest(lut!, r, g, b);
+    } else if (memoOn) {
+      const key = (r << 16) | (g << 8) | b;
+      const hit = memo!.get(key);
+      if (hit !== undefined) {
+        index = hit;
+        hits++;
+      } else {
+        index = match(r, g, b);
+        memo!.set(key, index);
+      }
+      if (++tried === MEMO_WARMUP && hits * 4 < MEMO_WARMUP) memoOn = false; // <25% repeats → drop it
     } else {
-      const lab = linearRgbToOklab(
-        srgbChannelToLinear(img.data[i]!),
-        srgbChannelToLinear(img.data[i + 1]!),
-        srgbChannelToLinear(img.data[i + 2]!),
-      );
-      index = gamutMap === undefined ? nearestByLab(lab, pal).index : nearestByLabHue(lab, pal, gamutMap).index;
+      index = match(r, g, b);
     }
     writePixel(frame, p, index, pal.entries[index]!.color.mapColorId);
   }
@@ -164,15 +195,46 @@ export function quantizeBayer(
 ): QuantizedFrame {
   const { width, height } = img;
   const frame = emptyFrame(img);
+  // Exact memo: bayer is position-deterministic, so the match is a pure function of
+  // (r, g, b, bayerCell) (amplitude/gamutMap are frame-constant). Real frames repeat colors
+  // within each of the 64 cells → skip the O(palette) match on repeats. Byte-identical.
+  // Adaptive — drop the memo after a warmup window that shows few repeats so a high-entropy
+  // frame pays no Map overhead. The LUT path is already O(1)/pixel, so it skips the memo.
+  const memo = lut ? null : new Map<number, number>();
+  let memoOn = memo !== null;
+  let tried = 0;
+  let hits = 0;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const p = y * width + x;
       const i = p * 3;
-      const t = BAYER8[y & 7]![x & 7]! * amplitude;
-      const lr = srgbChannelToLinear(img.data[i]!) + t;
-      const lg = srgbChannelToLinear(img.data[i + 1]!) + t;
-      const lb = srgbChannelToLinear(img.data[i + 2]!) + t;
-      const index = matchLinear(lr, lg, lb, pal, lut, gamutMap);
+      const r = img.data[i]!;
+      const g = img.data[i + 1]!;
+      const b = img.data[i + 2]!;
+      let index: number;
+      if (memoOn) {
+        const key = ((r << 16) | (g << 8) | b) * 64 + ((y & 7) << 3) + (x & 7);
+        const hit = memo!.get(key);
+        if (hit !== undefined) {
+          index = hit;
+          hits++;
+        } else {
+          const t = BAYER8[y & 7]![x & 7]! * amplitude;
+          index = matchLinear(srgbChannelToLinear(r) + t, srgbChannelToLinear(g) + t, srgbChannelToLinear(b) + t, pal, lut, gamutMap);
+          memo!.set(key, index);
+        }
+        if (++tried === MEMO_WARMUP && hits * 4 < MEMO_WARMUP) memoOn = false; // <25% repeats → drop it
+      } else {
+        const t = BAYER8[y & 7]![x & 7]! * amplitude;
+        index = matchLinear(
+          srgbChannelToLinear(r) + t,
+          srgbChannelToLinear(g) + t,
+          srgbChannelToLinear(b) + t,
+          pal,
+          lut,
+          gamutMap,
+        );
+      }
       writePixel(frame, p, index, pal.entries[index]!.color.mapColorId);
     }
   }
