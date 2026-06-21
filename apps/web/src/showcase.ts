@@ -23,6 +23,8 @@ import {
 } from "@blockdream/voxel";
 import { rgbFramesToAnimated3d } from "./video3d";
 import { isVideoFile, decodeVideo } from "./video";
+import { analyzeFileAudio } from "./audio";
+import type { NoteEvent } from "@blockdream/audio";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
@@ -343,6 +345,7 @@ async function setup3dViewer(): Promise<void> {
 
   const depth = $<HTMLInputElement>("v3-depth");
   let current3d: VoxelVolume[] = [];
+  let current3dMusic: NoteEvent[] = []; // note-block music transcribed from an imported video's audio
   let baseVolume: VoxelVolume | null = null; // the single built solid (source for block-motion anims)
   let lastSource: ReturnType<typeof quantizeFrame> | null = null;
   let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
@@ -432,6 +435,7 @@ async function setup3dViewer(): Promise<void> {
     const files = Array.from((ev.target as HTMLInputElement).files ?? []);
     if (!files.length) return;
     viewer.pause(); // stop the render loop overwriting the status line
+    current3dMusic = []; // a fresh import drops any prior video's note-block music
     playBtn.textContent = "play";
     hud.textContent = `importing ${files.length > 1 ? `${files.length} files` : files[0]!.name}…`;
     try {
@@ -462,6 +466,16 @@ async function setup3dViewer(): Promise<void> {
         const rgb = canvases.map((c) => rgbImageFromCanvas(c, 40));
         const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
         showFrames(frames, `video ${video.name} · 3D`, durationsMs);
+        // If the clip carries audio, transcribe it to a note-block music timeline (kept on builder
+        // state for the canvas-mod toggle + datapack export). Audio never blocks the visual import.
+        try {
+          current3dMusic = await analyzeFileAudio(video);
+          if (current3dMusic.length) {
+            hud.textContent = `video ${video.name} · 3D · ${current3dMusic.length} note-block notes from audio`;
+          }
+        } catch (err) {
+          log.warn("audio analysis failed", err);
+        }
       } else {
         hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), .gif, or a video (.mp4/.webm/.mov)";
       }
