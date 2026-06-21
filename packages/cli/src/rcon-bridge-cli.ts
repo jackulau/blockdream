@@ -435,6 +435,7 @@ export async function main(argv: string[]): Promise<number> {
 
   // ----- wall state: what is painted now, plus over-budget cells carried forward -----
   let prevWall: WallFrame | undefined; // undefined until the first paint → first frame is a keyframe
+  let prevQuant: WallCommands["quantized"] | undefined; // prevWall's quantization, reused so each frame is quantized once
   let carry: WallCommands["remainder"] = [];
   let painted = 0;
   let lastPaintAt = 0;
@@ -449,7 +450,7 @@ export async function main(argv: string[]): Promise<number> {
   const paint = async (rgb: RgbImage, genMs: number): Promise<void> => {
     const frame: WallFrame = { width: rgb.width, height: rgb.height, pixels: rgb.data };
     const keyframe = !prevWall;
-    const wall = frameToWallCommands(frame, origin, prevWall, { carry, maxCommands, facing: wallFacing });
+    const wall = frameToWallCommands(frame, origin, prevWall, { carry, maxCommands, facing: wallFacing, prevQuantized: prevQuant });
     const paintT0 = Date.now();
     if (!dryRun) {
       // pooled concurrent sends; a throw leaves prevWall/carry untouched so the next
@@ -461,6 +462,7 @@ export async function main(argv: string[]): Promise<number> {
     const effMs = lastPaintAt ? now - lastPaintAt : 0;
     lastPaintAt = now;
     prevWall = frame;
+    prevQuant = wall.quantized; // feed this frame's quantization back so next frame skips re-quantizing it
     carry = wall.remainder;
     painted++;
     genMsTotal += genMs;

@@ -37,24 +37,30 @@ export interface VoxelFrameDelta {
 export function computeVoxelDeltas(volumes: VoxelVolume[]): VoxelFrameDelta[] {
   if (volumes.length === 0) return [];
   const { sx, sy, sz } = volumes[0]!;
+  const n = sx * sy * sz;
+  const sxsy = sx * sy;
   const out: VoxelFrameDelta[] = [];
+  // voxelIndex is x + sx*(y + sy*z), so backing-array index i ascends in exact z→y→x order:
+  // a flat data[i] walk visits the same voxels as the nested loop but skips the per-voxel
+  // inBounds + voxelIndex that getVoxel pays (every voxel here is provably in bounds). x/y/z
+  // are reconstructed only for the voxels actually emitted (sparse for delta frames).
   for (let f = 0; f < volumes.length; f++) {
     const cur = volumes[f]!;
     if (cur.sx !== sx || cur.sy !== sy || cur.sz !== sz) {
       throw new Error(`frame ${f} is ${cur.sx}x${cur.sy}x${cur.sz}, expected ${sx}x${sy}x${sz}`);
     }
-    const prev = f === 0 ? undefined : volumes[f - 1]!;
+    const cd = cur.data;
     const cells: VoxelCell[] = [];
-    for (let z = 0; z < sz; z++) {
-      for (let y = 0; y < sy; y++) {
-        for (let x = 0; x < sx; x++) {
-          const id = getVoxel(cur, x, y, z);
-          if (f === 0) {
-            if (id !== EMPTY) cells.push({ x, y, z, mapColorId: id });
-          } else if (getVoxel(prev!, x, y, z) !== id) {
-            cells.push({ x, y, z, mapColorId: id });
-          }
-        }
+    if (f === 0) {
+      for (let i = 0; i < n; i++) {
+        const id = cd[i]!;
+        if (id !== EMPTY) cells.push({ x: i % sx, y: ((i / sx) | 0) % sy, z: (i / sxsy) | 0, mapColorId: id });
+      }
+    } else {
+      const pd = volumes[f - 1]!.data;
+      for (let i = 0; i < n; i++) {
+        const id = cd[i]!;
+        if (pd[i] !== id) cells.push({ x: i % sx, y: ((i / sx) | 0) % sy, z: (i / sxsy) | 0, mapColorId: id });
       }
     }
     out.push({ index: f, keyframe: f === 0, cells });

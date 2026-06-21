@@ -41,6 +41,24 @@ describe("generateVoxelDatapack (3D)", () => {
     expect(pack.files.get("data/blockdream/function/frames/1.mcfunction")).toContain("setblock 2 64 0 minecraft:air replace");
   });
 
+  it("reconstructs x/y/z across multiple planes (flat-walk index math, keyframe + delta)", () => {
+    // 2x2x2 so y and z are both non-trivial — guards the i→(x,y,z) reconstruction
+    const v0 = createVolume(2, 2, 2);
+    setVoxel(v0, 0, 1, 0, 4); // backing index 2
+    setVoxel(v0, 1, 1, 1, 7); // backing index 7
+    // emitted in ascending backing-index (z→y→x) order
+    expect(computeVoxelDeltas([v0])[0]!.cells).toEqual([
+      { x: 0, y: 1, z: 0, mapColorId: 4 },
+      { x: 1, y: 1, z: 1, mapColorId: 7 },
+    ]);
+    const v1 = createVolume(2, 2, 2);
+    setVoxel(v1, 1, 1, 1, 9); // recolor the far corner; (0,1,0) drops to air
+    expect(computeVoxelDeltas([v0, v1])[1]!.cells).toEqual([
+      { x: 0, y: 1, z: 0, mapColorId: 255 }, // solid→air (EMPTY)
+      { x: 1, y: 1, z: 1, mapColorId: 9 }, // recolor
+    ]);
+  });
+
   it("optimize hook (fill run-batching) collapses contiguous same-block runs", () => {
     const pack = generateVoxelDatapack([lineVolume()], resolve, {
       origin: { x: 0, y: 64, z: 0 },
