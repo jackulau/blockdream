@@ -14,10 +14,25 @@ export interface Lab {
   b: number;
 }
 
-/** Decode one 8-bit sRGB channel (0..255) to linear light (0..1). */
-export function srgbChannelToLinear(c8: number): number {
+/** The sRGB transfer function, evaluated fresh (no table). */
+function srgbDecode(c8: number): number {
   const c = c8 / 255;
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+/**
+ * Precomputed decode for the 256 valid 8-bit channel values. This is the hot path: the quantizers
+ * call srgbChannelToLinear 3x per pixel, and the only inputs are Uint8Array / 8-bit palette channels,
+ * so the table holds the EXACT same float srgbDecode would return — byte-identical, no Math.pow.
+ */
+const SRGB_LIN_LUT = new Float64Array(256);
+for (let c = 0; c < 256; c++) SRGB_LIN_LUT[c] = srgbDecode(c);
+
+/** Decode one 8-bit sRGB channel (0..255) to linear light (0..1). */
+export function srgbChannelToLinear(c8: number): number {
+  // Integer 0..255 hits the table (the documented contract + every real caller); a non-integer or
+  // out-of-range value misses (typed-array index => undefined) and falls back to the exact formula.
+  return SRGB_LIN_LUT[c8] ?? srgbDecode(c8);
 }
 
 /** Encode one linear-light channel (0..1) back to 8-bit sRGB (0..255). */

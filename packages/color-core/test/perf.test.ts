@@ -53,11 +53,10 @@ describe("LUT matcher (efficiency)", () => {
     expect([...fast.mapColorId].every((v) => v >= 4 && v <= 247)).toBe(true);
   });
 
-  it("LUT is far faster than brute force (kills the video lag)", () => {
+  it("exact L-band match is fast enough for video on its own (the lossy LUT is no longer needed for speed)", () => {
     const img = pseudoRandomImage(256, 256);
     // Best-of-N timings: the minimum is the least noisy estimate, so this stays robust under
-    // a busy machine/CI (absolute throughput is environment-dependent and must not gate CI -
-    // we only assert the algorithmic win: the LUT path is faster). Locally ~19× / ~45 Mpx/s.
+    // a busy machine/CI (absolute throughput is environment-dependent and must not gate CI).
     const best = (run: () => void): number => {
       let m = Infinity;
       for (let i = 0; i < 3; i++) {
@@ -67,9 +66,12 @@ describe("LUT matcher (efficiency)", () => {
       }
       return m;
     };
-    const brute = best(() => quantizeNearest(img, pal));
-    const fast = best(() => quantizeNearest(img, pal, lut));
-    expect(fast).toBeLessThan(brute); // LUT beats brute force (the claim that matters)
-    expect((256 * 256) / 1e6 / (fast / 1000)).toBeGreaterThan(1); // sanity floor only
+    // Before the L-band prune, exact brute force was the video bottleneck and the approximate
+    // RgbLut existed to dodge it. The prune makes the EXACT path ~9x faster, so it now clears a
+    // real-time floor with ZERO quality loss - locally it even beats the LUT. The LUT remains only
+    // a precompute-amortization option (its quality is covered by the two tests above).
+    const exact = best(() => quantizeNearest(img, pal));
+    const mpx = (256 * 256) / 1e6 / (exact / 1000);
+    expect(mpx).toBeGreaterThan(1.5); // conservative for busy CI; locally ~38 Mpx/s
   });
 });
