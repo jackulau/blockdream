@@ -18,7 +18,8 @@ import {
   type QuantizedFrame,
   type PreparedPalette,
 } from "@blockdream/color-core";
-import { extractFrames } from "@blockdream/video";
+import { extractFrames, extractAudioPcm, hasAudioTrack } from "@blockdream/video";
+import { analyzeAudio, type NoteEvent } from "@blockdream/audio";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
@@ -64,6 +65,28 @@ export interface RenderOptions {
   animateFrames?: number; // frames for the procedural animation (default 24)
   origin?: { x: number; y: number; z: number }; // 3D build spawn coordinates in-world (datapack; default 0,64,0)
   facing?: Facing; // 3D build orientation: which way the build faces (north|south|east|west; default south/+Z)
+  music?: MusicMode; // voxel3d: video audio → note-block music (auto = on iff the input has an audio track)
+  musicInstrument?: string; // note-block instrument for the music (default harp)
+  musicOrigin?: { x: number; y: number; z: number }; // where the note-block music area spawns (default beside the build)
+}
+
+/** Note-block music inclusion for a video import. auto = on iff the input carries audio. */
+export type MusicMode = "auto" | "on" | "off";
+
+/**
+ * Decode + transcribe the input's audio track into a Minecraft note-block timeline,
+ * honouring the --music mode. Returns undefined when music is off, the input has no
+ * audio, or nothing voiced was detected. Shells ffmpeg (CLI-only path).
+ */
+function analyzeMusicForInput(opts: RenderOptions): NoteEvent[] | undefined {
+  const mode: MusicMode = opts.music ?? "auto";
+  if (mode === "off") return undefined;
+  const want = mode === "on" || (mode === "auto" && hasAudioTrack(opts.input));
+  if (!want) return undefined;
+  const { pcm, sampleRate } = extractAudioPcm(opts.input);
+  if (pcm.length === 0) return undefined;
+  const events = analyzeAudio(pcm, sampleRate, { instrument: opts.musicInstrument ?? "harp" });
+  return events.length ? events : undefined;
 }
 
 /** Compass direction a 3D build faces. south = +Z = the un-rotated default. */
@@ -307,13 +330,22 @@ export function render(opts: RenderOptions): RenderResult {
     );
     assertNonEmpty3d(volumes);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
+    // --music: if the video carries audio, transcribe it to a note-block music area + sequencer.
+    const music = analyzeMusicForInput(opts);
     const pack = generateVoxelDatapack(volumes, resolveBlock, {
       namespace: "blockdream_3d",
       packFormat: mc.packFormat,
       origin: opts.origin,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
+      music,
+      musicOrigin: opts.musicOrigin,
     });
+    if (music?.length) {
+      notes.push(
+        `note-block music: ${music.length} notes from the audio track (instrument ${opts.musicInstrument ?? "harp"}); plays on /function ${pack.namespace}:start.`,
+      );
+    }
     const vv = volumes[0]!;
     pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, vv.sx, vv.sy, vv.sz));
     writePack(pack, opts.out);

@@ -12,6 +12,7 @@
   "dependencies": {
     "@blockdream/palette": "workspace:*",
     "@blockdream/color-core": "workspace:*",
+    "@blockdream/audio": "workspace:*",
     "@blockdream/video": "workspace:*",
     "@blockdream/emit-java": "workspace:*",
     "@blockdream/emit-bedrock": "workspace:*",

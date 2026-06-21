@@ -59,6 +59,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@blockdream/audio':
+        specifier: workspace:*
+        version: link:../audio
       '@blockdream/color-core':
         specifier: workspace:*
         version: link:../color-core
