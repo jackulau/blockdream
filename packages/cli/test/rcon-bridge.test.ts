@@ -271,6 +271,17 @@ describe("frameToWallCommands: prevQuantized cache (live loop quantizes each fra
     const withStale = frameToWallCommands(patched, ORIGIN, halves, { prevQuantized: stale });
     expect(withStale.commands).toEqual(recompute.commands);
   });
+
+  // The current-frame TEMPORAL SKIP (copy the prior index where a pixel's RGB is unchanged) must be
+  // byte-identical to a full quantize. The keyframe path (no prevFrame) never temporal-skips, so its
+  // .quantized IS the full from-scratch quantize — compare the live delta path's current frame to it.
+  it("the temporal-skipped current frame is byte-identical to the full keyframe quantize", () => {
+    const full = frameToWallCommands(patched, ORIGIN, undefined).quantized; // keyframe = full quantize (no skip)
+    const q0 = frameToWallCommands(halves, ORIGIN, undefined).quantized; // prevFrame's quantize, threaded in
+    const live = frameToWallCommands(patched, ORIGIN, halves, { prevQuantized: q0 }); // delta path → temporal skip
+    expect([...live.quantized.paletteIndex]).toEqual([...full.paletteIndex]);
+    expect([...live.quantized.mapColorId]).toEqual([...full.mapColorId]);
+  });
 });
 
 describe("frameToWallCommands: per-frame command cap", () => {

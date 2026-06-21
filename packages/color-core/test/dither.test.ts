@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getJavaMapPalette } from "@blockdream/palette";
 import { preparePalette } from "../src/match";
-import { quantizeFloydSteinberg, quantizeBayer, quantizeNearest } from "../src/dither";
+import { quantizeFloydSteinberg, quantizeBayer, quantizeNearest, quantizeFrame } from "../src/dither";
 import { createRgbImage, setPixel, type RgbImage } from "../src/image";
 
 const pal = preparePalette(getJavaMapPalette());
@@ -87,5 +87,84 @@ describe("quantizers", () => {
     let mismatches = 0;
     for (let y = 40; y < N; y++) for (let x = 0; x < N; x++) if (q.mapColorId[y * N + x] !== want) mismatches++;
     expect(mismatches).toBe(0);
+  });
+});
+
+// Live-cast temporal skip: when the previous frame's RGB + quantized result are supplied, a pixel
+// whose RGB is unchanged copies the prior palette index instead of re-matching. Must be byte-
+// identical to a full quantize (the index is a pure function of the pixel for bayer/nearest), and
+// floyd-steinberg must ignore the prev (error diffusion is not position-deterministic).
+describe("temporal-skip quantize (live screencast cast)", () => {
+  const N = 48;
+  function detailed(): RgbImage {
+    // high-detail content so the intra-frame memo can't mask a broken temporal copy
+    const img = createRgbImage(N, N);
+    for (let p = 0; p < N * N; p++) setPixel(img, p % N, (p / N) | 0, (p * 7) & 255, (p * 13) & 255, (p * 5) & 255);
+    return img;
+  }
+  function changedFrom(base: RgbImage): RgbImage {
+    const cur = createRgbImage(N, N);
+    cur.data.set(base.data);
+    for (let y = 5; y < 20; y++) for (let x = 5; x < 20; x++) setPixel(cur, x, y, (x * 17) & 255, (y * 19) & 255, 200);
+    return cur;
+  }
+
+  it("bayer: temporal-skip output is byte-identical to a full quantize on a mixed frame", () => {
+    const prev = detailed();
+    const cur = changedFrom(prev);
+    const prevQ = quantizeBayer(prev, pal);
+    const full = quantizeBayer(cur, pal);
+    const temporal = quantizeBayer(cur, pal, 0.06, undefined, undefined, prev, prevQ);
+    expect([...temporal.paletteIndex]).toEqual([...full.paletteIndex]);
+    expect([...temporal.mapColorId]).toEqual([...full.mapColorId]);
+  });
+
+  it("nearest: temporal-skip output is byte-identical to a full quantize on a mixed frame", () => {
+    const prev = detailed();
+    const cur = changedFrom(prev);
+    const prevQ = quantizeNearest(prev, pal);
+    const full = quantizeNearest(cur, pal);
+    const temporal = quantizeNearest(cur, pal, undefined, undefined, prev, prevQ);
+    expect([...temporal.paletteIndex]).toEqual([...full.paletteIndex]);
+    expect([...temporal.mapColorId]).toEqual([...full.mapColorId]);
+  });
+
+  it("quantizeFrame bayer threads prev through and stays byte-identical", () => {
+    const prev = detailed();
+    const cur = changedFrom(prev);
+    const prevQ = quantizeFrame(prev, pal, { method: "bayer" });
+    const full = quantizeFrame(cur, pal, { method: "bayer" });
+    const temporal = quantizeFrame(cur, pal, { method: "bayer", prevImage: prev, prevQuantized: prevQ });
+    expect([...temporal.paletteIndex]).toEqual([...full.paletteIndex]);
+  });
+
+  // load-bearing: the skip path is actually taken — a tampered prior index propagates verbatim for an
+  // unchanged pixel (proves we copy, not re-match), and the byte-identity above depends on prevQ being
+  // the real quantize of prevFrame (which the live loop guarantees).
+  it("copies the prior index verbatim for an unchanged pixel (skip path is exercised)", () => {
+    const prev = detailed();
+    const prevQ = quantizeBayer(prev, pal);
+    const tampered = {
+      width: prevQ.width,
+      height: prevQ.height,
+      paletteIndex: Int32Array.from(prevQ.paletteIndex),
+      mapColorId: Uint8Array.from(prevQ.mapColorId),
+    };
+    const wrong = (prevQ.paletteIndex[0]! + 1) % pal.entries.length;
+    tampered.paletteIndex[0] = wrong;
+    tampered.mapColorId[0] = pal.entries[wrong]!.color.mapColorId;
+    // cur === prev (every pixel unchanged) → every pixel must be copied from `tampered`
+    const out = quantizeBayer(prev, pal, 0.06, undefined, undefined, prev, tampered);
+    expect(out.paletteIndex[0]).toBe(wrong);
+    expect([...out.paletteIndex]).toEqual([...tampered.paletteIndex]);
+  });
+
+  it("floyd-steinberg IGNORES prev (error diffusion is not position-deterministic)", () => {
+    const prev = detailed();
+    const cur = changedFrom(prev);
+    const prevQ = quantizeFrame(prev, pal, { method: "floyd-steinberg" });
+    const noPrev = quantizeFrame(cur, pal, { method: "floyd-steinberg" });
+    const withPrev = quantizeFrame(cur, pal, { method: "floyd-steinberg", prevImage: prev, prevQuantized: prevQ });
+    expect([...withPrev.paletteIndex]).toEqual([...noPrev.paletteIndex]);
   });
 });

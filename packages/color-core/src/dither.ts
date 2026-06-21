@@ -26,6 +26,30 @@ export interface QuantizeOptions {
    * (the hue-penalized search is exact). Best for stills/hero quality.
    */
   gamutMap?: number;
+  /**
+   * Live-cast temporal skip: the previous frame's RGB image + its quantized result. When BOTH are
+   * supplied (and dimensions match), a pixel whose input RGB equals the previous frame's at the same
+   * position copies the previous palette index instead of re-running the O(palette) match. Byte-
+   * identical for the position-deterministic dithers (bayer/none): the chosen index is a pure
+   * function of (r,g,b,bayerCell) and the palette/amplitude/gamut are frame-constant, so the copied
+   * index equals a freshly-matched one. A screencast is ~97% temporally static, so this skips nearly
+   * the whole frame. Ignored by floyd-steinberg (error diffusion is not position-deterministic).
+   * Absent => every pixel is matched exactly as before (all non-live callers stay byte-unchanged).
+   */
+  prevImage?: RgbImage;
+  prevQuantized?: QuantizedFrame;
+}
+
+/** Whether a temporal skip is usable: both prev buffers present and all dimensions match `img`. */
+function temporalUsable(img: RgbImage, prevImage?: RgbImage, prevQuantized?: QuantizedFrame): boolean {
+  return (
+    !!prevImage &&
+    !!prevQuantized &&
+    prevImage.width === img.width &&
+    prevImage.height === img.height &&
+    prevQuantized.width === img.width &&
+    prevQuantized.height === img.height
+  );
 }
 
 /** Nearest palette index for a linear-RGB triple - gamut-mapped, LUT (fast), or exact OKLab. */
@@ -67,9 +91,22 @@ function writePixel(frame: QuantizedFrame, p: number, entryIndex: number, mapCol
  * Pass a prebuilt `lut` (buildRgbLut) for O(1)/pixel matching - the fast path
  * for real-time/video; without it, exact brute-force OKLab match.
  */
-export function quantizeNearest(img: RgbImage, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): QuantizedFrame {
+export function quantizeNearest(
+  img: RgbImage,
+  pal: PreparedPalette,
+  lut?: RgbLut,
+  gamutMap?: number,
+  prevImage?: RgbImage,
+  prevQuantized?: QuantizedFrame,
+): QuantizedFrame {
   const frame = emptyFrame(img);
   const px = img.width * img.height;
+  // Temporal skip: copy the prior index where this pixel's RGB is unchanged (byte-identical, see
+  // QuantizeOptions). The match is a pure function of (r,g,b), so an unchanged pixel re-matches the
+  // same index. Skipped pixels never touch the memo accounting; matched pixels are unaffected.
+  const temporal = temporalUsable(img, prevImage, prevQuantized);
+  const pImg = temporal ? prevImage!.data : null;
+  const pIdx = temporal ? prevQuantized!.paletteIndex : null;
   // Exact memo for the brute-force path: with no LUT the match is a pure function of (r,g,b)
   // (gamutMap is frame-constant), so repeated colors reuse the result and skip the O(palette)
   // OKLab search. Byte-identical. The LUT path is already O(1)/pixel, so it skips the memo.
@@ -91,6 +128,11 @@ export function quantizeNearest(img: RgbImage, pal: PreparedPalette, lut?: RgbLu
     const r = img.data[i]!;
     const g = img.data[i + 1]!;
     const b = img.data[i + 2]!;
+    if (pImg && r === pImg[i]! && g === pImg[i + 1]! && b === pImg[i + 2]!) {
+      const idx = pIdx![p]!; // re-matching would return this same index (pure function of r,g,b)
+      writePixel(frame, p, idx, pal.entries[idx]!.color.mapColorId);
+      continue;
+    }
     let index: number;
     if (useLut) {
       index = lutNearest(lut!, r, g, b);
@@ -192,9 +234,17 @@ export function quantizeBayer(
   amplitude = 0.06,
   lut?: RgbLut,
   gamutMap?: number,
+  prevImage?: RgbImage,
+  prevQuantized?: QuantizedFrame,
 ): QuantizedFrame {
   const { width, height } = img;
   const frame = emptyFrame(img);
+  // Temporal skip: copy the prior index where this pixel's RGB is unchanged (byte-identical, see
+  // QuantizeOptions). bayer is position-deterministic, so an unchanged pixel at the same (x,y) cell
+  // re-matches the same index. Skipped pixels never touch the memo accounting.
+  const temporal = temporalUsable(img, prevImage, prevQuantized);
+  const pImg = temporal ? prevImage!.data : null;
+  const pIdx = temporal ? prevQuantized!.paletteIndex : null;
   // Exact memo: bayer is position-deterministic, so the match is a pure function of
   // (r, g, b, bayerCell) (amplitude/gamutMap are frame-constant). Real frames repeat colors
   // within each of the 64 cells → skip the O(palette) match on repeats. Byte-identical.
@@ -211,6 +261,11 @@ export function quantizeBayer(
       const r = img.data[i]!;
       const g = img.data[i + 1]!;
       const b = img.data[i + 2]!;
+      if (pImg && r === pImg[i]! && g === pImg[i + 1]! && b === pImg[i + 2]!) {
+        const idx = pIdx![p]!; // re-matching would return this same index (pure fn of r,g,b,cell)
+        writePixel(frame, p, idx, pal.entries[idx]!.color.mapColorId);
+        continue;
+      }
       let index: number;
       if (memoOn) {
         const key = ((r << 16) | (g << 8) | b) * 64 + ((y & 7) << 3) + (x & 7);
@@ -248,11 +303,15 @@ export function quantizeFrame(
 ): QuantizedFrame {
   switch (opts.method ?? "floyd-steinberg") {
     case "none":
-      return quantizeNearest(img, pal, opts.lut, opts.gamutMap);
+      // position-deterministic → temporal skip is byte-identical (prev threaded through)
+      return quantizeNearest(img, pal, opts.lut, opts.gamutMap, opts.prevImage, opts.prevQuantized);
     case "bayer":
-      return quantizeBayer(img, pal, opts.bayerAmplitude, opts.lut, opts.gamutMap);
+      // position-deterministic → temporal skip is byte-identical (prev threaded through)
+      return quantizeBayer(img, pal, opts.bayerAmplitude, opts.lut, opts.gamutMap, opts.prevImage, opts.prevQuantized);
     case "floyd-steinberg":
     default:
+      // error diffusion is NOT position-deterministic — a pixel depends on its neighbours' diffused
+      // error, so a temporal skip would corrupt it. Always full-quantize (prev intentionally ignored).
       return quantizeFloydSteinberg(img, pal, opts.lut, opts.gamutMap);
   }
 }
