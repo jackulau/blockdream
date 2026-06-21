@@ -302,23 +302,30 @@ export function frameToWallCommands(
   const W = frame.width;
   const facing = opts.facing ?? "south";
 
-  const curQ = quantizeFrame(toRgb(frame), pal, { method: dither });
-  let cells: Cell[];
+  // Quantize prev FIRST (reused from the live loop's threaded `quantized`, else fresh), then quantize
+  // the CURRENT frame with a temporal skip against it: a screencast is ~97% static, so most pixels
+  // copy their prior palette index instead of re-running the O(palette) OKLab match. Byte-identical
+  // for the position-deterministic dithers used on this path (bayer default / none) — see
+  // quantizeFrame's prevImage/prevQuantized. (Floyd would be ignored by quantizeFrame anyway.)
+  let prevQ: QuantizedFrame | undefined;
+  let prevRgb: RgbImage | undefined;
   if (prevFrame) {
     if (prevFrame.width !== frame.width || prevFrame.height !== frame.height) {
       throw new Error(`prevFrame ${prevFrame.width}×${prevFrame.height} != frame ${frame.width}×${frame.height}`);
     }
+    prevRgb = toRgb(prevFrame);
     // reuse the caller's prior `quantized` for prevFrame when its dimensions match (the live
     // loop threads it back so each frame is quantized exactly once); else quantize fresh.
     const reuse =
       opts.prevQuantized &&
       opts.prevQuantized.width === prevFrame.width &&
       opts.prevQuantized.height === prevFrame.height;
-    const prevQ = reuse ? opts.prevQuantized! : quantizeFrame(toRgb(prevFrame), pal, { method: dither });
-    cells = computeDeltas([prevQ, curQ])[1]!.cells;
-  } else {
-    cells = computeDeltas([curQ])[0]!.cells; // full keyframe
+    prevQ = reuse ? opts.prevQuantized! : quantizeFrame(prevRgb, pal, { method: dither });
   }
+  const curQ = quantizeFrame(toRgb(frame), pal, { method: dither, prevImage: prevRgb, prevQuantized: prevQ });
+  const cells: Cell[] = prevFrame
+    ? computeDeltas([prevQ!, curQ])[1]!.cells
+    : computeDeltas([curQ])[0]!.cells; // full keyframe when no prev
 
   // image → world cells, merged with carried-over cells (fresh delta wins per coordinate)
   const pending = new Map<string, PlacedCell>();
