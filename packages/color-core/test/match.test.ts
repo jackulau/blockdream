@@ -76,19 +76,21 @@ describe("nearest match", () => {
 describe("L-band exact match (byte-identical to brute force)", () => {
   it("builds a monotone L-sorted structure covering every entry", () => {
     expect(pal.sortedOrigIdx.length).toBe(pal.entries.length);
-    expect(pal.sortedLab.length).toBe(pal.entries.length * 3);
+    expect(pal.sortedL.length).toBe(pal.entries.length);
+    expect(pal.sortedA.length).toBe(pal.entries.length);
+    expect(pal.sortedB.length).toBe(pal.entries.length);
     // every original index appears exactly once
     const seen = new Set(pal.sortedOrigIdx);
     expect(seen.size).toBe(pal.entries.length);
     // L is non-decreasing, and each slot's coords match the referenced entry
     for (let p = 1; p < pal.sortedOrigIdx.length; p++) {
-      expect(pal.sortedLab[p * 3]!).toBeGreaterThanOrEqual(pal.sortedLab[(p - 1) * 3]!);
+      expect(pal.sortedL[p]!).toBeGreaterThanOrEqual(pal.sortedL[p - 1]!);
     }
     for (let p = 0; p < pal.sortedOrigIdx.length; p++) {
       const e = pal.entries[pal.sortedOrigIdx[p]!]!.lab;
-      expect(pal.sortedLab[p * 3]!).toBe(e.L);
-      expect(pal.sortedLab[p * 3 + 1]!).toBe(e.a);
-      expect(pal.sortedLab[p * 3 + 2]!).toBe(e.b);
+      expect(pal.sortedL[p]!).toBe(e.L);
+      expect(pal.sortedA[p]!).toBe(e.a);
+      expect(pal.sortedB[p]!).toBe(e.b);
     }
   });
 
