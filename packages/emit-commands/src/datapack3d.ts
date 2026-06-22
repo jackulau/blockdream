@@ -160,8 +160,12 @@ export function generateVoxelDatapack(
     const resolve = (id: number) => blockOf(id, resolveBlock, fallback, air);
     let lines: string[];
     if (opts.optimize) {
+      // Explicit field construction (NOT `{ ...c, x: … }`): a VoxelCell is exactly
+      // {x,y,z,mapColorId}, so this builds an identical object but skips the object-spread's
+      // runtime key enumeration — ~5x faster on this 1-per-cell map (65→13ms at 256px / 1.47M
+      // cells). Matches voxelToLiveCommands above (line ~130) which already does this.
       lines = opts.optimize(
-        d.cells.map((c) => ({ ...c, x: origin.x + c.x, y: origin.y + c.y, z: origin.z + c.z })),
+        d.cells.map((c) => ({ x: origin.x + c.x, y: origin.y + c.y, z: origin.z + c.z, mapColorId: c.mapColorId })),
         resolve,
       );
     } else {
