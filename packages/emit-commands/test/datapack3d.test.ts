@@ -68,6 +68,28 @@ describe("generateVoxelDatapack (3D)", () => {
     expect(f0).toContain("fill 0 64 0 1 64 0 minecraft:c1 replace"); // the two c1 cells → one /fill
     expect(f0).toContain("setblock 2 64 0 minecraft:c2 replace"); // singleton stays /setblock
   });
+
+  it("optimize callback receives origin-offset cells with mapColorId preserved (explicit-build invariant)", () => {
+    // The optimize branch builds each cell explicitly ({x,y,z,mapColorId}) instead of object-spread
+    // for speed; this guards that the offset coords AND the mapColorId still arrive intact (a botched
+    // spread-removal would silently drop mapColorId → every fill resolves to the fallback block).
+    let captured: Array<{ x: number; y: number; z: number; mapColorId: number }> = [];
+    generateVoxelDatapack([lineVolume()], resolve, {
+      origin: { x: 10, y: 70, z: -5 },
+      optimize: (cells, r) => {
+        captured = cells.map((c) => ({ ...c }));
+        return fillBatch(cells, r);
+      },
+    });
+    // lineVolume: (0,0,0)=1, (1,0,0)=1, (2,0,0)=2 — offset by origin (10,70,-5)
+    expect(captured).toEqual([
+      { x: 10, y: 70, z: -5, mapColorId: 1 },
+      { x: 11, y: 70, z: -5, mapColorId: 1 },
+      { x: 12, y: 70, z: -5, mapColorId: 2 },
+    ]);
+    // each cell has EXACTLY the four fields (no stray spread leftovers, none missing)
+    for (const c of captured) expect(Object.keys(c).sort()).toEqual(["mapColorId", "x", "y", "z"]);
+  });
 });
 
 describe("start/stop chunk lifecycle (3D)", () => {
