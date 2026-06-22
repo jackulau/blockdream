@@ -153,6 +153,13 @@ export function buildVoxelMcStructure(
   };
   intern(fill);
 
+  // Cache the palette index per raw mapColorId so a repeated voxel skips the resolve + the
+  // per-cell `JSON.stringify(states)` string key (the hot spot: at 256px/4.2M cells the intern
+  // loop was ~96% of build time, since a build reuses only a few dozen distinct blocks across
+  // millions of cells). `blockFor` is a pure id->block lookup and EMPTY always maps to `fill`, so
+  // the first cell using each id still interns in the same x->y->z scan order: every distinct
+  // block key lands at the same palette index it would under per-cell interning. Byte-identical.
+  const idToPaletteIdx = new Map<number, number>();
   const layer0 = new Int32Array(W * H * D);
   const layer1 = new Int32Array(W * H * D);
   for (let x = 0; x < W; x++) {
@@ -160,8 +167,13 @@ export function buildVoxelMcStructure(
       for (let z = 0; z < D; z++) {
         const idx = (x * H + y) * D + z;
         const id = getVoxel(volume, x, y, z);
-        const block = id === EMPTY ? fill : (blockFor(id) ?? fill);
-        layer0[idx] = intern(block);
+        let pi = idToPaletteIdx.get(id);
+        if (pi === undefined) {
+          const block = id === EMPTY ? fill : (blockFor(id) ?? fill);
+          pi = intern(block);
+          idToPaletteIdx.set(id, pi);
+        }
+        layer0[idx] = pi;
         layer1[idx] = -1;
       }
     }
