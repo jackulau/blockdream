@@ -44,6 +44,10 @@ Options:
                        harp bass basedrum snare hat bell flute chime guitar xylophone
                        iron_xylophone cow_bell didgeridoo bit banjo pling
   --music-origin <x,y,z>  where the note-block music area spawns (default: beside the build)
+  --music-engine <e> how the note blocks play. playsound | redstone (default: playsound).
+                       playsound = a tick-driven /playsound clock strikes them. redstone =
+                       a physical repeater delay-line powers the note blocks themselves, so
+                       the build literally plays the song (rising-edge trigger).
   --version <ver>    target Minecraft version: 1.21 .. 1.21.10 (default: 1.21).
                        Sets pack_format / DataVersion / block stamps. Java datapacks
                        also declare supported_formats so one pack loads across the
@@ -91,6 +95,7 @@ export function runCli(argv: string[]): number {
       music: { type: "string" },
       instrument: { type: "string" },
       "music-origin": { type: "string" },
+      "music-engine": { type: "string" },
       version: { type: "string" },
       out: { type: "string" },
       palette: { type: "string" },
@@ -189,6 +194,12 @@ export function runCli(argv: string[]): number {
     return 2;
   }
 
+  const musicEngine = values["music-engine"] as "playsound" | "redstone" | undefined;
+  if (musicEngine !== undefined && musicEngine !== "playsound" && musicEngine !== "redstone") {
+    process.stderr.write(`unknown --music-engine "${musicEngine}" (valid: playsound | redstone)\n`);
+    return 2;
+  }
+
   let musicOrigin: { x: number; y: number; z: number } | undefined;
   if (values["music-origin"]) {
     const m = /^(-?\d+),(-?\d+),(-?\d+)$/.exec(values["music-origin"]);
@@ -201,8 +212,8 @@ export function runCli(argv: string[]): number {
 
   // Note-block music only attaches to the voxel3d datapack (where generateVoxelDatapack's music lives).
   // Warn rather than silently no-op so the music flags can't mislead on another target.
-  if ((values.music || values.instrument || values["music-origin"]) && target !== "voxel3d") {
-    process.stderr.write(`note: --music/--instrument/--music-origin apply only to --target voxel3d (ignored for ${target})\n`);
+  if ((values.music || values.instrument || values["music-origin"] || values["music-engine"]) && target !== "voxel3d") {
+    process.stderr.write(`note: --music/--instrument/--music-origin/--music-engine apply only to --target voxel3d (ignored for ${target})\n`);
   }
 
   const opts: RenderOptions = {
@@ -231,6 +242,7 @@ export function runCli(argv: string[]): number {
     music,
     musicInstrument: instrument,
     musicOrigin,
+    musicEngine,
   };
 
   try {

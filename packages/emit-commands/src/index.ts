@@ -5,6 +5,7 @@ export * from "./validate";
 export * from "./datapack";
 export * from "./datapack3d";
 export * from "./note-sequencer";
+export * from "./redstone-sequencer";
 export * from "./fill";
 export * from "./zip";
 export * from "./package";

@@ -68,6 +68,7 @@ export interface RenderOptions {
   music?: MusicMode; // voxel3d: video audio → note-block music (auto = on iff the input has an audio track)
   musicInstrument?: string; // note-block instrument for the music (default harp)
   musicOrigin?: { x: number; y: number; z: number }; // where the note-block music area spawns (default beside the build)
+  musicEngine?: "playsound" | "redstone"; // voxel3d: "playsound" clock (default) or a physical "redstone" delay-line that plays the note blocks
 }
 
 /** Note-block music inclusion for a video import. auto = on iff the input carries audio. */
@@ -343,10 +344,15 @@ export function render(opts: RenderOptions): RenderResult {
       optimize: (cells, r) => greedyBoxes(cells, r),
       music,
       musicOrigin: opts.musicOrigin,
+      musicEngine: opts.musicEngine,
     });
     if (music?.length) {
+      const engine =
+        opts.musicEngine === "redstone"
+          ? "a physical redstone delay-line plays the note blocks"
+          : "a tick-driven playsound clock";
       notes.push(
-        `note-block music: ${music.length} notes from the audio track (instrument ${opts.musicInstrument ?? "harp"}); plays on /function ${pack.namespace}:start.`,
+        `note-block music: ${music.length} notes from the audio track (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`,
       );
     }
     const vv = volumes[0]!;

@@ -176,6 +176,8 @@ node --check tools/mineflayer-collector/scale-datapack-e2e.mjs
 ok "node --check scale-datapack-e2e.mjs"
 node --check tools/mineflayer-collector/music-datapack-e2e.mjs
 ok "node --check music-datapack-e2e.mjs"
+node --check tools/mineflayer-collector/redstone-music-e2e.mjs
+ok "node --check redstone-music-e2e.mjs"
 if [ "${BLOCKDREAM_E2E:-}" = "1" ]; then
   node tools/mineflayer-collector/bridge-e2e.mjs >/dev/null
   ok "bridge-e2e live run (vanilla server + bot + sidecar)"
@@ -185,8 +187,10 @@ if [ "${BLOCKDREAM_E2E:-}" = "1" ]; then
   ok "scale-datapack-e2e live run (large 3D voxel build → vanilla server executes it at scale, sampled voxels cell-exact)"
   node tools/mineflayer-collector/music-datapack-e2e.mjs >/dev/null
   ok "music-datapack-e2e live run (voxel3d --music → vanilla server places the note-block area + drives the music clock)"
+  node tools/mineflayer-collector/redstone-music-e2e.mjs >/dev/null
+  ok "redstone-music-e2e live run (voxel3d --music-engine redstone → vanilla server builds the note-block instrument + the delay-line conducts the pulse end-to-end)"
 else
-  skipped_allowed "bridge-e2e + datapack-e2e + scale-datapack-e2e + music-datapack-e2e live runs - set BLOCKDREAM_E2E=1 (needs network for the Mojang server jar + Java 21 + ffmpeg; ~60s)"
+  skipped_allowed "bridge-e2e + datapack-e2e + scale-datapack-e2e + music-datapack-e2e + redstone-music-e2e live runs - set BLOCKDREAM_E2E=1 (needs network for the Mojang server jar + Java 21 + ffmpeg; ~70s)"
 fi
 
 printf '\nverify-all: %d passed, %d skipped - ' "$pass" "$skip"

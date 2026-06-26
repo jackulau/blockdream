@@ -166,3 +166,73 @@ d("CLI flag plumbing", () => {
     expect(setup).toContain("minecraft:note_block[note=");
   });
 });
+
+// --music-engine playsound|redstone: the same transcribed melody, two ways to make sound.
+// playsound (default) = decorative keyboard + a /playsound clock. redstone = a physical
+// repeater delay-line that powers the note blocks themselves. The default MUST stay
+// byte-identical to a build with no --music-engine set.
+d("redstone music engine (--music-engine)", () => {
+  it("default engine stays playsound — no redstone leaks into the pack", () => {
+    const out = join(dir, "engine-default");
+    render({ input: avClip, out, target: "voxel3d", width: 24, height: 24, maxFrames: 3, depth: 6, music: "on" });
+    const music = readFileSync(musicPath(out), "utf8");
+    expect(music).toContain("playsound minecraft:block.note_block");
+    expect(music).not.toContain("redstone_block");
+    expect(setupText(out)).not.toContain("minecraft:repeater");
+  });
+
+  it("--music-engine playsound is byte-identical to the default", () => {
+    const a = join(dir, "engine-explicit-ps");
+    const b = join(dir, "engine-default-ps");
+    render({ input: avClip, out: a, target: "voxel3d", width: 24, height: 24, maxFrames: 3, depth: 6, music: "on", musicEngine: "playsound" });
+    render({ input: avClip, out: b, target: "voxel3d", width: 24, height: 24, maxFrames: 3, depth: 6, music: "on" });
+    expect(readFileSync(musicPath(a), "utf8")).toBe(readFileSync(musicPath(b), "utf8"));
+    expect(setupText(a)).toBe(setupText(b));
+  });
+
+  it("--music-engine redstone builds a physical repeater delay-line that plays the note blocks", () => {
+    const out = join(dir, "engine-redstone");
+    const res = render({ input: avClip, out, target: "voxel3d", width: 24, height: 24, maxFrames: 3, depth: 6, music: "on", musicEngine: "redstone" });
+    // melody is physical: the music function carries NO playsound, only the re-pulse metronome
+    const music = readFileSync(musicPath(out), "utf8");
+    expect(music).not.toContain("playsound");
+    expect(music).toContain("minecraft:redstone_block");
+    // the physical track lives in setup: a smooth_stone spine carrying redstone dust
+    // with tuned note blocks beside it (this 1-note clip has no inter-note gap, so no
+    // repeater — the repeater delay-line is covered by redstone-sequencer.test.ts's
+    // multi-note fixture; here we prove the engine is WIRED end-to-end through the CLI).
+    const setup = setupText(out);
+    expect(setup).toContain("minecraft:smooth_stone"); // track floor — absent in playsound mode
+    expect(setup).toContain("minecraft:redstone_wire"); // the timing spine
+    expect(setup).toContain("minecraft:note_block[note=");
+    expect(res.notes.some((n) => /redstone delay-line/.test(n))).toBe(true);
+  });
+
+  it("runCli --music-engine redstone returns 0 and writes the redstone track", () => {
+    const out = join(dir, "cli-redstone");
+    const code = runCli(["render", avClip, "--target", "voxel3d", "--grid", "24x24", "--max-frames", "3", "--depth", "6", "--music", "on", "--music-engine", "redstone", "--out", out]);
+    expect(code).toBe(0);
+    expect(setupText(out)).toContain("minecraft:redstone_wire");
+  });
+
+  it("rejects an unknown --music-engine", () => {
+    const code = runCli(["render", avClip, "--target", "voxel3d", "--music", "on", "--music-engine", "pistons", "--out", join(dir, "bad-engine")]);
+    expect(code).toBe(2);
+  });
+
+  // Composition: redstone engine + a NEGATIVE --music-origin. The coordinate-bug class
+  // (node parseArgs rejecting a dash-leading value) recurred on --origin/--music-origin
+  // (goals 055/056); the existing negative-origin lock only exercises the default playsound
+  // engine. Prove the redstone delay-line also builds at common negative in-world coords.
+  it("builds the redstone track at a NEGATIVE --music-origin", () => {
+    const out = join(dir, "redstone-neg-origin");
+    const code = runCli(["render", avClip, "--target", "voxel3d", "--grid", "24x24", "--max-frames", "3", "--depth", "6", "--music", "on", "--music-engine", "redstone", "--music-origin", "-20,70,-30", "--out", out]);
+    expect(code).toBe(0);
+    const setup = setupText(out);
+    // the redstone input/spine lands at the negative origin (input at x-1 = -21), proving the
+    // negative coords reached the redstone emitter verbatim — not rejected, not zeroed.
+    expect(setup).toContain("setblock -21 70 -30 minecraft:air"); // pulse input cell
+    expect(setup).toContain("minecraft:redstone_wire");
+    expect(setup).toContain("minecraft:note_block[note=");
+  });
+});
