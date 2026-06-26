@@ -42,10 +42,11 @@ describe("redstoneSequencer", () => {
   });
 
   it("builds a repeater delay-line whose cumulative delay equals each note's onset", () => {
-    // note 1 (rt delay 3 from note 0) → one repeater delay=3 at x=101
-    expect(blocks).toContain("setblock 101 64 0 minecraft:repeater[facing=east,delay=3] replace");
+    // note 1 (rt delay 3 from note 0) → one repeater delay=3 at x=101.
+    // facing=west: input/back faces the powered cell to its west, output drives east (+X).
+    expect(blocks).toContain("setblock 101 64 0 minecraft:repeater[facing=west,delay=3] replace");
     // note 2 (rt delay 3 from note 1) → one repeater delay=3 at x=103
-    expect(blocks).toContain("setblock 103 64 0 minecraft:repeater[facing=east,delay=3] replace");
+    expect(blocks).toContain("setblock 103 64 0 minecraft:repeater[facing=west,delay=3] replace");
     // tap cells carry redstone dust on the spine
     expect(blocks).toContain("setblock 100 64 0 minecraft:redstone_wire replace");
     expect(blocks).toContain("setblock 102 64 0 minecraft:redstone_wire replace");

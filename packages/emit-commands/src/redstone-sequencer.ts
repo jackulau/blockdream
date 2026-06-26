@@ -118,10 +118,14 @@ export function redstoneSequencer(
     const delay = Math.max(0, rt - prevRt);
     prevRt = rt;
 
-    // Delay segment: repeaters facing east carry + delay the pulse to this note.
+    // Delay segment: repeaters carry + delay the pulse east to this note. A repeater's
+    // `facing` is the direction its INPUT/back faces (where the signal comes FROM), so a
+    // pulse travelling +X (input at x-1, west) needs `facing=west`: back to the west, the
+    // powered dust/redstone behind it; front/output to the east, the next cell. (Confirmed
+    // empirically on a real 1.21.1 server in the D3 e2e — `facing=east` does NOT conduct.)
     for (const d of distributeDelay(delay)) {
       blocks.push(`setblock ${cx} ${y - 1} ${z} ${floor} replace`);
-      blocks.push(`setblock ${cx} ${y} ${z} minecraft:repeater[facing=east,delay=${d}] replace`);
+      blocks.push(`setblock ${cx} ${y} ${z} minecraft:repeater[facing=west,delay=${d}] replace`);
       blocks.push(`setblock ${cx} ${y + 1} ${z} minecraft:air replace`);
       cx += 1;
     }
