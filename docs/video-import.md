@@ -66,12 +66,21 @@ and `packages/cli/test/animate-cli.test.ts` (explode/wave/buildup wired to voxel
 
 When the imported video **has an audio track**, the build can come with **Minecraft note blocks that
 play that audio**. The audio is transcribed to a melodic note-block line (monophonic — the dominant
-pitch per ~50 ms hop) and emitted two ways into the 3D voxel datapack:
+pitch per ~50 ms hop) and emitted into the 3D voxel datapack as a **physical "music area"** (one tuned
+`note_block[note=N,instrument=…]` per note, on its instrument base block with air above so it is
+audible — visible and editable in-world) plus an **engine** that strikes those note blocks in time.
+Two engines, chosen with `--music-engine` (default `playsound`):
 
-- a **physical "music area"**: one tuned `note_block[note=N,instrument=…]` per distinct pitch, placed
-  on its instrument base block, so the notes are visible and editable in-world;
-- a **tick-driven sequencer** (`music.mcfunction`) that plays the melody with positional `playsound`
-  on the same scoreboard clock as the build animation — robust vanilla audio, no redstone wiring.
+- **`playsound`** (default) — a tick-driven sequencer (`music.mcfunction`) plays the melody with
+  positional `playsound` on the same scoreboard clock as the build animation. Robust vanilla audio,
+  smallest footprint, no wiring. Byte-identical to the pre-`--music-engine` output.
+- **`redstone`** — a **physical repeater delay-line** is built beside the note blocks. A pulse enters
+  one end and propagates down a spine of repeaters; each note's onset is quantised to the redstone grid
+  (1 redstone tick = 2 game ticks) and realised by repeater delay (1..4 rt each, chained for longer
+  gaps), so the pulse strikes each note block on its rising edge exactly on time. The build literally
+  plays itself; `music.mcfunction` shrinks to a once-per-loop re-pulse metronome. Bigger footprint,
+  100 ms timing granularity. Proven end-to-end on a real 1.21.1 server
+  (`tools/mineflayer-collector/redstone-music-e2e.mjs`, `BLOCKDREAM_E2E=1`).
 
 The analysis core is `@blockdream/audio` (`analyzeAudio(pcm, sampleRate, opts) → NoteEvent[]`):
 autocorrelation pitch detection with YIN-style octave correction, RMS-gated onsets (silence yields no
@@ -84,9 +93,12 @@ DOM-free, shared by both the CLI and the browser.
   - `--instrument <name>` — note-block instrument (default `harp`; `bass`, `bell`, `flute`, `chime`,
     `guitar`, `xylophone`, `pling`, …)
   - `--music-origin x,y,z` — where the music area spawns (default: beside the build)
+  - `--music-engine playsound|redstone` — how the note blocks are struck (default `playsound`; see above)
 
   ```bash
   blockdream render clip.mp4 --target voxel3d --music on --instrument bell --out ./build-with-music
+  # build a self-playing redstone instrument instead of a playsound clock:
+  blockdream render clip.mp4 --target voxel3d --music on --music-engine redstone --out ./redstone-music
   ```
 
 - **Web (builder canvas mod):** importing a video auto-decodes its audio (Web Audio
@@ -99,7 +111,9 @@ DOM-free, shared by both the CLI and the browser.
 
 Tests: `packages/audio/test/analyze.test.ts` (pitch detection on synthesized sines/scales),
 `packages/video/test/audio.test.ts` (ffmpeg PCM extraction), `packages/emit-commands/test/note-sequencer.test.ts`
-(note-block placement + playsound + additive datapack), `packages/cli/test/music-cli.test.ts`
-(`--music` end-to-end), `apps/web/test/audio.test.ts` (browser decode→analyze glue),
+(note-block placement + playsound + additive datapack),
+`packages/emit-commands/test/redstone-sequencer.test.ts` (the redstone delay-line emitter — repeater
+delays, tuned note blocks, cumulative-delay == onset), `packages/cli/test/music-cli.test.ts`
+(`--music` / `--music-engine` end-to-end), `apps/web/test/audio.test.ts` (browser decode→analyze glue),
 `apps/web/test/canvas-mod.test.ts` (drag/projection/toggle math), and
 `apps/web/test/datapack-export.test.ts` (the arranged music carried into the export).

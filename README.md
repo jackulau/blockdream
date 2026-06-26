@@ -98,8 +98,10 @@ Two coupled workstreams (full map in [docs/architecture.md](./docs/architecture.
 - **Workstream A - Block-art renderer.** Images / GIFs / videos → Minecraft blocks, colour-matched
   in OKLab, native on **both Java and Bedrock** (maps, structures, datapacks, behaviour packs). 2D
   walls *and* real 3D voxel builds, with animation + glTF/video import. A video's **audio becomes
-  in-world note blocks** (`--music`), and the 3D builder's **canvas mod** drags the build and the
-  note-block "music area" independently, with a note-block on/off toggle.
+  in-world note blocks** (`--music`) - struck by a tick-driven playsound clock, or by a **physical
+  redstone delay-line** (`--music-engine redstone`) so the build literally plays itself - and the
+  3D builder's **canvas mod** drags the build and the note-block "music area" independently, with a
+  note-block on/off toggle.
 - **Workstream B - Neural world model.** Action-conditioned interactive Minecraft world model: a
   served autoregressive (MineWorld-style) model + a latent-diffusion track exported to ONNX for a
   server-free, in-browser engine. Plus a separate driving world model (real comma.ai commaVQ) whose
@@ -134,7 +136,7 @@ ml/               # Workstream B - world model (Python / PyTorch)
 - [Live cast into a running world](./docs/live-cast.md) - stream the world model onto a block wall in-place (no mod, no datapack); the transport + honest frame rates
 - [Play it in Minecraft without Fabric](./docs/play-without-fabric.md) - offline cast + live RCON bridge
 - [3D builds & animation](./docs/3d-and-animation.md) - image→3D, greedy meshing, animation system
-- [Importing animations](./docs/video-import.md) - glTF / .glb / .obj-sequence / GIF / video (.mp4/.webm) → blocks; `--animate explode|wave|buildup` for procedural block-motion; **video audio → note blocks** (`--music auto|on|off`) + the builder's drag-to-arrange canvas mod
+- [Importing animations](./docs/video-import.md) - glTF / .glb / .obj-sequence / GIF / video (.mp4/.webm) → blocks; `--animate explode|wave|buildup` for procedural block-motion; **video audio → note blocks** (`--music auto|on|off`, `--music-engine playsound|redstone`) + the builder's drag-to-arrange canvas mod
 - [World models - full guide](./docs/world-models-guide.md) - models, train/serve/run, movement types, browser diffusion
 - Also: [colour theory](./docs/color-theory.md), [command-block optimization](./docs/command-block-optimization.md),
   [real world models](./docs/real-world-models.md), [movement types](./docs/movement-types.md),

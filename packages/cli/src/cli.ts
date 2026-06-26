@@ -44,6 +44,10 @@ Options:
                        harp bass basedrum snare hat bell flute chime guitar xylophone
                        iron_xylophone cow_bell didgeridoo bit banjo pling
   --music-origin <x,y,z>  where the note-block music area spawns (default: beside the build)
+  --music-engine <e> how the note blocks play. playsound | redstone (default: playsound).
+                       playsound = a tick-driven /playsound clock strikes them. redstone =
+                       a physical repeater delay-line powers the note blocks themselves, so
+                       the build literally plays the song (rising-edge trigger).
   --version <ver>    target Minecraft version: 1.21 .. 1.21.10 (default: 1.21).
                        Sets pack_format / DataVersion / block stamps. Java datapacks
                        also declare supported_formats so one pack loads across the

@@ -219,4 +219,20 @@ d("redstone music engine (--music-engine)", () => {
     const code = runCli(["render", avClip, "--target", "voxel3d", "--music", "on", "--music-engine", "pistons", "--out", join(dir, "bad-engine")]);
     expect(code).toBe(2);
   });
+
+  // Composition: redstone engine + a NEGATIVE --music-origin. The coordinate-bug class
+  // (node parseArgs rejecting a dash-leading value) recurred on --origin/--music-origin
+  // (goals 055/056); the existing negative-origin lock only exercises the default playsound
+  // engine. Prove the redstone delay-line also builds at common negative in-world coords.
+  it("builds the redstone track at a NEGATIVE --music-origin", () => {
+    const out = join(dir, "redstone-neg-origin");
+    const code = runCli(["render", avClip, "--target", "voxel3d", "--grid", "24x24", "--max-frames", "3", "--depth", "6", "--music", "on", "--music-engine", "redstone", "--music-origin", "-20,70,-30", "--out", out]);
+    expect(code).toBe(0);
+    const setup = setupText(out);
+    // the redstone input/spine lands at the negative origin (input at x-1 = -21), proving the
+    // negative coords reached the redstone emitter verbatim — not rejected, not zeroed.
+    expect(setup).toContain("setblock -21 70 -30 minecraft:air"); // pulse input cell
+    expect(setup).toContain("minecraft:redstone_wire");
+    expect(setup).toContain("minecraft:note_block[note=");
+  });
 });
