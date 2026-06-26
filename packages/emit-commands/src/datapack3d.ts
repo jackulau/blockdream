@@ -9,6 +9,7 @@ import type { NoteEvent } from "@blockdream/audio";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
 import { fillLines, greedyBoxes } from "./fill";
 import { noteSequencer, type Vec3 } from "./note-sequencer";
+import { redstoneSequencer } from "./redstone-sequencer";
 import type { DatapackOptions, GeneratedPack } from "./datapack";
 
 const RESERVED = new Set(["minecraft"]);
@@ -80,6 +81,14 @@ export interface VoxelDatapackOptions extends DatapackOptions {
   music?: NoteEvent[];
   /** World position of the music area. Default: just past the build along +X. */
   musicOrigin?: Vec3;
+  /**
+   * How the note blocks are driven. "playsound" (default) plays the melody from a
+   * tick-driven `/playsound` clock beside a decorative tuned keyboard — frame-accurate.
+   * "redstone" instead builds a physical repeater delay-line that powers the note
+   * blocks themselves in onset order, so the blocks play the song. The default is
+   * byte-identical to a build with no `musicEngine` set.
+   */
+  musicEngine?: "playsound" | "redstone";
 }
 
 function blockOf(id: number, resolveBlock: (id: number) => string | undefined, fallback: string, air: string): string {
@@ -192,11 +201,22 @@ export function generateVoxelDatapack(
   // `seq` is undefined and every music-conditioned spread below is empty, so the
   // emitted pack is byte-identical to a music-less build.
   const music = opts.music && opts.music.length ? opts.music : undefined;
-  const seq = music
-    ? noteSequencer(music, {
-        musicOrigin: opts.musicOrigin ?? { x: origin.x + sx + 2, y: origin.y, z: origin.z },
-      })
-    : undefined;
+  const musicOrigin = opts.musicOrigin ?? { x: origin.x + sx + 2, y: origin.y, z: origin.z };
+  // Unified shape over both engines: `physical` is placed in setup (after the build
+  // box is cleared, so it survives), `musicLines` becomes music.mcfunction, and
+  // `setupScores` seeds the shared #mt/#mtcount clock. The playsound branch calls
+  // noteSequencer with the identical musicOrigin → byte-identical to before.
+  const seq = !music
+    ? undefined
+    : (opts.musicEngine ?? "playsound") === "redstone"
+      ? (() => {
+          const r = redstoneSequencer(music, { musicOrigin });
+          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores };
+        })()
+      : (() => {
+          const n = noteSequencer(music, { musicOrigin });
+          return { physical: n.keyboard, musicLines: n.musicLines, setupScores: n.setupScores };
+        })();
 
   files.set(
     `${fnDir}/setup.mcfunction`,
@@ -211,7 +231,7 @@ export function generateVoxelDatapack(
       ...(seq ? seq.setupScores : []),
       `forceload add ${x0} ${z0} ${x1} ${z1}`,
       ...fillLines(x0, y0, z0, x1, y1, z1, air, "replace"), // clear the build box (split at the 32768 /fill cap)
-      ...(seq ? seq.keyboard : []), // place the physical tuned note-block music area
+      ...(seq ? seq.physical : []), // place the physical music area (tuned keyboard or redstone track)
       `function ${ns}:frames/0`,
       "",
     ].join("\n"),
