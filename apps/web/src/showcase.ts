@@ -21,7 +21,7 @@ import {
   type SequenceAnimName,
   type VoxelVolume,
 } from "@blockdream/voxel";
-import { rgbFramesToAnimated3d } from "./video3d";
+import { rgbFramesToFlat3d } from "./video3d";
 import { isVideoFile, decodeVideo } from "./video";
 import { analyzeFileAudio } from "./audio";
 import type { NoteEvent } from "@blockdream/audio";
@@ -246,6 +246,31 @@ function rgbImageFromCanvas(src: HTMLCanvasElement, gridW: number): RgbImage {
   return { width: w, height: h, data: out };
 }
 
+// Like rgbImageFromCanvas, but ALSO returns a 1=air mask from the source alpha (alpha < 128 → air),
+// for the flat animation path: a transparent GIF/video pixel becomes air so the subject floats instead
+// of sitting on a filled rectangle. An opaque clip (e.g. any video) yields an all-zero mask (full frame).
+function rgbAndAirFromCanvas(src: HTMLCanvasElement, gridW: number): { rgb: RgbImage; air: Uint8Array } {
+  const aspect = src.height / src.width || 1;
+  const w = Math.min(gridW, src.width);
+  const h = Math.max(1, Math.round(w * aspect));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.clearRect(0, 0, w, h); // transparent default so untouched pixels read as air, not black
+  ctx.drawImage(src, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const out = new Uint8Array(w * h * 3);
+  const air = new Uint8Array(w * h);
+  for (let i = 0, j = 0, p = 0; i < data.length; i += 4, j += 3, p++) {
+    out[j] = data[i]!;
+    out[j + 1] = data[i + 1]!;
+    out[j + 2] = data[i + 2]!;
+    if (data[i + 3]! < 128) air[p] = 1;
+  }
+  return { rgb: { width: w, height: h, data: out }, air };
+}
+
 function rgbImageFromImg(img: HTMLImageElement, gridW: number): RgbImage {
   const aspect = img.naturalHeight / img.naturalWidth || 1;
   const w = gridW;
@@ -454,9 +479,10 @@ async function setup3dViewer(): Promise<void> {
 
   // import a real animation → block animation: a Blender glTF/.glb (node-TRS animation sampled to
   // frames), an .obj-per-frame sequence (select multiple), a single .obj model, an animated .gif,
-  // or a VIDEO file (.mp4/.webm/.mov — decoded natively in the browser, no ffmpeg).
-  $<HTMLInputElement>("v3-import").addEventListener("change", async (ev) => {
-    const files = Array.from((ev.target as HTMLInputElement).files ?? []);
+  // a VIDEO file (.mp4/.webm/.mov — decoded natively in the browser, no ffmpeg), or a still image
+  // (→ a 3D solid the viewer spins). Files arrive from the picker, a drag-drop, OR a pasted URL —
+  // all three funnel through importFiles so every source gets the identical pipeline.
+  async function importFiles(files: File[]): Promise<void> {
     if (!files.length) return;
     viewer.pause(); // stop the render loop overwriting the status line
     current3dMusic = []; // a fresh import drops any prior video's note-block music
@@ -470,6 +496,7 @@ async function setup3dViewer(): Promise<void> {
       const gltf = files.find((f) => /\.gltf$/i.test(f.name));
       const gif = files.find((f) => /\.gif$/i.test(f.name) || f.type === "image/gif");
       const video = files.find((f) => isVideoFile(f));
+      const image = files.find((f) => f.type.startsWith("image/")); // any still image (gif handled above)
       if (glb) {
         showFrames(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glb ${glb.name}`);
       } else if (gltf) {
@@ -480,18 +507,30 @@ async function setup3dViewer(): Promise<void> {
       } else if (objs.length === 1) {
         showFrames([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true, matchColor: match3d })], `model ${objs[0]!.name}`);
       } else if (gif) {
-        // animated GIF → temporally-stable 3D block animation (subject-isolated solids, not flat slabs)
+        // animated GIF → FLAT, faithful per-frame block animation. A 2D motion graphic has no "subject"
+        // to lift off a "background"; the OLD dome-inflation path turned it into a boiling blob. Here the
+        // front face of each thin slab IS the source frame, block-for-block — the frames ARE the motion,
+        // played at the GIF's real per-frame timing. Transparent pixels (canvas alpha) map to air.
         const { canvases, durationsMs } = await decodeGif(gif);
-        const rgb = canvases.map((c) => rgbImageFromCanvas(c, 40));
-        const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
-        showFrames(frames, `gif ${gif.name} · 3D`, durationsMs);
+        const decoded = canvases.map((c) => rgbAndAirFromCanvas(c, 64));
+        const rgb = decoded.map((d) => d.rgb);
+        const frames = rgbFramesToFlat3d(rgb, pal3d, {
+          depth: 2,
+          isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
+        });
+        showFrames(frames, `gif ${gif.name} · flat`, durationsMs);
       } else if (video) {
-        // VIDEO → frames decoded natively in the browser → same temporally-stable 3D block animation
+        // VIDEO → same FLAT faithful per-frame block animation (decoded natively in the browser). Video
+        // has no transparency, so the air mask is empty and the full frame is reproduced as blocks.
         const { canvases, durationsMs } = await decodeVideo(video, { fps: 12, maxFrames: 48 });
         if (!canvases.length) throw new Error("no frames decoded from video");
-        const rgb = canvases.map((c) => rgbImageFromCanvas(c, 40));
-        const frames = rgbFramesToAnimated3d(rgb, pal3d, { maxDepth: 10 });
-        showFrames(frames, `video ${video.name} · 3D`, durationsMs);
+        const decoded = canvases.map((c) => rgbAndAirFromCanvas(c, 64));
+        const rgb = decoded.map((d) => d.rgb);
+        const frames = rgbFramesToFlat3d(rgb, pal3d, {
+          depth: 2,
+          isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
+        });
+        showFrames(frames, `video ${video.name} · flat`, durationsMs);
         // If the clip carries audio, transcribe it to a note-block music timeline + a draggable music
         // area beside the build (kept on builder state for the toggle + datapack export). Audio never
         // blocks the visual import.
@@ -512,13 +551,62 @@ async function setup3dViewer(): Promise<void> {
         } catch (err) {
           log.warn("audio analysis failed", err);
         }
+      } else if (image) {
+        // still image → a single subject-isolated 3D solid the viewer spins live (its own animation)
+        const bmp = await createImageBitmap(image);
+        const c = document.createElement("canvas");
+        c.width = bmp.width;
+        c.height = bmp.height;
+        c.getContext("2d")!.drawImage(bmp, 0, 0);
+        bmp.close();
+        setSource(quantizeFrame(rgbImageFromCanvas(c, 40), pal3d, QUANT3D_STILL));
+        hud.textContent = `image ${image.name} · 3D solid · ${animSel.value} · drag to orbit`;
       } else {
-        hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), .gif, or a video (.mp4/.webm/.mov)";
+        hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), .gif, a video (.mp4/.webm/.mov), or an image";
       }
     } catch (err) {
       log.warn("3D import failed", err);
       hud.textContent = `import failed: ${(err as Error).message}`;
     }
+  }
+
+  // Fetch a remote asset and wrap it as a File so a pasted link flows through the EXACT same import
+  // pipeline as a local file. Name comes from the URL path; MIME from the response Content-Type (so a
+  // gif/video whose URL has no extension still routes correctly). Needs the host to allow CORS.
+  async function fetchAsFile(url: string): Promise<File> {
+    const res = await fetch(url, { mode: "cors" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const type = (res.headers.get("content-type") ?? blob.type ?? "").split(";")[0]!.trim();
+    let name = "import";
+    try {
+      name = new URL(url).pathname.split("/").filter(Boolean).pop() || name;
+    } catch {
+      /* non-URL string → keep the fallback name; fetch will throw a clear error */
+    }
+    return new File([blob], name, { type: type || blob.type });
+  }
+
+  $<HTMLInputElement>("v3-import").addEventListener("change", (ev) => {
+    void importFiles(Array.from((ev.target as HTMLInputElement).files ?? []));
+  });
+
+  // paste a link (the Dribbble GIF, a video, any CORS-friendly image) → fetched → same block pipeline
+  const urlInput = $<HTMLInputElement>("v3-url");
+  async function importUrl(): Promise<void> {
+    const url = urlInput.value.trim();
+    if (!url) return;
+    hud.textContent = `fetching ${url}…`;
+    try {
+      await importFiles([await fetchAsFile(url)]);
+    } catch (err) {
+      log.warn("URL import failed", err);
+      hud.textContent = `URL import failed: ${(err as Error).message} — the host may block cross-origin fetch (CORS)`;
+    }
+  }
+  $<HTMLButtonElement>("v3-url-go").addEventListener("click", () => void importUrl());
+  urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") void importUrl();
   });
 
   // Download a vanilla datapack that builds the 3D spin animation (fill-batched). The export carries

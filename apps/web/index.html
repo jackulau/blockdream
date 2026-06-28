@@ -65,7 +65,7 @@
       .dr-rgb { width: 260px; height: 260px; }
       .dr-bev { width: 150px; height: 150px; }
       .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.7rem; }
-      select, input[type="range"], input[type="file"], button.ui {
+      select, input[type="range"], input[type="file"], input[type="url"], button.ui {
         background: #0f1217; color: var(--ink); border: 1px solid #2b3038; border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.85rem;
       }
       button.ui { cursor: pointer; transition: border-color 0.15s, opacity 0.15s; }
@@ -207,7 +207,7 @@
 
       <section class="block">
         <h2><span class="num">03</span>3D voxel builder + replay</h2>
-        <p class="desc">The custom voxel engine reconstructs the image as a real 3D solid · the subject is isolated from its background and inflated by silhouette shape into a centered, double-sided form that reads from every angle, then spun live. The same volumes the command-block builder emits as a vanilla datapack. Drag to orbit · hover any block to identify it; raise depth for a fuller build. Real block textures.</p>
+        <p class="desc">A still image is reconstructed as a real 3D solid · the subject is isolated from its background and inflated by silhouette shape into a centered, double-sided form that reads from every angle, then spun live. An imported GIF or video plays back as a faithful flat block animation instead — the frames are reproduced block-for-block at the source's real timing, not inflated into a blob. The same volumes the command-block builder emits as a vanilla datapack. Drag to orbit · hover any block to identify it; raise depth for a fuller build. Real block textures.</p>
         <div class="card" style="max-width:980px">
           <div class="stage" style="align-items:flex-start">
             <canvas id="v3-canvas" style="width:480px;max-width:100%;aspect-ratio:4/3;height:auto;border-radius:8px;cursor:crosshair"></canvas>
@@ -263,6 +263,10 @@
             <label class="ui" style="cursor:pointer">import .gltf / .glb / .obj / .gif / video → blocks
               <input id="v3-import" type="file" multiple accept=".gltf,.glb,.obj,.gif,.mp4,.webm,.mov,.m4v,image/gif,video/*,model/gltf+json,model/gltf-binary" style="display:none" />
             </label>
+          </div>
+          <div class="row">
+            <input id="v3-url" type="url" placeholder="…or paste an image / GIF / video URL → blocks" style="flex:1;min-width:220px" />
+            <button id="v3-url-go" class="ui">import URL</button>
           </div>
           <div id="v3-hud" class="hud">building…</div>
           <div id="v3-export" style="font-size:.74rem;color:var(--dim)"></div>
