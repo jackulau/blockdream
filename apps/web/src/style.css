@@ -1,0 +1,154 @@
+/*
+ * Blockdream design system — tokens + base layer.
+ *
+ * Grounded in Japanese design tradition (rationale + citations in docs/design-notes.md):
+ *  - Kenya Hara / MUJI "emptiness" (ku 空) + restraint: prune to the essential; one quiet accent.
+ *  - Ma (間): negative space is an active element — generous spacing scale + large section rhythm.
+ *  - Kanso (簡素) / Shibui (渋い): plain, uncluttered, understated; muted sumi-ink ground, washi-paper ink.
+ *  - Wabi-sabi: natural, slightly warm neutrals over cold tech-navy; an off-white, not a pure #fff.
+ *  - tha ltd / Yugo Nakamura: motion "modeled on the natural world" — natural ease-out, restrained, purposeful.
+ *
+ * D4 ships the token + base layer (this file). D5 applies it to the page. Old var names (--panel/--dim/
+ * --acc/--link) are aliased onto the new system so existing styles keep working through the migration —
+ * and --link folds into the single accent (no more competing cyan), satisfying "exactly one accent".
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- color: sumi ink ground, washi-paper ink, one jade accent ---- */
+  --bg: #0f0f11; /* sumi ground (near-black, faintly warm-neutral, no blue cast) */
+  --surface: #16171b; /* raised panel */
+  --surface-2: #1b1d22; /* input wells, BOM rows */
+  --line: #24262c; /* hairline border (low contrast — restraint) */
+  --line-2: #30333a; /* slightly stronger divider */
+  --ink: #ecebe6; /* washi paper white — warm off-white, not pure #fff (wabi-sabi) */
+  --ink-dim: #a4a39c; /* secondary text */
+  --ink-faint: #74736c; /* captions / meta */
+  --accent: #63bd84; /* jade / froglight green — calmer than neon, the single accent */
+  --accent-2: #7ccf99; /* hover / active */
+  --accent-soft: rgba(99, 189, 132, 0.13); /* tint for focus/hover beds + selection */
+
+  /* ---- type: refined system sans + mono, modular ~1.25 scale ---- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --text-xs: 0.75rem; /* 12 — meta */
+  --text-sm: 0.8125rem; /* 13 — mono / labels */
+  --text-base: 1rem; /* 16 — body */
+  --text-md: 1.125rem; /* 18 — lede */
+  --text-lg: 1.375rem; /* 22 — h3 */
+  --text-xl: 1.75rem; /* 28 — h2 */
+  --text-2xl: 2.25rem; /* 36 */
+  --text-3xl: 3rem; /* 48 — h1 */
+  --leading-tight: 1.15; /* headings */
+  --leading-snug: 1.4;
+  --leading: 1.65; /* body — generous vertical Ma */
+  --tracking-tight: -0.02em; /* large headings */
+  --tracking-wide: 0.08em; /* small caps / mono labels */
+
+  /* ---- spacing (Ma): 8px base, widening to large section rhythm ---- */
+  --space-1: 0.25rem; /* 4 */
+  --space-2: 0.5rem; /* 8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-5: 1.5rem; /* 24 */
+  --space-6: 2rem; /* 32 */
+  --space-7: 3rem; /* 48 */
+  --space-8: 4.5rem; /* 72 */
+  --space-9: 7rem; /* 112 — between major sections */
+  --space-10: 10rem; /* 160 — hero breathing room */
+  --measure: 68ch; /* readable line length */
+  --container: 1080px; /* content max width */
+
+  /* ---- form / radius: small radii (restraint, not pill) ---- */
+  --radius-sm: 3px;
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  /* ---- motion (tha.jp natural easing): purposeful, restrained ---- */
+  --ease-out: cubic-bezier(0.22, 0.7, 0.24, 1); /* natural deceleration */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1); /* subtle overshoot — use sparingly */
+  --dur-fast: 120ms;
+  --dur: 240ms;
+  --dur-slow: 480ms;
+
+  /* ---- back-compat aliases (existing inline CSS reads these; D5 migrates off them) ---- */
+  --panel: var(--surface);
+  --dim: var(--ink-dim);
+  --acc: var(--accent);
+  --link: var(--accent); /* unify: links use the single accent, not a separate cyan */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading);
+  color: var(--ink);
+  /* calm, warm-neutral vignette — NOT the old blue radial glow (that read as AI-slop) */
+  background: radial-gradient(1100px 620px at 50% -12%, #161719, var(--bg)) fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover {
+  color: var(--accent-2);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* scroll-reveal utility (applied in D5): fade + a small natural rise */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+  will-change: opacity, transform;
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

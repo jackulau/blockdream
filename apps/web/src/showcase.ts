@@ -2,6 +2,7 @@
 // the block-art tester, on a single page. Each canvas captures keys only while focused
 // so the two worlds don't fight over the keyboard.
 
+import "./style.css"; // design system: tokens (sumi/washi palette, type/space/motion scale) + base layer
 import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
