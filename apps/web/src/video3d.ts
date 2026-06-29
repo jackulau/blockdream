@@ -54,6 +54,6 @@ export function rgbFramesToFlat3d(
   palette: Palette,
   opts: { depth?: number; quantize?: QuantizeOptions; isAirForFrame?: (f: number, x: number, y: number) => boolean } = {},
 ): VoxelVolume[] {
-  const quantized = frames.map((f) => quantizeFrame(f, palette, opts.quantize ?? { method: "bayer", gamutMap: 0.8 }));
+  const quantized = frames.map((f) => quantizeFrame(f, palette, opts.quantize ?? { method: "bayer", gamutMap: 0.8, bayerAmplitude: 0.035 }));
   return framesToFlat3d(quantized, { depth: opts.depth ?? 2, isAirForFrame: opts.isAirForFrame });
 }
