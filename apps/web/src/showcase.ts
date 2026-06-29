@@ -203,6 +203,11 @@ drViewer.connect();
 // (per-frame dither speckle would defeat the temporal stabilizer).
 const pal3d = preparePalette(getSolidBlockMapPalette().palette);
 const QUANT3D_STILL = { method: "floyd-steinberg", gamutMap: 0.8 } as const;
+// Quantization for a SOLID built from a flat import (GIF/video). A 2D motion graphic typically has a
+// uniform background; nearest (no dither) keeps that field ONE block so detectBackgroundMask can flood
+// it away and isolate the subject. Floyd–Steinberg would scatter the flat field into dithered islands
+// that block the flood, leaving the whole rectangle as a slab (the mint box around the Snorlax).
+const QUANT3D_FLAT_BUILD = { method: "none", gamutMap: 0.8 } as const;
 // single-color OKLab match for 3D model imports (vertex colors / material colors → blocks)
 const match3d = (r: number, g: number, b: number) => nearestSrgbHue(r, g, b, pal3d, 0.8).color.mapColorId;
 const hexByMap = new Map<number, number>();
@@ -412,6 +417,15 @@ async function setup3dViewer(): Promise<void> {
   });
   let lastSource: ReturnType<typeof quantizeFrame> | null = null;
   let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
+  // The active FLAT import (GIF/video): per-frame RGB, or null when we're showing a single solid /
+  // model / sequence. Non-null ⇒ "build 3D from image" solidifies the imported subject (current frame)
+  // and the animation dropdown rides a transform on top of the playing frames instead of discarding them.
+  let flatFramesRgb: RgbImage[] | null = null;
+  let flatLabel = ""; // hud label for the active flat import (e.g. "gif snorlax.gif")
+  // True only while current3d is a sequence GENERATED from baseVolume (explode/wave/buildup) — i.e. one
+  // that reverts cleanly to the single solid. Distinguishes a generated sequence from an IMPORTED
+  // multi-frame animation (GIF/video/glb/obj-seq), which must NOT be discarded when a transform is picked.
+  let seqFromBase = false;
   const isTransformAnim = (s: string) => (TRANSFORM_ANIMS as readonly string[]).includes(s);
 
   // Build a genuine 3D SOLID from the current source. imageToSolid isolates the subject from the
@@ -423,6 +437,8 @@ async function setup3dViewer(): Promise<void> {
   function rebuildVolume(): void {
     const q = lastSource;
     if (!q) return;
+    flatFramesRgb = null; // a single solid is not a flat import…
+    seqFromBase = false; // …nor a generated sequence
     const maxDepth = Math.max(4, Number(depth.value));
     const depthOf =
       depthMap && depthMap.length === q.width * q.height
@@ -453,16 +469,37 @@ async function setup3dViewer(): Promise<void> {
     rebuildVolume();
   }
 
+  // The image "build 3D from image" should solidify: the SUBJECT the user imported (the currently
+  // displayed frame of an active GIF/video) when one is loaded, else the §02 block-art source. This is
+  // the fix for "build 3D from image builds an unrelated image" — it now follows the §03 import.
+  function build3dSource(): RgbImage | null {
+    if (flatFramesRgb && flatFramesRgb.length) {
+      const i = Math.round(Number(scrub.value));
+      const idx = Math.min(flatFramesRgb.length - 1, Math.max(0, Number.isFinite(i) ? i : 0));
+      return flatFramesRgb[idx] ?? flatFramesRgb[0]!;
+    }
+    return ba.getSourceRgb(40);
+  }
+
+  // Build one 3D solid from an RGB source (re-quantized in the 3D palette), keeping the prior fallbacks
+  // (the last source, then the preloaded sample) when nothing usable is supplied. `quant` lets a flat
+  // import build with nearest (clean background isolation) while the §02 still keeps its dither.
+  function buildSolidFrom(rgb: RgbImage | null, quant: Parameters<typeof quantizeFrame>[2] = QUANT3D_STILL): void {
+    setSource(rgb ? quantizeFrame(rgb, pal3d, quant) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
+  }
+
   // initial source = the preloaded sample image (higher res than the old 28px for a sharper solid)
   const img = new Image();
   img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
   img.src = "/test-assets/pixelart.png";
 
   // "build 3D from image" re-quantizes the SOURCE colors in the 3D palette - not a nearest
-  // subsample of the already-dithered 2D map-palette frame (which compounds two quantizers)
+  // subsample of the already-dithered 2D map-palette frame (which compounds two quantizers). With a
+  // GIF/video imported, it solidifies that subject's current frame; otherwise the §02 block-art source.
   $<HTMLButtonElement>("v3-rebuild").addEventListener("click", () => {
-    const rgb = ba.getSourceRgb(40);
-    setSource(rgb ? quantizeFrame(rgb, pal3d, QUANT3D_STILL) : lastSource ?? quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
+    if (flatFramesRgb) animSel.value = "spin"; // a flat clip parks the dropdown at "still" for head-on
+    // playback; a freshly built solid should turntable-spin like the section copy promises.
+    buildSolidFrom(build3dSource(), flatFramesRgb ? QUANT3D_FLAT_BUILD : QUANT3D_STILL);
   });
   depth.addEventListener("input", () => rebuildVolume());
 
@@ -470,18 +507,38 @@ async function setup3dViewer(): Promise<void> {
   // block-motion anims (explode/wave/buildup) regenerate a frame sequence from the built solid.
   animSel.addEventListener("change", () => {
     const sel = animSel.value;
+    // A flat GIF/video import is a multi-frame animation whose frames ARE the content. Apply the chosen
+    // animation WITHOUT discarding the import: a transform anim rides live on top of the playing frames
+    // (camera swings to 3/4 so a rotation reads in depth; "still" restores head-on), while a sequence
+    // anim needs a single solid, so solidify the imported subject's current frame and sequence THAT.
+    if (flatFramesRgb) {
+      if (isTransformAnim(sel)) {
+        viewer.reframe(sel === "none"); // none → head-on; any motion → 3/4 so it reads in depth
+        viewer.setAnim(sel);
+        hud.textContent = `${flatLabel} · ${sel === "none" ? "head-on" : sel} · drag to orbit`;
+      } else {
+        buildSolidFrom(build3dSource(), QUANT3D_FLAT_BUILD); // solidify current frame (exits flat mode, sets baseVolume)
+        if (baseVolume) {
+          showFrames(generateSequence(sel as SequenceAnimName, baseVolume, 24), sel);
+          seqFromBase = true;
+        }
+      }
+      return;
+    }
     if (isTransformAnim(sel)) {
-      if (current3d.length > 1) rebuildVolume(); // back to a single solid from a sequence
+      if (seqFromBase) rebuildVolume(); // revert a GENERATED sequence to its solid (imports are left intact)
       viewer.setAnim(sel);
       if (lastSource) hud.textContent = `${sel} · drag to orbit`;
     } else if (baseVolume) {
-      const frames = generateSequence(sel as SequenceAnimName, baseVolume, 24);
-      showFrames(frames, sel);
+      showFrames(generateSequence(sel as SequenceAnimName, baseVolume, 24), sel);
+      seqFromBase = true;
     }
   });
 
   function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>, faceOn = false): void {
     current3d = frames;
+    if (!faceOn) flatFramesRgb = null; // a model / sequence / solid is not a flat import…
+    seqFromBase = false; // …and is not a base-derived sequence unless the caller re-sets this after
     if (frames[0]) renderBom3d(frames[0]);
     if (faceOn) animSel.value = "none"; // reflect the head-on, no-transform default in the dropdown
     viewer.setFrames(frames, { durationsMs, faceOn }); // faceOn (flat GIF/video) → head-on, no transform
@@ -500,6 +557,7 @@ async function setup3dViewer(): Promise<void> {
   async function importFiles(files: File[]): Promise<void> {
     if (!files.length) return;
     viewer.pause(); // stop the render loop overwriting the status line
+    flatFramesRgb = null; // a fresh import invalidates the prior flat import (re-set below on success)
     current3dMusic = []; // a fresh import drops any prior video's note-block music
     viewer.setMusicArea([]);
     musicToggle.disabled = true;
@@ -535,6 +593,8 @@ async function setup3dViewer(): Promise<void> {
           isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
         });
         showFrames(frames, `gif ${gif.name} · flat`, durationsMs, true);
+        flatFramesRgb = rgb; // remember the imported frames so build-from-image / transforms follow them
+        flatLabel = `gif ${gif.name}`;
       } else if (video) {
         // VIDEO → same FLAT faithful per-frame block animation (decoded natively in the browser). Video
         // has no transparency, so the air mask is empty and the full frame is reproduced as blocks.
@@ -548,6 +608,8 @@ async function setup3dViewer(): Promise<void> {
           isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
         });
         showFrames(frames, `video ${video.name} · flat`, durationsMs, true);
+        flatFramesRgb = rgb; // remember the imported frames so build-from-image / transforms follow them
+        flatLabel = `video ${video.name}`;
         // If the clip carries audio, transcribe it to a note-block music timeline + a draggable music
         // area beside the build (kept on builder state for the toggle + datapack export). Audio never
         // blocks the visual import.
