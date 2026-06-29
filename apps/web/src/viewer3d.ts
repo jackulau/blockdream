@@ -190,28 +190,41 @@ export class Viewer3D {
    * Turntable-spin is DECOUPLED from frame playback: a multi-frame animation defaults
    * spin OFF (the frames ARE the motion - spinning on top double-rotates), a single static
    * volume defaults spin ON (turntable showcase).
+   *
+   * `opts.faceOn` (a flat 2D GIF/video animation) frames the slab HEAD-ON — camera straight down -Z,
+   * transform off - so playback reads exactly like the source instead of a skewed, orbiting slab. The
+   * user can still drag to orbit; this only sets the initial pose. Everything else gets the 3/4 view.
    */
-  setFrames(frames: VoxelVolume[], opts: { durationsMs?: Array<number | undefined | null> } = {}): void {
+  setFrames(frames: VoxelVolume[], opts: { durationsMs?: Array<number | undefined | null>; faceOn?: boolean } = {}): void {
     this.disposeGroups(); // free the previous frames' geometries (materials/textures stay cached)
     this.groups = new Array(frames.length).fill(null);
     this.frames = frames;
     this.index = 0;
     this.schedule = opts.durationsMs ? buildSchedule(opts.durationsMs) : uniformSchedule(frames.length, this.fps);
-    // a single static volume turntable-spins; a multi-frame animation defaults its transform off
-    // (the frames ARE the motion - a transform on top would double-animate).
-    this.animName = frames.length <= 1 ? "spin" : "none";
+    // faceOn (flat animation) → no transform, read head-on. Else: single static volume turntable-spins;
+    // a multi-frame 3D sequence defaults its transform off (the frames ARE the motion).
+    this.animName = opts.faceOn ? "none" : frames.length <= 1 ? "spin" : "none";
     this.animStart = performance.now();
     this.playStart = performance.now();
-    // frame the camera to the volume: fit the bounding SPHERE for the current FOV, and pull back further
-    // on a narrow canvas (aspect < 1) so a wide/flat volume doesn't overflow horizontally.
     const v = frames[0];
     if (v) {
       this.maxDim = Math.max(v.sx, v.sy, v.sz);
-      const radius = 0.5 * Math.hypot(v.sx, v.sy, v.sz);
       const aspect = this.camera.aspect || 1;
-      const fitH = radius / Math.tan((this.camera.fov * Math.PI) / 360);
-      const dist = Math.max(fitH, fitH / Math.max(0.0001, aspect)) * 1.3;
-      this.camera.position.copy(new THREE.Vector3(0.6, 0.5, 0.8).normalize().multiplyScalar(dist));
+      const halfV = Math.tan((this.camera.fov * Math.PI) / 360); // tan(vertical FOV / 2)
+      if (opts.faceOn) {
+        // look straight down -Z at the front face; fit BOTH width and height with a small breathing
+        // margin (Ma). Horizontal extent is gated by the camera's horizontal FOV (≈ vFOV·aspect).
+        const distV = v.sy / 2 / halfV;
+        const distH = v.sx / 2 / (halfV * Math.max(0.0001, aspect));
+        this.camera.position.set(0, 0, Math.max(distV, distH) * 1.12);
+      } else {
+        // fit the bounding SPHERE for the current FOV; pull back further on a narrow canvas (aspect < 1)
+        // so a wide/flat volume doesn't overflow horizontally.
+        const radius = 0.5 * Math.hypot(v.sx, v.sy, v.sz);
+        const fitH = radius / halfV;
+        const dist = Math.max(fitH, fitH / Math.max(0.0001, aspect)) * 1.3;
+        this.camera.position.copy(new THREE.Vector3(0.6, 0.5, 0.8).normalize().multiplyScalar(dist));
+      }
       this.controls.target.set(0, 0, 0);
     }
     this.showFrame(0);

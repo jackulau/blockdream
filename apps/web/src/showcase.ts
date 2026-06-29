@@ -479,10 +479,11 @@ async function setup3dViewer(): Promise<void> {
     }
   });
 
-  function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>): void {
+  function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>, faceOn = false): void {
     current3d = frames;
     if (frames[0]) renderBom3d(frames[0]);
-    viewer.setFrames(frames, { durationsMs }); // multi-frame → live transform anim defaults off
+    if (faceOn) animSel.value = "none"; // reflect the head-on, no-transform default in the dropdown
+    viewer.setFrames(frames, { durationsMs, faceOn }); // faceOn (flat GIF/video) → head-on, no transform
     scrub.max = String(frames.length - 1);
     $<HTMLButtonElement>("v3-download").disabled = false;
     viewer.play();
@@ -532,7 +533,7 @@ async function setup3dViewer(): Promise<void> {
           depth: 2,
           isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
         });
-        showFrames(frames, `gif ${gif.name} · flat`, durationsMs);
+        showFrames(frames, `gif ${gif.name} · flat`, durationsMs, true);
       } else if (video) {
         // VIDEO → same FLAT faithful per-frame block animation (decoded natively in the browser). Video
         // has no transparency, so the air mask is empty and the full frame is reproduced as blocks.
@@ -545,7 +546,7 @@ async function setup3dViewer(): Promise<void> {
           depth: 2,
           isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
         });
-        showFrames(frames, `video ${video.name} · flat`, durationsMs);
+        showFrames(frames, `video ${video.name} · flat`, durationsMs, true);
         // If the clip carries audio, transcribe it to a note-block music timeline + a draggable music
         // area beside the build (kept on builder state for the toggle + datapack export). Audio never
         // blocks the visual import.
