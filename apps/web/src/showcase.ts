@@ -203,11 +203,18 @@ drViewer.connect();
 // (per-frame dither speckle would defeat the temporal stabilizer).
 const pal3d = preparePalette(getSolidBlockMapPalette().palette);
 const QUANT3D_STILL = { method: "floyd-steinberg", gamutMap: 0.8 } as const;
-// Quantization for a SOLID built from a flat import (GIF/video). A 2D motion graphic typically has a
-// uniform background; nearest (no dither) keeps that field ONE block so detectBackgroundMask can flood
-// it away and isolate the subject. Floyd–Steinberg would scatter the flat field into dithered islands
-// that block the flood, leaving the whole rectangle as a slab (the mint box around the Snorlax).
-const QUANT3D_FLAT_BUILD = { method: "none", gamutMap: 0.8 } as const;
+// Quantization for any 3D SOLID build (a flat GIF/video subject OR an imported still image). A solid is
+// isolated by detectBackgroundMask, which flood-fills cells matching the EXACT dominant border block id;
+// nearest (no dither) keeps a flat background ONE block so the flood can sweep it away and lift the
+// subject, and keeps the solid itself speckle-free. Floyd–Steinberg would scatter the flat field into
+// dithered islands that block the flood, leaving the whole rectangle a slab (the mint box around the
+// Snorlax). So 3D-solid builds use this; only the §02 / init flat stills keep QUANT3D_STILL's dither.
+const QUANT3D_SOLID = { method: "none", gamutMap: 0.8 } as const;
+// Grid width for an imported still image's 3D solid. Well above the old 40px (which made the subject
+// tiny + blocky) — a single still has no per-frame temporal cost, so it can afford detail; bounded so
+// the inflated solid's block count + datapack stay sane. rgbImageFromCanvas clamps to the source width,
+// so a small sprite is never upscaled past its native pixels.
+const STILL_SOLID_GRID = 96;
 // single-color OKLab match for 3D model imports (vertex colors / material colors → blocks)
 const match3d = (r: number, g: number, b: number) => nearestSrgbHue(r, g, b, pal3d, 0.8).color.mapColorId;
 const hexByMap = new Map<number, number>();
@@ -499,7 +506,7 @@ async function setup3dViewer(): Promise<void> {
   $<HTMLButtonElement>("v3-rebuild").addEventListener("click", () => {
     if (flatFramesRgb) animSel.value = "spin"; // a flat clip parks the dropdown at "still" for head-on
     // playback; a freshly built solid should turntable-spin like the section copy promises.
-    buildSolidFrom(build3dSource(), flatFramesRgb ? QUANT3D_FLAT_BUILD : QUANT3D_STILL);
+    buildSolidFrom(build3dSource(), flatFramesRgb ? QUANT3D_SOLID : QUANT3D_STILL);
   });
   depth.addEventListener("input", () => rebuildVolume());
 
@@ -517,7 +524,7 @@ async function setup3dViewer(): Promise<void> {
         viewer.setAnim(sel);
         hud.textContent = `${flatLabel} · ${sel === "none" ? "head-on" : sel} · drag to orbit`;
       } else {
-        buildSolidFrom(build3dSource(), QUANT3D_FLAT_BUILD); // solidify current frame (exits flat mode, sets baseVolume)
+        buildSolidFrom(build3dSource(), QUANT3D_SOLID); // solidify current frame (exits flat mode, sets baseVolume)
         if (baseVolume) {
           showFrames(generateSequence(sel as SequenceAnimName, baseVolume, 24), sel);
           seqFromBase = true;
@@ -631,15 +638,20 @@ async function setup3dViewer(): Promise<void> {
           log.warn("audio analysis failed", err);
         }
       } else if (image) {
-        // still image → a single subject-isolated 3D solid the viewer spins live (its own animation)
+        // still image → a single subject-isolated 3D solid the viewer spins live (its own animation).
+        // Build it the SAME clean way as the flat-import build: NEAREST quant (QUANT3D_SOLID) so
+        // detectBackgroundMask can flood a flat background away and isolate the subject — floyd-steinberg
+        // dither scattered the flat field into a non-isolatable speckled slab (the old "looks bad") — at
+        // STILL_SOLID_GRID (well above the old 40px) so the subject has real detail, not a blocky blob.
         const bmp = await createImageBitmap(image);
         const c = document.createElement("canvas");
         c.width = bmp.width;
         c.height = bmp.height;
         c.getContext("2d")!.drawImage(bmp, 0, 0);
         bmp.close();
-        setSource(quantizeFrame(rgbImageFromCanvas(c, 40), pal3d, QUANT3D_STILL));
-        hud.textContent = `image ${image.name} · 3D solid · ${animSel.value} · drag to orbit`;
+        animSel.value = "spin"; // a fresh solid turntable-spins; keep the dropdown honest
+        buildSolidFrom(rgbImageFromCanvas(c, STILL_SOLID_GRID), QUANT3D_SOLID);
+        hud.textContent = `image ${image.name} · 3D solid · spin · drag to orbit`;
       } else {
         hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), .gif, a video (.mp4/.webm/.mov), or an image";
       }
