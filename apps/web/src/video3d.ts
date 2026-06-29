@@ -39,13 +39,21 @@ export function rgbFramesToAnimated3d(
  *  subject or inflate a dome: the front face of each thin slab is the source frame, block-for-block, so
  *  playback reproduces the original animation instead of a boiling blob. `isAirForFrame` (from the
  *  decoded canvas alpha) maps transparent pixels to air so a transparent GIF floats; an opaque clip
- *  becomes the full rectangle. Same nearest+gamut quantizer as the solid path (per-frame dither would
- *  speckle and break temporal stability). */
+ *  becomes the full rectangle.
+ *
+ *  Quantizer defaults to BAYER ordered dither (not flat nearest). The block palette is only ~60 colours,
+ *  so a flat nearest match bands smooth shading into ugly steps; bayer dithers between the two nearest
+ *  palette colours to approximate the true colour, which is what makes playback actually resemble the
+ *  source. Crucially bayer is POSITION-deterministic (threshold is a pure function of the (x,y) cell), so
+ *  a pixel whose colour is unchanged frame-to-frame quantizes to the SAME block every frame — no temporal
+ *  shimmer, no boiling. (Error-diffusion would shimmer, which is why the dome path avoided dither; the
+ *  flat path has no such constraint.) A low amplitude keeps genuinely-flat regions mapping to a single
+ *  colour so greedy meshing still merges them — only gradients/edges dither. */
 export function rgbFramesToFlat3d(
   frames: RgbImage[],
   palette: Palette,
   opts: { depth?: number; quantize?: QuantizeOptions; isAirForFrame?: (f: number, x: number, y: number) => boolean } = {},
 ): VoxelVolume[] {
-  const quantized = frames.map((f) => quantizeFrame(f, palette, opts.quantize ?? { method: "none", gamutMap: 0.8 }));
+  const quantized = frames.map((f) => quantizeFrame(f, palette, opts.quantize ?? { method: "bayer", gamutMap: 0.8 }));
   return framesToFlat3d(quantized, { depth: opts.depth ?? 2, isAirForFrame: opts.isAirForFrame });
 }

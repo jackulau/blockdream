@@ -271,6 +271,19 @@ function rgbAndAirFromCanvas(src: HTMLCanvasElement, gridW: number): { rgb: RgbI
   return { rgb: { width: w, height: h, data: out }, air };
 }
 
+// Per-frame grid width for a flat animation, ADAPTIVE to frame count. The flat path's render cost is
+// ~ (front-face cells x frames); a 240-frame GIF and a 24-frame clip should not get the same grid. We
+// hold the total cell budget B roughly constant: cells/frame = w * h = w^2 * aspect (aspect = h/w), so
+// w = sqrt(B / (frames * aspect)), clamped. A long clip lands near the floor, a short one near a crisp
+// cap — both far above the old fixed 64. Bayer keeps flat regions merged, so this budget tracks geometry.
+function flatGridWidth(frameCount: number, aspect: number): number {
+  const B = 2_400_000; // total front-face cells across all frames (pre-greedy-merge)
+  const n = Math.max(1, frameCount);
+  const a = aspect > 0 ? aspect : 0.75;
+  const w = Math.round(Math.sqrt(B / (n * a)));
+  return Math.max(64, Math.min(160, w)); // never worse than the old 64; cap so blocks/datapack stay sane
+}
+
 function rgbImageFromImg(img: HTMLImageElement, gridW: number): RgbImage {
   const aspect = img.naturalHeight / img.naturalWidth || 1;
   const w = gridW;
@@ -512,7 +525,8 @@ async function setup3dViewer(): Promise<void> {
         // front face of each thin slab IS the source frame, block-for-block — the frames ARE the motion,
         // played at the GIF's real per-frame timing. Transparent pixels (canvas alpha) map to air.
         const { canvases, durationsMs } = await decodeGif(gif);
-        const decoded = canvases.map((c) => rgbAndAirFromCanvas(c, 64));
+        const gw = flatGridWidth(canvases.length, (canvases[0]!.height || 3) / (canvases[0]!.width || 4));
+        const decoded = canvases.map((c) => rgbAndAirFromCanvas(c, gw));
         const rgb = decoded.map((d) => d.rgb);
         const frames = rgbFramesToFlat3d(rgb, pal3d, {
           depth: 2,
@@ -524,7 +538,8 @@ async function setup3dViewer(): Promise<void> {
         // has no transparency, so the air mask is empty and the full frame is reproduced as blocks.
         const { canvases, durationsMs } = await decodeVideo(video, { fps: 12, maxFrames: 48 });
         if (!canvases.length) throw new Error("no frames decoded from video");
-        const decoded = canvases.map((c) => rgbAndAirFromCanvas(c, 64));
+        const gw = flatGridWidth(canvases.length, (canvases[0]!.height || 9) / (canvases[0]!.width || 16));
+        const decoded = canvases.map((c) => rgbAndAirFromCanvas(c, gw));
         const rgb = decoded.map((d) => d.rgb);
         const frames = rgbFramesToFlat3d(rgb, pal3d, {
           depth: 2,
