@@ -670,3 +670,28 @@ async function setup3dViewer(): Promise<void> {
   });
 }
 void setup3dViewer();
+
+// Scroll-reveal: sections fade + rise a little as they enter view (tha.jp — restrained motion
+// modeled on natural deceleration; easing/duration live in style.css). The class is added by JS,
+// so with no JS the content is simply visible; reduced-motion or no IntersectionObserver also
+// leave everything visible. Hero + first section are left untouched so the fold paints instantly.
+function setupReveal(): void {
+  const targets = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
+  if (!targets.length) return;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || !("IntersectionObserver" in window)) return; // leave fully visible
+  for (const el of targets) el.classList.add("reveal");
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add("in");
+          io.unobserve(e.target);
+        }
+      }
+    },
+    { rootMargin: "0px 0px -8% 0px", threshold: 0.08 },
+  );
+  for (const el of targets) io.observe(el);
+}
+setupReveal();
