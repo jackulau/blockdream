@@ -1,9 +1,9 @@
 // Import a real VIDEO file (.mp4/.webm/.mov/…) → per-frame canvases, decoded natively in the browser
-// with a <video> element + canvas (NO ffmpeg, NO wasm — the browser already ships a video decoder).
+// with a <video> element + canvas (NO ffmpeg, NO wasm - the browser already ships a video decoder).
 // Returns the SAME { canvases, durationsMs } shape as gif.ts so it slots straight into the existing
 // "frames → animated 3D blocks" path (rgbFramesToAnimated3d). The browser-only seek loop is thin and
 // feature-detected; the sampling MATH (which timestamps to grab) is the pure, unit-tested
-// planFrameTimes — jsdom can't decode video, exactly like gif.ts keeps its timing math in anim.ts.
+// planFrameTimes - jsdom can't decode video, exactly like gif.ts keeps its timing math in anim.ts.
 
 export interface DecodedVideo {
   canvases: HTMLCanvasElement[];
@@ -19,7 +19,7 @@ export function isVideoFile(file: { type?: string; name?: string }): boolean {
 }
 
 export interface VideoSampleOptions {
-  /** frames/sec to sample (default 12 — smooth enough for block playback, cheap to decode). */
+  /** frames/sec to sample (default 12 - smooth enough for block playback, cheap to decode). */
   fps?: number;
   /** hard cap on sampled frames (default 48). Long clips are sampled evenly across the whole duration. */
   maxFrames?: number;

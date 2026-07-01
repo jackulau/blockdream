@@ -107,7 +107,7 @@ function shifted(v: VoxelVolume, sx: number, sy: number, sz: number, off: (x: nu
 
 /** Explode⇄assemble loop: voxels fly out from the centroid then come back together. The middle
  *  frame is fully assembled; the ends are fully exploded, so playback loops seamlessly. */
-export function explodeAssemble(v: VoxelVolume, frames = 24, spread = 6): VoxelVolume[] {
+export function explodeFrame(v: VoxelVolume, f: number, frames: number, spread = 6): VoxelVolume {
   const pad = Math.ceil(spread) + 1;
   const sx = v.sx + pad * 2;
   const sy = v.sy + pad * 2;
@@ -115,60 +115,71 @@ export function explodeAssemble(v: VoxelVolume, frames = 24, spread = 6): VoxelV
   const cx = (v.sx - 1) / 2;
   const cy = (v.sy - 1) / 2;
   const cz = (v.sz - 1) / 2;
-  const out: VoxelVolume[] = [];
-  for (let f = 0; f < frames; f++) {
-    const s = easing.easeInOutSine!(1 - pingPong(f / frames, 1)) * spread; // spread at ends, 0 (assembled) at mid
-    out.push(
-      shifted(v, sx, sy, sz, (x, y, z) => {
-        const dx = x - cx;
-        const dy = y - cy;
-        const dz = z - cz;
-        const len = Math.hypot(dx, dy, dz) || 1;
-        return [pad + x + (dx / len) * s, pad + y + (dy / len) * s, pad + z + (dz / len) * s];
-      }),
-    );
-  }
-  return out;
+  const s = easing.easeInOutSine!(1 - pingPong(f / frames, 1)) * spread; // spread at ends, 0 (assembled) at mid
+  return shifted(v, sx, sy, sz, (x, y, z) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const dz = z - cz;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    return [pad + x + (dx / len) * s, pad + y + (dy / len) * s, pad + z + (dz / len) * s];
+  });
+}
+export function explodeAssemble(v: VoxelVolume, frames = 24, spread = 6): VoxelVolume[] {
+  return Array.from({ length: frames }, (_, f) => explodeFrame(v, f, frames, spread));
 }
 
 /** Travelling vertical wave: each column is displaced in +Y by a sine that moves along X over time. */
-export function wave(v: VoxelVolume, frames = 24, amp = 3, wavelength = 0): VoxelVolume[] {
+export function waveFrame(v: VoxelVolume, f: number, frames: number, amp = 3, wavelength = 0): VoxelVolume {
   const a = Math.max(1, Math.round(amp));
   const wl = wavelength > 0 ? wavelength : Math.max(4, v.sx / 2);
   const sy = v.sy + a * 2;
-  const out: VoxelVolume[] = [];
-  for (let f = 0; f < frames; f++) {
-    const phase = (f / frames) * Math.PI * 2;
-    out.push(
-      shifted(v, v.sx, sy, v.sz, (x, y, z) => [x, y + a + Math.round(Math.sin((x / wl) * Math.PI * 2 - phase) * a), z]),
-    );
-  }
-  return out;
+  const phase = (f / frames) * Math.PI * 2;
+  return shifted(v, v.sx, sy, v.sz, (x, y, z) => [x, y + a + Math.round(Math.sin((x / wl) * Math.PI * 2 - phase) * a), z]);
+}
+export function wave(v: VoxelVolume, frames = 24, amp = 3, wavelength = 0): VoxelVolume[] {
+  return Array.from({ length: frames }, (_, f) => waveFrame(v, f, frames, amp, wavelength));
 }
 
 /** Build-up: reveal the model bottom-to-top over the frames (an assemble/dissolve-in). */
+export function buildUpFrame(v: VoxelVolume, f: number, frames: number, ease: Easing = easing.easeOutCubic!): VoxelVolume {
+  const thresh = ease((f + 1) / frames) * v.sy;
+  const out_v = createVolume(v.sx, v.sy, v.sz);
+  forEachSolid(v, (x, y, z, c) => {
+    if (y <= thresh) setVoxel(out_v, x, y, z, c);
+  });
+  return out_v;
+}
 export function buildUp(v: VoxelVolume, frames = 24, ease: Easing = easing.easeOutCubic!): VoxelVolume[] {
-  const out: VoxelVolume[] = [];
-  for (let f = 0; f < frames; f++) {
-    const thresh = ease((f + 1) / frames) * v.sy;
-    const out_v = createVolume(v.sx, v.sy, v.sz);
-    forEachSolid(v, (x, y, z, c) => {
-      if (y <= thresh) setVoxel(out_v, x, y, z, c);
-    });
-    out.push(out_v);
-  }
-  return out;
+  return Array.from({ length: frames }, (_, f) => buildUpFrame(v, f, frames, ease));
 }
 
 /** Names of the volume-sequence generators, for UI menus. */
 export const SEQUENCE_ANIMS = ["explode", "wave", "buildup"] as const;
 export type SequenceAnimName = (typeof SEQUENCE_ANIMS)[number];
 
-/** Dispatch a sequence generator by name. */
+/** One output frame f (of `frames`) of a named sequence effect applied to a single volume. */
+export function sequenceFrame(name: SequenceAnimName, v: VoxelVolume, f: number, frames: number): VoxelVolume {
+  if (name === "explode") return explodeFrame(v, f, frames);
+  if (name === "wave") return waveFrame(v, f, frames);
+  return buildUpFrame(v, f, frames);
+}
+
+/** Dispatch a sequence generator by name (one static volume, an N-frame effect loop). */
 export function generateSequence(name: SequenceAnimName, v: VoxelVolume, frames = 24): VoxelVolume[] {
-  if (name === "explode") return explodeAssemble(v, frames);
-  if (name === "wave") return wave(v, frames);
-  return buildUp(v, frames);
+  return Array.from({ length: frames }, (_, f) => sequenceFrame(name, v, f, frames));
+}
+
+/** Apply a block-motion effect OVER an already-animated clip: output frame f displaces the clip's
+ *  frame (f mod N) by the effect's phase at f, so an imported GIF/video keeps PLAYING while the
+ *  wave / explode / build-up rides on top, instead of freezing one frame and animating only that.
+ *  Frame count defaults to the clip length (at least 24 so a short clip still gets a smooth cycle). */
+export function generateSequenceOverFrames(
+  name: SequenceAnimName,
+  clip: VoxelVolume[],
+  frames = Math.max(clip.length, 24),
+): VoxelVolume[] {
+  if (clip.length === 0) return [];
+  return Array.from({ length: frames }, (_, f) => sequenceFrame(name, clip[f % clip.length]!, f, frames));
 }
 
 // Animations a CLI user can BAKE into a vanilla datapack (a playable block sequence): the three

@@ -1,6 +1,6 @@
 // Import a video's AUDIO track in the browser → a Minecraft note-block timeline.
-// The browser already ships a Web Audio decoder (AudioContext.decodeAudioData), so — exactly like
-// video.ts uses a <video> element instead of ffmpeg — we decode natively and run the SAME pure
+// The browser already ships a Web Audio decoder (AudioContext.decodeAudioData), so - exactly like
+// video.ts uses a <video> element instead of ffmpeg - we decode natively and run the SAME pure
 // analyzeAudio() the CLI uses. The decode step is isolated behind an injectable AudioDecoder so the
 // downmix + analysis MATH stays unit-testable without Web Audio (jsdom/node can't decode audio).
 
@@ -19,7 +19,7 @@ export type AudioDecoder = (bytes: ArrayBuffer) => Promise<AudioBufferLike>;
 
 /**
  * Downmix a (possibly multi-channel) AudioBuffer to one mono Float32Array by averaging channels.
- * Pure + deterministic — the unit-tested core of the web audio path.
+ * Pure + deterministic - the unit-tested core of the web audio path.
  */
 export function audioBufferToMonoPcm(buffer: AudioBufferLike): Float32Array {
   const channels = Math.max(0, buffer.numberOfChannels);
@@ -67,7 +67,7 @@ export interface AnalyzeFileAudioOptions {
 
 /**
  * Decode a media file's audio track and transcribe it to a note-block timeline. Returns [] when the
- * file has no decodable audio (a silent / video-only clip) rather than throwing — mirrors the CLI's
+ * file has no decodable audio (a silent / video-only clip) rather than throwing - mirrors the CLI's
  * `--music auto`: no audio ⇒ no music, never an error that blocks the import.
  */
 export async function analyzeFileAudio(file: Blob, opts: AnalyzeFileAudioOptions = {}): Promise<NoteEvent[]> {

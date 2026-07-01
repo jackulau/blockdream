@@ -1,7 +1,7 @@
-# Blockdream — design notes
+# Blockdream - design notes
 
 The web demo's visual language, grounded in Japanese design tradition. This is the *why* behind the
-tokens in [`apps/web/src/style.css`](../apps/web/src/style.css). The goal is restraint — a quiet,
+tokens in [`apps/web/src/style.css`](../apps/web/src/style.css). The goal is restraint - a quiet,
 crafted product page, not a loud "AI-slop technical demo" (generic gradients, competing accents,
 cramped boxes).
 
@@ -9,34 +9,66 @@ cramped boxes).
 
 | Principle | Source | What it means | Move on Blockdream |
 |---|---|---|---|
-| **Emptiness (ku 空) + restraint** | Kenya Hara, art director of MUJI — design by pruning anything extraneous; "emptiness" invites rather than decorates ([Dezeen interview](https://www.dezeen.com/2017/12/13/kenya-hara-exclusive-interview-muji-us-expansion-brand-aesthetic/), [blakecrosley](https://blakecrosley.com/blog/design-philosophy-kenya-hara)) | Beauty by subtraction; leave room. | Remove the blue radial-glow background; drop the second (cyan) accent so there is exactly one; let the work (the blocks) be the focus, not the chrome. |
-| **Ma (間) — negative space** | A core pillar of Japanese minimalism; negative space is an *active* element that prevents cognitive overload ([shizenstyle](https://www.shizenstyle.com/post/the-three-pillars-of-japanese-minimalism-beyond-the-trends), [fireart](https://fireart.studio/blog/japanese-minimalism-in-ui-design-for-digital-products/)) | Intervals and breathing room carry meaning. | A real spacing scale (`--space-*`, 8px base) widening to large section rhythm (`--space-9/10`); generous line-height (1.65); a bounded measure (~68ch) so text breathes. |
-| **Kanso (簡素) — simplicity** | "Things expressed plain, simple, natural"; one clear focus, generous whitespace ([presentationzen](https://presentationzen.com/blog/7-japanese-aesthetic-principles-to-change-your-thinking)) | Eliminate clutter. | Hairline borders over filled boxes; flat BOM rows separated by rules, not zebra-striped cards; one primary action per section. |
-| **Shibui (渋い) — understated elegance** | Quiet, refined taste; subdued palettes ([shizenstyle](https://www.shizenstyle.com/post/the-three-pillars-of-japanese-minimalism-beyond-the-trends)) | Sophistication without shouting. | Jade accent `#63bd84` instead of neon GitHub-green `#56d364`; muted ink-dim greys for secondary text. |
+| **Emptiness (ku 空) + restraint** | Kenya Hara, art director of MUJI - design by pruning anything extraneous; "emptiness" invites rather than decorates ([Dezeen interview](https://www.dezeen.com/2017/12/13/kenya-hara-exclusive-interview-muji-us-expansion-brand-aesthetic/), [blakecrosley](https://blakecrosley.com/blog/design-philosophy-kenya-hara)) | Beauty by subtraction; leave room. | Remove the blue radial-glow background; drop the second (cyan) accent so there is exactly one; let the work (the blocks) be the focus, not the chrome. |
+| **Ma (間) - negative space** | A core pillar of Japanese minimalism; negative space is an *active* element that prevents cognitive overload ([shizenstyle](https://www.shizenstyle.com/post/the-three-pillars-of-japanese-minimalism-beyond-the-trends), [fireart](https://fireart.studio/blog/japanese-minimalism-in-ui-design-for-digital-products/)) | Intervals and breathing room carry meaning. | A real spacing scale (`--space-*`, 8px base) widening to large section rhythm (`--space-9/10`); generous line-height (1.65); a bounded measure (~68ch) so text breathes. |
+| **Kanso (簡素) - simplicity** | "Things expressed plain, simple, natural"; one clear focus, generous whitespace ([presentationzen](https://presentationzen.com/blog/7-japanese-aesthetic-principles-to-change-your-thinking)) | Eliminate clutter. | Hairline borders over filled boxes; flat BOM rows separated by rules, not zebra-striped cards; one primary action per section. |
+| **Shibui (渋い) - understated elegance** | Quiet, refined taste; subdued palettes ([shizenstyle](https://www.shizenstyle.com/post/the-three-pillars-of-japanese-minimalism-beyond-the-trends)) | Sophistication without shouting. | Jade accent `#63bd84` instead of neon GitHub-green `#56d364`; muted ink-dim greys for secondary text. |
 | **Wabi-sabi** | Beauty in natural, imperfect, weathered things ([silphiumdesign](https://silphiumdesign.com/wabi-sabi-web-design-understanding-imp-prin/)) | Natural over synthetic. | Warm-neutral *sumi* ink ground and a warm off-white *washi* ink (`#ecebe6`, not pure `#fff`); subtle warm vignette, not a cold tech-navy. |
-| **Motion modeled on the natural world** | Yugo Nakamura / tha ltd — interactions feel familiar because their behavior is modeled on natural complexity ([Wikipedia](https://en.wikipedia.org/wiki/Yugo_Nakamura), [tha.jp](https://tha.jp/)) | Restrained, physical, purposeful motion. | Natural `ease-out` curves; short durations (120–480ms); reveal-on-scroll is a small fade+rise, hover is a 1px lift — nothing bounces or autoplays; honors `prefers-reduced-motion`. |
+| **Motion modeled on the natural world** | Yugo Nakamura / tha ltd - interactions feel familiar because their behavior is modeled on natural complexity ([Wikipedia](https://en.wikipedia.org/wiki/Yugo_Nakamura), [tha.jp](https://tha.jp/)) | Restrained, physical, purposeful motion. | Natural `ease-out` curves; short durations (120–480ms); reveal-on-scroll is a small fade+rise, hover is a 1px lift - nothing bounces or autoplays; honors `prefers-reduced-motion`. |
 
 ## Tokens (reference)
 
-**Color — sumi ink ground, washi-paper ink, one jade accent**
-- `--bg #0f0f11` · `--surface #16171b` · `--surface-2 #1b1d22` — three quiet layers, near-black, faintly warm.
-- `--line #24262c` · `--line-2 #30333a` — low-contrast hairlines (restraint; structure without weight).
-- `--ink #ecebe6` (≈16:1 on `--bg`) · `--ink-dim #a4a39c` (≈8:1, body-safe) · `--ink-faint #74736c` (≈3.6:1 — meta/large only).
-- `--accent #63bd84` (≈7:1 on `--bg`) · `--accent-2 #7ccf99` (hover) · `--accent-soft` (focus/selection bed). **One** accent — the old cyan `--link` now folds into it.
+**Color - sumi ink ground, washi-paper ink, one jade accent**
+- `--bg #0f0f11` · `--surface #16171b` · `--surface-2 #1b1d22` - three quiet layers, near-black, faintly warm.
+- `--line #24262c` · `--line-2 #30333a` - low-contrast hairlines (restraint; structure without weight).
+- `--ink #ecebe6` (≈16:1 on `--bg`) · `--ink-dim #a4a39c` (≈8:1, body-safe) · `--ink-faint #74736c` (≈3.6:1 - meta/large only).
+- `--accent #63bd84` (≈7:1 on `--bg`) · `--accent-2 #7ccf99` (hover) · `--accent-soft` (focus/selection bed). **One** accent - the old cyan `--link` now folds into it.
 
-**Type — system sans + mono, modular ~1.25 scale**
+**Type - system sans + mono, modular ~1.25 scale**
 - `--font-sans` (system-ui first → no webfont cost) for UI/headings; `--font-mono` for the technical bits (HUD, BOM counts, block ids, section numbers).
 - Sizes `--text-xs … --text-3xl` (12 → 48px). Headings `--leading-tight` (1.15) + `--tracking-tight`; small labels/mono get `--tracking-wide` (+0.08em). Body `--leading` 1.65.
 
-**Spacing (Ma) — 8px base** `--space-1 … --space-10` (4 → 160px). `--measure` 68ch, `--container` 1080px.
+**Spacing (Ma) - 8px base** `--space-1 … --space-10` (4 → 160px). `--measure` 68ch, `--container` 1080px.
 
-**Form/radius** small radii only (`--radius-sm 3`, `--radius 6`, `--radius-lg 10`) — crafted, not bubbly.
+**Form/radius** small radii only (`--radius-sm 3`, `--radius 6`, `--radius-lg 10`) - crafted, not bubbly.
 
 **Motion** `--ease-out` / `--ease-in-out` / `--ease-spring`; `--dur-fast/–/–slow` (120/240/480ms).
 
+**Display serif - the editorial voice** `--font-display` = **Fraunces** (a high-contrast old-style with a
+display optical size), self-hosted woff2 (latin + latin-ext, ~124 KB, no CDN → works offline, honoring
+"everything runs locally"). It carries the hero wordmark, the section titles, the big load-step numerals,
+and the footer brand - nothing else. Body/UI/mono stay system fonts, so there is **no** webfont cost on the
+reading copy and no layout shift on the fold. `font-optical-sizing: auto` lets the opsz axis track font-size:
+the giant hero gets maximum thick/thin contrast while a small kicker stays sturdy on the dark ground. This is
+the single move that lifts the page from "clean dev README" to "crafted studio page".
+
+## live-up.co.jp - what we borrowed (and what we deliberately did not)
+
+[live-up.co.jp](https://live-up.co.jp/) is the reference: a Japanese design studio site whose whole identity
+is a **giant high-contrast serif** headline set in acres of negative space, with tiny **bilingual EN/JP
+section labels** ("OUR DOMAIN / 事業領域"), pure-monochrome restraint, and a soft organic gradient ground.
+
+Borrowed, translated onto our dark canvas:
+- **Editorial display serif** (Fraunces) for the wordmark + every section title - the defining lift.
+- **Bilingual section headers**: a tiny mono kicker (`01 · LIVE MODELS`, accent number) over a large serif
+  title over a muted Japanese subtitle. This finally makes the page's *stated* Japanese thesis **visible**
+  instead of only living in these notes.
+- **A commanding hero**: fluid-scaled serif wordmark, a bilingual eyebrow, and a poetic JP line
+  ("ブロックで、夢を見る。" - *dreaming in blocks*), with more Ma around it.
+- **Big serif numerals** for the load-into-Minecraft steps (echoing live-up's numbered `1 / 2` domains).
+- **A washi-paper grain** - a barely-there fractal-noise tooth over the ground (wabi-sabi: a natural,
+  imperfect surface), fixed behind all content so it never touches the pixel-art canvases.
+
+Deliberately NOT borrowed:
+- **live-up is light; we stay dark.** The sumi ground is load-bearing here - the neon Minecraft blocks and
+  the black demo canvases (`canvas{background:#000}`) need a dark stage; a light theme would wash them out.
+- **No color.** live-up is monochrome; we keep our one jade accent and no more (the one-accent rule holds).
+- **No autoplaying silk-gradient hero.** The design-notes already killed a moving glow as AI-slop; the grain
+  gives craft without motion, and honors `prefers-reduced-motion`.
+
 ## Top changes (ranked by visual impact)
 
-1. **Kill the blue radial glow.** Replace the cold navy `radial-gradient(... #18222e ...)` with a calm warm-neutral vignette — the single biggest "stop looking AI-generated" move.
+1. **Kill the blue radial glow.** Replace the cold navy `radial-gradient(... #18222e ...)` with a calm warm-neutral vignette - the single biggest "stop looking AI-generated" move.
 2. **One accent, not two.** Fold the cyan `--link` into the jade `--accent`; recolor it from neon `#56d364` to a quieter `#63bd84`.
 3. **Breathe (Ma).** Raise section rhythm to `--space-9` and give the hero `--space-10` of headroom; cap text at `--measure`.
 4. **Hairlines, not boxes.** Cards/sections lose heavy 12px-radius filled panels in favor of hairline rules + whitespace; BOM loses zebra stripes for hairline-separated rows.

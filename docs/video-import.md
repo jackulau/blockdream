@@ -40,18 +40,18 @@ A rendered video has no depth, so each frame is reconstructed with the same silh
   `planFrameTimes` (unit-tested, pure) handles frame-rate sampling and clamping so the last seek
   never hangs on an exact-duration timestamp.
 - **CLI:** `blockdream render <video> --target voxel3d` extracts frames via **ffmpeg** (required;
-  install with `brew install ffmpeg` or `apt-get install ffmpeg` — a missing binary is caught early
+  install with `brew install ffmpeg` or `apt-get install ffmpeg` - a missing binary is caught early
   with a clear install hint instead of a raw ENOENT). Key flags:
-  - `--depth N` — build thickness in blocks (default 8)
-  - `--smooth 0..1` — temporal depth smoothing between frames (default 0.35)
-  - `--curve N` — thickness profile exponent (default 0.5; <1 rounds the dome)
-  - `--animate explode|wave|buildup` — **procedural block-motion** of the built solid. Animates a
+  - `--depth N` - build thickness in blocks (default 8)
+  - `--smooth 0..1` - temporal depth smoothing between frames (default 0.35)
+  - `--curve N` - thickness profile exponent (default 0.5; <1 rounds the dome)
+  - `--animate explode|wave|buildup` - **procedural block-motion** of the built solid. Animates a
     still image or 3D model; for a clip, animates the first frame. `--animate-frames N` (default 24)
     controls the length of the generated sequence.
 
 **Procedural block-motion (`--animate`):** the same `explode`, `wave`, and `buildup` generators
 available in the web demo's animation selector are now reachable from the CLI for any 3D target.
-Example — make a PNG image explode and reassemble as a 3D Minecraft build:
+Example - make a PNG image explode and reassemble as a 3D Minecraft build:
 
 ```bash
 blockdream render my-image.png --target voxel3d --animate explode --animate-frames 24 --out ./explode-build
@@ -65,16 +65,16 @@ and `packages/cli/test/animate-cli.test.ts` (explode/wave/buildup wired to voxel
 ## Audio → note blocks
 
 When the imported video **has an audio track**, the build can come with **Minecraft note blocks that
-play that audio**. The audio is transcribed to a melodic note-block line (monophonic — the dominant
+play that audio**. The audio is transcribed to a melodic note-block line (monophonic - the dominant
 pitch per ~50 ms hop) and emitted into the 3D voxel datapack as a **physical "music area"** (one tuned
 `note_block[note=N,instrument=…]` per note, on its instrument base block with air above so it is
-audible — visible and editable in-world) plus an **engine** that strikes those note blocks in time.
+audible - visible and editable in-world) plus an **engine** that strikes those note blocks in time.
 Two engines, chosen with `--music-engine` (default `playsound`):
 
-- **`playsound`** (default) — a tick-driven sequencer (`music.mcfunction`) plays the melody with
+- **`playsound`** (default) - a tick-driven sequencer (`music.mcfunction`) plays the melody with
   positional `playsound` on the same scoreboard clock as the build animation. Robust vanilla audio,
   smallest footprint, no wiring. Byte-identical to the pre-`--music-engine` output.
-- **`redstone`** — a **physical repeater delay-line** is built beside the note blocks. A pulse enters
+- **`redstone`** - a **physical repeater delay-line** is built beside the note blocks. A pulse enters
   one end and propagates down a spine of repeaters; each note's onset is quantised to the redstone grid
   (1 redstone tick = 2 game ticks) and realised by repeater delay (1..4 rt each, chained for longer
   gaps), so the pulse strikes each note block on its rising edge exactly on time. The build literally
@@ -88,12 +88,12 @@ note), folded into the note block's two-octave range (F#3..F#5, indices 0..24). 
 DOM-free, shared by both the CLI and the browser.
 
 - **CLI:** `blockdream render <video> --target voxel3d --music auto|on|off`
-  - `--music auto` (default) — include note blocks **iff** the video carries an audio track
-  - `--music on` / `--music off` — force or suppress; an audio-less video is always music-free
-  - `--instrument <name>` — note-block instrument (default `harp`; `bass`, `bell`, `flute`, `chime`,
+  - `--music auto` (default) - include note blocks **iff** the video carries an audio track
+  - `--music on` / `--music off` - force or suppress; an audio-less video is always music-free
+  - `--instrument <name>` - note-block instrument (default `harp`; `bass`, `bell`, `flute`, `chime`,
     `guitar`, `xylophone`, `pling`, …)
-  - `--music-origin x,y,z` — where the music area spawns (default: beside the build)
-  - `--music-engine playsound|redstone` — how the note blocks are struck (default `playsound`; see above)
+  - `--music-origin x,y,z` - where the music area spawns (default: beside the build)
+  - `--music-engine playsound|redstone` - how the note blocks are struck (default `playsound`; see above)
 
   ```bash
   blockdream render clip.mp4 --target voxel3d --music on --instrument bell --out ./build-with-music
@@ -112,7 +112,7 @@ DOM-free, shared by both the CLI and the browser.
 Tests: `packages/audio/test/analyze.test.ts` (pitch detection on synthesized sines/scales),
 `packages/video/test/audio.test.ts` (ffmpeg PCM extraction), `packages/emit-commands/test/note-sequencer.test.ts`
 (note-block placement + playsound + additive datapack),
-`packages/emit-commands/test/redstone-sequencer.test.ts` (the redstone delay-line emitter — repeater
+`packages/emit-commands/test/redstone-sequencer.test.ts` (the redstone delay-line emitter - repeater
 delays, tuned note blocks, cumulative-delay == onset), `packages/cli/test/music-cli.test.ts`
 (`--music` / `--music-engine` end-to-end), `apps/web/test/audio.test.ts` (browser decode→analyze glue),
 `apps/web/test/canvas-mod.test.ts` (drag/projection/toggle math), and

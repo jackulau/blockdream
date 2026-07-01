@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { isVideoFile, planFrameTimes } from "../src/video";
 
-// The browser <video> seek-loop in decodeVideo can't run under jsdom (no real codec), so — exactly
-// like gif.ts keeps its timing math in anim.ts — the testable surface is the pure sampling plan +
+// The browser <video> seek-loop in decodeVideo can't run under jsdom (no real codec), so - exactly
+// like gif.ts keeps its timing math in anim.ts - the testable surface is the pure sampling plan +
 // the format sniffing. These are what actually decide "how many block-animation frames, when".
 
 describe("isVideoFile", () => {

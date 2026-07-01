@@ -11,14 +11,21 @@
     <meta property="og:description" content="From-scratch neural world models you can drive in the browser, plus a real-time image → Minecraft block-art and 3D voxel engine. Built end-to-end by Jack Lau." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://github.com/jackulau/blockdream" />
+    <link rel="preload" href="/fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin />
     <style>
       /* Tokens + base (reset, body, links, focus, motion) live in src/style.css. Below: page components. */
       .wrap { max-width: var(--container); margin: 0 auto; padding: 0 var(--space-5) var(--space-9); }
 
-      header.hero { padding: var(--space-10) 0 var(--space-7); }
-      .hero h1 { margin: 0; font-size: var(--text-3xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-tight); font-weight: 650; }
+      header.hero { padding: var(--space-10) 0 var(--space-8); position: relative; }
+      .hero .eyebrow { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-5); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--ink-faint); }
+      .hero .eyebrow .ja { font-family: var(--font-sans); letter-spacing: 0.06em; text-transform: none; color: var(--ink-dim); }
+      .hero .eyebrow .rule { flex: 0 0 auto; width: 28px; height: 1px; background: var(--line-2); }
+      /* Fraunces display: opsz drives max thick/thin contrast at this scale; fluid down to phones. */
+      .hero h1 { margin: 0; font-family: var(--font-display); font-optical-sizing: auto; font-size: clamp(3.25rem, 11vw, var(--text-5xl)); line-height: 0.94; letter-spacing: var(--tracking-tight); font-weight: 460; }
       .hero h1 .dot { color: var(--accent); }
-      .hero .tagline { margin: var(--space-4) 0 var(--space-6); color: var(--ink-dim); font-size: var(--text-md); max-width: 54ch; line-height: var(--leading-snug); }
+      .hero .sub-ja { margin: var(--space-5) 0 var(--space-2); font-size: var(--text-md); color: var(--ink); font-weight: 500; letter-spacing: 0.02em; }
+      .hero .tagline { margin: var(--space-3) 0 var(--space-6); color: var(--ink-dim); font-size: var(--text-md); max-width: 58ch; line-height: var(--leading-snug); }
+      @media (max-width: 640px) { .hero .eyebrow { flex-wrap: wrap; gap: var(--space-2); } .hero .eyebrow .rule { display: none; } }
       .byline { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-faint); }
       .byline .who { color: var(--ink-dim); font-weight: 600; }
       .btn {
@@ -33,8 +40,13 @@
       .lede { color: var(--ink-dim); font-size: var(--text-md); max-width: var(--measure); border-left: 2px solid var(--line-2); padding-left: var(--space-4); margin: var(--space-6) 0 var(--space-8); line-height: var(--leading); }
 
       section.block { margin: var(--space-9) 0; }
-      .block > h2 { font-size: var(--text-xl); margin: 0 0 var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); line-height: var(--leading-tight); letter-spacing: var(--tracking-tight); font-weight: 620; }
-      .block > h2 .num { color: var(--accent); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 500; letter-spacing: var(--tracking-wide); margin-right: var(--space-3); }
+      /* live-up-style bilingual header: tiny mono kicker + accent number, a large serif title, a muted
+         Japanese subtitle beneath - makes the page's stated Japanese design thesis actually visible. */
+      .block > .head { margin: 0 0 var(--space-6); padding-bottom: var(--space-4); border-bottom: 1px solid var(--line); }
+      .block .kicker { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--ink-faint); }
+      .block .kicker .num { color: var(--accent); font-weight: 500; }
+      .block .head h2 { margin: 0; font-family: var(--font-display); font-optical-sizing: auto; font-size: clamp(2rem, 5.2vw, var(--text-3xl)); line-height: var(--leading-tight); letter-spacing: var(--tracking-tight); font-weight: 470; }
+      .block .head .ja { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--ink-faint); letter-spacing: 0.08em; }
       .block > .desc { color: var(--ink-dim); margin: 0 0 var(--space-6); max-width: var(--measure); line-height: var(--leading); }
 
       .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
@@ -92,7 +104,17 @@
       .tooltip .sw { display: inline-block; width: 12px; height: 12px; border: 1px solid #0008; vertical-align: -2px; margin-right: 6px; image-rendering: pixelated; }
       .tooltip .id { color: var(--accent); }
 
-      footer { border-top: 1px solid var(--line); margin-top: var(--space-9); padding-top: var(--space-5); color: var(--ink-faint); font-size: var(--text-sm); display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: space-between; }
+      /* load-into-Minecraft steps: big serif numerals (Fraunces) over hairline-separated rows.
+         The numeral is absolutely positioned (NOT a grid cell) so inline <strong>/<code> in the step
+         text stay in normal flow - a grid li would blockify each into its own overlapping cell. */
+      .steps { list-style: none; counter-reset: step; margin: 0.4rem 0 1rem; padding: 0; color: var(--ink); font-size: 0.92rem; }
+      .steps li { counter-increment: step; position: relative; padding: var(--space-3) 0 var(--space-3) 3.2ch; border-top: 1px solid var(--line); line-height: var(--leading-snug); }
+      .steps li:first-child { border-top: 0; }
+      .steps li::before { content: counter(step); position: absolute; left: 0; top: calc(var(--space-3) - 1px); font-family: var(--font-display); font-optical-sizing: auto; font-size: var(--text-xl); font-weight: 460; line-height: 1; color: var(--accent); }
+      .steps code { font-size: 0.86em; }
+
+      footer { border-top: 1px solid var(--line); margin-top: var(--space-9); padding-top: var(--space-6); color: var(--ink-faint); font-size: var(--text-sm); display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: space-between; align-items: baseline; }
+      footer .brand { font-family: var(--font-display); font-optical-sizing: auto; font-size: var(--text-lg); font-weight: 460; color: var(--ink-dim); letter-spacing: var(--tracking-tight); }
       footer a { color: var(--ink-dim); }
       footer a:hover { color: var(--accent); }
     </style>
@@ -100,7 +122,9 @@
   <body>
     <div class="wrap">
       <header class="hero">
+        <p class="eyebrow"><span>Neural world models · block-art</span><span class="rule"></span><span class="ja" lang="ja">世界モデル ＆ ブロックアート</span></p>
         <h1>blockdream<span class="dot">.</span></h1>
+        <p class="sub-ja" lang="ja">ブロックで、夢を見る。</p>
         <p class="tagline">From-scratch neural world models you can drive in the browser · a recursive Minecraft model and a real comma.ai commaVQ driving model · plus a real-time image→Minecraft-block-art engine.</p>
         <div class="byline">
           <span class="who">Jack Lau</span>
@@ -118,7 +142,11 @@
       <p class="lede">Everything here runs locally and open-source. The world models generate every frame with a recursive transformer (KV-cached, served over a tiny WebSocket); the block-art engine quantizes to the real Minecraft map palette with OKLab color matching and dithering. Built end-to-end · data, training, serving, and these testers.</p>
 
       <section class="block">
-        <h2><span class="num">01</span>Live neural world models</h2>
+        <div class="head">
+          <p class="kicker"><span class="num">01</span> Live models</p>
+          <h2>Live neural world models</h2>
+          <p class="ja" lang="ja">ニューラル世界モデル</p>
+        </div>
         <p class="desc">Each frame is generated by the model from the previous frame + your control · no game engine underneath. The canvas redraws at your screen's refresh rate (display fps), decoupled from how fast the model generates (gen fps), so it's always smooth. Auto-connects to the local servers.</p>
         <div class="grid2">
           <div class="card">
@@ -167,7 +195,11 @@
       </section>
 
       <section class="block" data-reveal>
-        <h2><span class="num">02</span>Image → Minecraft block-art</h2>
+        <div class="head">
+          <p class="kicker"><span class="num">02</span> Block-art</p>
+          <h2>Image → Minecraft block-art</h2>
+          <p class="ja" lang="ja">ブロックアート</p>
+        </div>
         <p class="desc">Drop any image to map it to the 244-color Minecraft map palette (OKLab matching + dithering). Hover the result to identify the exact block; the bill-of-materials lists every block used with a texture-ish icon and count · what you'd need to build it.</p>
         <div class="ba">
           <div class="controls">
@@ -198,8 +230,12 @@
       </section>
 
       <section class="block" data-reveal>
-        <h2><span class="num">03</span>3D voxel builder + replay</h2>
-        <p class="desc">A still image is reconstructed as a real 3D solid · the subject is isolated from its background and inflated by silhouette shape into a centered, double-sided form that reads from every angle, then spun live. An imported GIF or video plays back as a faithful flat block animation instead — the frames are reproduced block-for-block at the source's real timing, not inflated into a blob. The same volumes the command-block builder emits as a vanilla datapack. Drag to orbit · hover any block to identify it; raise depth for a fuller build. Real block textures.</p>
+        <div class="head">
+          <p class="kicker"><span class="num">03</span> Voxel builder</p>
+          <h2>3D voxel builder + replay</h2>
+          <p class="ja" lang="ja">立体ボクセル構築</p>
+        </div>
+        <p class="desc">A still image is reconstructed as a real 3D solid · the subject is isolated from its background and inflated by silhouette shape into a centered, double-sided form that reads from every angle, then spun live. An imported GIF or video plays back as a faithful flat block animation instead - the frames are reproduced block-for-block at the source's real timing, not inflated into a blob. The same volumes the command-block builder emits as a vanilla datapack. Drag to orbit · hover any block to identify it; raise depth for a fuller build. Real block textures.</p>
         <div class="card" style="max-width:980px">
           <div class="stage" style="align-items:flex-start">
             <canvas id="v3-canvas" style="width:480px;max-width:100%;aspect-ratio:4/3;height:auto;border-radius:8px;cursor:crosshair"></canvas>
@@ -266,11 +302,15 @@
       </section>
 
       <section class="block" data-reveal>
-        <h2><span class="num">04</span>Load it into Minecraft</h2>
+        <div class="head">
+          <p class="kicker"><span class="num">04</span> Export</p>
+          <h2>Load it into Minecraft</h2>
+          <p class="ja" lang="ja">マインクラフトへ</p>
+        </div>
         <p class="desc">Every downloaded datapack is a ready-to-drop <code>.zip</code> with a <code>HOW_TO_LOAD.txt</code> inside. Quick version:</p>
         <div class="card" style="max-width:760px">
           <h3>Java Edition (1.21+)</h3>
-          <ol style="margin:.3rem 0 .8rem 1.1rem;color:var(--ink);font-size:.92rem;line-height:1.7">
+          <ol class="steps">
             <li>Open your world, pause, <strong>Open World Folder</strong> then the <code>datapacks/</code> folder (or <code>.minecraft/saves/&lt;world&gt;/datapacks/</code>; a server's is <code>world/datapacks/</code>).</li>
             <li>Drop the <code>.zip</code> in there. <strong>Do not unzip it.</strong></li>
             <li>In game: <code>/reload</code></li>
@@ -284,7 +324,7 @@
       </section>
 
       <footer data-reveal>
-        <span>blockdream · neural Minecraft &amp; driving world models + block-art · runs locally</span>
+        <span><span class="brand">blockdream</span> · neural Minecraft &amp; driving world models + block-art · runs locally</span>
         <span>by <strong>Jack Lau</strong> · <a href="https://github.com/jackulau/blockdream" target="_blank" rel="noopener">GitHub</a> · <a href="https://www.linkedin.com/in/-jacklau/" target="_blank" rel="noopener">LinkedIn</a></span>
       </footer>
     </div>

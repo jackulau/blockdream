@@ -9,6 +9,8 @@ import {
   wave,
   buildUp,
   generateSequence,
+  generateSequenceOverFrames,
+  sequenceFrame,
 } from "../src/animate";
 import { createVolume, setVoxel, countSolid, forEachSolid, type VoxelVolume } from "../src/volume";
 
@@ -114,5 +116,56 @@ describe("volume-sequence generators", () => {
     expect(generateSequence("explode", v, 6).length).toBe(6);
     expect(generateSequence("wave", v, 6).length).toBe(6);
     expect(generateSequence("buildup", v, 6).length).toBe(6);
+  });
+
+  it("sequenceFrame equals the matching generateSequence frame (shared per-frame core)", () => {
+    const v = blob();
+    for (const name of ["explode", "wave", "buildup"] as const) {
+      const seq = generateSequence(name, v, 10);
+      for (let f = 0; f < 10; f++) expect(countSolid(sequenceFrame(name, v, f, 10))).toBe(countSolid(seq[f]!));
+    }
+  });
+});
+
+describe("generateSequenceOverFrames — effect rides OVER a playing clip", () => {
+  // two clip frames with DIFFERENT voxel counts, so we can tell which one a given output frame came from.
+  function clipFrame(id: number, layers: number): VoxelVolume {
+    const v = createVolume(6, 6, 6);
+    for (let z = 1; z <= layers; z++) for (let y = 1; y < 5; y++) for (let x = 1; x < 5; x++) setVoxel(v, x, y, z, id);
+    return v;
+  }
+
+  it("keeps the clip advancing (frame f uses clip[f % N]) instead of freezing one frame", () => {
+    const a = clipFrame(4, 1);
+    const b = clipFrame(5, 4);
+    const na = countSolid(a);
+    const nb = countSolid(b);
+    expect(na).not.toBe(nb);
+    // wave is a pure per-column Y shift → each output frame keeps its SOURCE frame's voxel count.
+    const out = generateSequenceOverFrames("wave", [a, b], 8);
+    expect(out.length).toBe(8);
+    expect(countSolid(out[0]!)).toBe(na); // frame 0 → clip[0]
+    expect(countSolid(out[1]!)).toBe(nb); // frame 1 → clip[1]  (the animation moved, it is not frozen)
+    const counts = new Set(out.map((f) => countSolid(f)));
+    expect(counts.has(na) && counts.has(nb)).toBe(true);
+  });
+
+  it("also applies the effect: the wave crest height changes over time", () => {
+    const highestSolidY = (v: VoxelVolume): number => {
+      let m = -Infinity;
+      forEachSolid(v, (_x, y) => { m = Math.max(m, y); });
+      return m;
+    };
+    const out = generateSequenceOverFrames("wave", [blob()], 24); // single-frame clip isolates the effect
+    expect(new Set(out.map(highestSolidY)).size).toBeGreaterThan(1);
+  });
+
+  it("defaults to at least 24 frames so a short clip still gets a smooth effect cycle", () => {
+    expect(generateSequenceOverFrames("wave", [blob()]).length).toBe(24);
+    expect(generateSequenceOverFrames("wave", Array.from({ length: 40 }, () => blob())).length).toBe(40);
+  });
+
+  it("empty clip yields no frames", () => {
+    expect(generateSequenceOverFrames("wave", []).length).toBe(0);
   });
 });

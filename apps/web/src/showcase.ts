@@ -18,6 +18,7 @@ import {
   gltfToFrames,
   glbToFrames,
   generateSequence,
+  generateSequenceOverFrames,
   TRANSFORM_ANIMS,
   type SequenceAnimName,
   type VoxelVolume,
@@ -211,7 +212,7 @@ const QUANT3D_STILL = { method: "floyd-steinberg", gamutMap: 0.8 } as const;
 // Snorlax). So 3D-solid builds use this; only the §02 / init flat stills keep QUANT3D_STILL's dither.
 const QUANT3D_SOLID = { method: "none", gamutMap: 0.8 } as const;
 // Grid width for an imported still image's 3D solid. Well above the old 40px (which made the subject
-// tiny + blocky) — a single still has no per-frame temporal cost, so it can afford detail; bounded so
+// tiny + blocky) - a single still has no per-frame temporal cost, so it can afford detail; bounded so
 // the inflated solid's block count + datapack stay sane. rgbImageFromCanvas clamps to the source width,
 // so a small sprite is never upscaled past its native pixels.
 const STILL_SOLID_GRID = 96;
@@ -288,7 +289,7 @@ function rgbAndAirFromCanvas(src: HTMLCanvasElement, gridW: number): { rgb: RgbI
 // ~ (front-face cells x frames); a 240-frame GIF and a 24-frame clip should not get the same grid. We
 // hold the total cell budget B roughly constant: cells/frame = w * h = w^2 * aspect (aspect = h/w), so
 // w = sqrt(B / (frames * aspect)), clamped. A long clip lands near the floor, a short one near a crisp
-// cap — both far above the old fixed 64. Bayer keeps flat regions merged, so this budget tracks geometry.
+// cap - both far above the old fixed 64. Bayer keeps flat regions merged, so this budget tracks geometry.
 function flatGridWidth(frameCount: number, aspect: number): number {
   const B = 2_400_000; // total front-face cells across all frames (pre-greedy-merge)
   const n = Math.max(1, frameCount);
@@ -429,7 +430,11 @@ async function setup3dViewer(): Promise<void> {
   // and the animation dropdown rides a transform on top of the playing frames instead of discarding them.
   let flatFramesRgb: RgbImage[] | null = null;
   let flatLabel = ""; // hud label for the active flat import (e.g. "gif snorlax.gif")
-  // True only while current3d is a sequence GENERATED from baseVolume (explode/wave/buildup) — i.e. one
+  // The imported clip's plain FLAT VoxelVolume frames (un-effected). Kept so a block-motion anim
+  // (wave/explode/buildup) can play OVER the animation (content keeps advancing + the effect rides on
+  // top), and so switching back to a transform anim restores the plain clip. Cleared when flat mode exits.
+  let flatVolFrames: VoxelVolume[] | null = null;
+  // True only while current3d is a sequence GENERATED from baseVolume (explode/wave/buildup) - i.e. one
   // that reverts cleanly to the single solid. Distinguishes a generated sequence from an IMPORTED
   // multi-frame animation (GIF/video/glb/obj-seq), which must NOT be discarded when a transform is picked.
   let seqFromBase = false;
@@ -444,15 +449,16 @@ async function setup3dViewer(): Promise<void> {
   function rebuildVolume(): void {
     const q = lastSource;
     if (!q) return;
-    flatFramesRgb = null; // a single solid is not a flat import…
-    seqFromBase = false; // …nor a generated sequence
+    flatFramesRgb = null; // a single solid is not a flat import, nor a base-derived sequence,
+    flatVolFrames = null; // nor an imported clip
+    seqFromBase = false;
     const maxDepth = Math.max(4, Number(depth.value));
     const depthOf =
       depthMap && depthMap.length === q.width * q.height
         ? (x: number, y: number) => depthMap![y * q.width + x]!
         : undefined;
     // shape-from-shading: per-pixel OKLab lightness of the matched block carves internal relief into
-    // the dome (a bright cheek bulges, a dark socket recedes) — ignored when a real depthOf is present.
+    // the dome (a bright cheek bulges, a dark socket recedes) - ignored when a real depthOf is present.
     const shadingOf = (x: number, y: number) => pal3d.entries[q.paletteIndex[y * q.width + x]!]!.lab.L;
     const vol = log.time("imageToSolid", () => imageToSolid(q, { maxDepth, depthOf, shadingOf, shadingGain: 0.5 }));
     log.debug("build3d", { dims: [vol.sx, vol.sy, vol.sz], depthMapped: !!depthOf });
@@ -478,7 +484,7 @@ async function setup3dViewer(): Promise<void> {
 
   // The image "build 3D from image" should solidify: the SUBJECT the user imported (the currently
   // displayed frame of an active GIF/video) when one is loaded, else the §02 block-art source. This is
-  // the fix for "build 3D from image builds an unrelated image" — it now follows the §03 import.
+  // the fix for "build 3D from image builds an unrelated image" - it now follows the §03 import.
   function build3dSource(): RgbImage | null {
     if (flatFramesRgb && flatFramesRgb.length) {
       const i = Math.round(Number(scrub.value));
@@ -520,15 +526,32 @@ async function setup3dViewer(): Promise<void> {
     // anim needs a single solid, so solidify the imported subject's current frame and sequence THAT.
     if (flatFramesRgb) {
       if (isTransformAnim(sel)) {
+        // a block-motion effect (wave/explode/buildup) may have replaced the plain clip; restore it so
+        // the transform rides on the ACTUAL animation frames, not a frozen effected sequence.
+        if (flatVolFrames && current3d !== flatVolFrames) {
+          current3d = flatVolFrames;
+          if (flatVolFrames[0]) renderBom3d(flatVolFrames[0]);
+          viewer.setFrames(flatVolFrames, { faceOn: sel === "none" });
+          scrub.max = String(flatVolFrames.length - 1);
+          $<HTMLButtonElement>("v3-download").disabled = false;
+          playBtn.textContent = viewer.isPlaying ? "pause" : "play";
+        }
         viewer.reframe(sel === "none"); // none → head-on; any motion → 3/4 so it reads in depth
         viewer.setAnim(sel);
         hud.textContent = `${flatLabel} · ${sel === "none" ? "head-on" : sel} · drag to orbit`;
-      } else {
-        buildSolidFrom(build3dSource(), QUANT3D_SOLID); // solidify current frame (exits flat mode, sets baseVolume)
-        if (baseVolume) {
-          showFrames(generateSequence(sel as SequenceAnimName, baseVolume, 24), sel);
-          seqFromBase = true;
-        }
+      } else if (flatVolFrames && flatVolFrames.length) {
+        // block-motion effect (wave/explode/buildup) applied OVER the playing clip: the animation keeps
+        // advancing (frame f uses clip[f % N]) while the effect displaces it, instead of the old
+        // behaviour that froze one frame, solidified it, and animated only that (losing the animation).
+        const combined = generateSequenceOverFrames(sel as SequenceAnimName, flatVolFrames);
+        current3d = combined;
+        if (combined[0]) renderBom3d(combined[0]);
+        viewer.setFrames(combined, { faceOn: false }); // 3/4 view so the displacement reads; frames carry the motion
+        scrub.max = String(combined.length - 1);
+        $<HTMLButtonElement>("v3-download").disabled = false;
+        viewer.play();
+        playBtn.textContent = "pause";
+        hud.textContent = `${flatLabel} · ${sel} · playing · drag to orbit`;
       }
       return;
     }
@@ -544,7 +567,10 @@ async function setup3dViewer(): Promise<void> {
 
   function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>, faceOn = false): void {
     current3d = frames;
-    if (!faceOn) flatFramesRgb = null; // a model / sequence / solid is not a flat import…
+    if (!faceOn) {
+      flatFramesRgb = null;
+      flatVolFrames = null;
+    } // a model / sequence / solid is not a flat import…
     seqFromBase = false; // …and is not a base-derived sequence unless the caller re-sets this after
     if (frames[0]) renderBom3d(frames[0]);
     if (faceOn) animSel.value = "none"; // reflect the head-on, no-transform default in the dropdown
@@ -558,13 +584,14 @@ async function setup3dViewer(): Promise<void> {
 
   // import a real animation → block animation: a Blender glTF/.glb (node-TRS animation sampled to
   // frames), an .obj-per-frame sequence (select multiple), a single .obj model, an animated .gif,
-  // a VIDEO file (.mp4/.webm/.mov — decoded natively in the browser, no ffmpeg), or a still image
-  // (→ a 3D solid the viewer spins). Files arrive from the picker, a drag-drop, OR a pasted URL —
+  // a VIDEO file (.mp4/.webm/.mov - decoded natively in the browser, no ffmpeg), or a still image
+  // (→ a 3D solid the viewer spins). Files arrive from the picker, a drag-drop, OR a pasted URL -
   // all three funnel through importFiles so every source gets the identical pipeline.
   async function importFiles(files: File[]): Promise<void> {
     if (!files.length) return;
     viewer.pause(); // stop the render loop overwriting the status line
     flatFramesRgb = null; // a fresh import invalidates the prior flat import (re-set below on success)
+    flatVolFrames = null;
     current3dMusic = []; // a fresh import drops any prior video's note-block music
     viewer.setMusicArea([]);
     musicToggle.disabled = true;
@@ -589,7 +616,7 @@ async function setup3dViewer(): Promise<void> {
       } else if (gif) {
         // animated GIF → FLAT, faithful per-frame block animation. A 2D motion graphic has no "subject"
         // to lift off a "background"; the OLD dome-inflation path turned it into a boiling blob. Here the
-        // front face of each thin slab IS the source frame, block-for-block — the frames ARE the motion,
+        // front face of each thin slab IS the source frame, block-for-block - the frames ARE the motion,
         // played at the GIF's real per-frame timing. Transparent pixels (canvas alpha) map to air.
         const { canvases, durationsMs } = await decodeGif(gif);
         const gw = flatGridWidth(canvases.length, (canvases[0]!.height || 3) / (canvases[0]!.width || 4));
@@ -601,6 +628,7 @@ async function setup3dViewer(): Promise<void> {
         });
         showFrames(frames, `gif ${gif.name} · flat`, durationsMs, true);
         flatFramesRgb = rgb; // remember the imported frames so build-from-image / transforms follow them
+        flatVolFrames = frames; // and the plain flat frames, so a block-motion effect can play over them
         flatLabel = `gif ${gif.name}`;
       } else if (video) {
         // VIDEO → same FLAT faithful per-frame block animation (decoded natively in the browser). Video
@@ -616,6 +644,7 @@ async function setup3dViewer(): Promise<void> {
         });
         showFrames(frames, `video ${video.name} · flat`, durationsMs, true);
         flatFramesRgb = rgb; // remember the imported frames so build-from-image / transforms follow them
+        flatVolFrames = frames; // and the plain flat frames, so a block-motion effect can play over them
         flatLabel = `video ${video.name}`;
         // If the clip carries audio, transcribe it to a note-block music timeline + a draggable music
         // area beside the build (kept on builder state for the toggle + datapack export). Audio never
@@ -640,8 +669,8 @@ async function setup3dViewer(): Promise<void> {
       } else if (image) {
         // still image → a single subject-isolated 3D solid the viewer spins live (its own animation).
         // Build it the SAME clean way as the flat-import build: NEAREST quant (QUANT3D_SOLID) so
-        // detectBackgroundMask can flood a flat background away and isolate the subject — floyd-steinberg
-        // dither scattered the flat field into a non-isolatable speckled slab (the old "looks bad") — at
+        // detectBackgroundMask can flood a flat background away and isolate the subject - floyd-steinberg
+        // dither scattered the flat field into a non-isolatable speckled slab (the old "looks bad") - at
         // STILL_SOLID_GRID (well above the old 40px) so the subject has real detail, not a blocky blob.
         const bmp = await createImageBitmap(image);
         const c = document.createElement("canvas");
@@ -692,7 +721,7 @@ async function setup3dViewer(): Promise<void> {
       await importFiles([await fetchAsFile(url)]);
     } catch (err) {
       log.warn("URL import failed", err);
-      hud.textContent = `URL import failed: ${(err as Error).message} — the host may block cross-origin fetch (CORS)`;
+      hud.textContent = `URL import failed: ${(err as Error).message} - the host may block cross-origin fetch (CORS)`;
     }
   }
   $<HTMLButtonElement>("v3-url-go").addEventListener("click", () => void importUrl());
@@ -701,8 +730,8 @@ async function setup3dViewer(): Promise<void> {
   });
 
   // Download a vanilla datapack that builds the 3D spin animation (fill-batched). The export carries
-  // the on-screen arrangement: the build spawns at its dragged origin, and — when the video had audio
-  // AND the note-block toggle is on — the note-block music area + sequencer at ITS dragged origin.
+  // the on-screen arrangement: the build spawns at its dragged origin, and - when the video had audio
+  // AND the note-block toggle is on - the note-block music area + sequencer at ITS dragged origin.
   $<HTMLButtonElement>("v3-download").addEventListener("click", () => {
     if (!current3d.length) return;
     // the viewer centers the build + the note-block row on their group positions; pass each object's
@@ -745,7 +774,7 @@ async function setup3dViewer(): Promise<void> {
 }
 void setup3dViewer();
 
-// Scroll-reveal: sections fade + rise a little as they enter view (tha.jp — restrained motion
+// Scroll-reveal: sections fade + rise a little as they enter view (tha.jp - restrained motion
 // modeled on natural deceleration; easing/duration live in style.css). The class is added by JS,
 // so with no JS the content is simply visible; reduced-motion or no IntersectionObserver also
 // leave everything visible. Hero + first section are left untouched so the fold paints instantly.
