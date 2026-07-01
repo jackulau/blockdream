@@ -93,7 +93,7 @@ export class Viewer3D {
     cfg.canvas.addEventListener("pointermove", this.onPointerDrag);
     window.addEventListener("pointerup", this.onPointerUp);
     // a touch interaction can end with pointercancel (palm rejection / system gesture) and no
-    // pointerup — without this, a drag could leave OrbitControls stuck disabled.
+    // pointerup - without this, a drag could leave OrbitControls stuck disabled.
     window.addEventListener("pointercancel", this.onPointerUp);
     this.loop(0);
   }
@@ -191,7 +191,7 @@ export class Viewer3D {
    * spin OFF (the frames ARE the motion - spinning on top double-rotates), a single static
    * volume defaults spin ON (turntable showcase).
    *
-   * `opts.faceOn` (a flat 2D GIF/video animation) frames the slab HEAD-ON — camera straight down -Z,
+   * `opts.faceOn` (a flat 2D GIF/video animation) frames the slab HEAD-ON - camera straight down -Z,
    * transform off - so playback reads exactly like the source instead of a skewed, orbiting slab. The
    * user can still drag to orbit; this only sets the initial pose. Everything else gets the 3/4 view.
    */
@@ -217,7 +217,7 @@ export class Viewer3D {
   /**
    * Position the camera for the current frame[0]: `faceOn` looks straight down -Z (read a flat slab
    * head-on), else the 3/4 turntable view. Extracted from setFrames so the host can RE-FRAME in place
-   * (reframe()) — e.g. when a flat GIF gets a live rotation applied and needs depth to read.
+   * (reframe()) - e.g. when a flat GIF gets a live rotation applied and needs depth to read.
    */
   private fitCamera(faceOn: boolean): void {
     const v = this.frames[0];
@@ -343,7 +343,7 @@ export class Viewer3D {
     g.position.z = z;
   }
 
-  /** Subscribe to arrange changes (fired while dragging) — the host UI mirrors positions into export. */
+  /** Subscribe to arrange changes (fired while dragging) - the host UI mirrors positions into export. */
   onArrange(cb: (s: ArrangeSnapshot) => void): void {
     this.onArrangeChange = cb;
   }

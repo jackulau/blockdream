@@ -109,24 +109,24 @@ export function groundToWorldOrigin(pos: GroundVec, base: Vec3): Vec3 {
 /** generateVoxelDatapack placement opts derived from the on-screen arrangement. */
 export interface DatapackPlacement {
   origin: Vec3; // build (animation) origin
-  music?: NoteEvent[]; // note timeline — present only when included
-  musicOrigin?: Vec3; // music-area origin — present only when included
+  music?: NoteEvent[]; // note timeline - present only when included
+  musicOrigin?: Vec3; // music-area origin - present only when included
 }
 
 /**
  * Half-extents (in blocks) of the on-screen objects. The viewer renders each object CENTERED on its
- * group position, but the datapack origin is the object's min-XZ CORNER — so the export must shift the
+ * group position, but the datapack origin is the object's min-XZ CORNER - so the export must shift the
  * dragged center by the half-extent to land the build/music where the user actually sees it (WYSIWYG).
  */
 export interface PlacementExtents {
-  buildHalf?: GroundVec; // (sx/2, sz/2) — the build box's half-extent
-  musicHalf?: GroundVec; // ((distinctNotes-1)/2, 0) — half the centered note-block row's width
+  buildHalf?: GroundVec; // (sx/2, sz/2) - the build box's half-extent
+  musicHalf?: GroundVec; // ((distinctNotes-1)/2, 0) - half the centered note-block row's width
 }
 
 /**
  * Turn the on-screen arrangement + analyzed notes into datapack placement opts: the build origin =
- * the animation's dragged CENTER shifted to its corner, and — ONLY when notes exist AND the note-block
- * toggle is on — the note timeline placed at the music area's dragged center (also corner-shifted).
+ * the animation's dragged CENTER shifted to its corner, and - ONLY when notes exist AND the note-block
+ * toggle is on - the note timeline placed at the music area's dragged center (also corner-shifted).
  * Toggle off or no notes ⇒ no music fields at all, so the export is byte-identical to a music-less
  * build (the additive contract from D3).
  */

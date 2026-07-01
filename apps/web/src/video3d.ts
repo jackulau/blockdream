@@ -34,7 +34,7 @@ export function rgbFramesToAnimated3d(
   return framesToAnimated3d(quantized, { ...video3d, shadingGain, shadingForFrame });
 }
 
-/** Quantize a sequence of decoded RGB frames to the block palette, then voxelize them FLAT — the
+/** Quantize a sequence of decoded RGB frames to the block palette, then voxelize them FLAT - the
  *  parity path for 2D motion-graphic GIFs/videos. Unlike rgbFramesToAnimated3d this does NOT isolate a
  *  subject or inflate a dome: the front face of each thin slab is the source frame, block-for-block, so
  *  playback reproduces the original animation instead of a boiling blob. `isAirForFrame` (from the
@@ -45,10 +45,10 @@ export function rgbFramesToAnimated3d(
  *  so a flat nearest match bands smooth shading into ugly steps; bayer dithers between the two nearest
  *  palette colours to approximate the true colour, which is what makes playback actually resemble the
  *  source. Crucially bayer is POSITION-deterministic (threshold is a pure function of the (x,y) cell), so
- *  a pixel whose colour is unchanged frame-to-frame quantizes to the SAME block every frame — no temporal
+ *  a pixel whose colour is unchanged frame-to-frame quantizes to the SAME block every frame - no temporal
  *  shimmer, no boiling. (Error-diffusion would shimmer, which is why the dome path avoided dither; the
  *  flat path has no such constraint.) A low amplitude keeps genuinely-flat regions mapping to a single
- *  colour so greedy meshing still merges them — only gradients/edges dither. */
+ *  colour so greedy meshing still merges them - only gradients/edges dither. */
 export function rgbFramesToFlat3d(
   frames: RgbImage[],
   palette: Palette,

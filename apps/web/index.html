@@ -41,7 +41,7 @@
 
       section.block { margin: var(--space-9) 0; }
       /* live-up-style bilingual header: tiny mono kicker + accent number, a large serif title, a muted
-         Japanese subtitle beneath — makes the page's stated Japanese design thesis actually visible. */
+         Japanese subtitle beneath - makes the page's stated Japanese design thesis actually visible. */
       .block > .head { margin: 0 0 var(--space-6); padding-bottom: var(--space-4); border-bottom: 1px solid var(--line); }
       .block .kicker { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--ink-faint); }
       .block .kicker .num { color: var(--accent); font-weight: 500; }
@@ -106,7 +106,7 @@
 
       /* load-into-Minecraft steps: big serif numerals (Fraunces) over hairline-separated rows.
          The numeral is absolutely positioned (NOT a grid cell) so inline <strong>/<code> in the step
-         text stay in normal flow — a grid li would blockify each into its own overlapping cell. */
+         text stay in normal flow - a grid li would blockify each into its own overlapping cell. */
       .steps { list-style: none; counter-reset: step; margin: 0.4rem 0 1rem; padding: 0; color: var(--ink); font-size: 0.92rem; }
       .steps li { counter-increment: step; position: relative; padding: var(--space-3) 0 var(--space-3) 3.2ch; border-top: 1px solid var(--line); line-height: var(--leading-snug); }
       .steps li:first-child { border-top: 0; }
@@ -235,7 +235,7 @@
           <h2>3D voxel builder + replay</h2>
           <p class="ja" lang="ja">立体ボクセル構築</p>
         </div>
-        <p class="desc">A still image is reconstructed as a real 3D solid · the subject is isolated from its background and inflated by silhouette shape into a centered, double-sided form that reads from every angle, then spun live. An imported GIF or video plays back as a faithful flat block animation instead — the frames are reproduced block-for-block at the source's real timing, not inflated into a blob. The same volumes the command-block builder emits as a vanilla datapack. Drag to orbit · hover any block to identify it; raise depth for a fuller build. Real block textures.</p>
+        <p class="desc">A still image is reconstructed as a real 3D solid · the subject is isolated from its background and inflated by silhouette shape into a centered, double-sided form that reads from every angle, then spun live. An imported GIF or video plays back as a faithful flat block animation instead - the frames are reproduced block-for-block at the source's real timing, not inflated into a blob. The same volumes the command-block builder emits as a vanilla datapack. Drag to orbit · hover any block to identify it; raise depth for a fuller build. Real block textures.</p>
         <div class="card" style="max-width:980px">
           <div class="stage" style="align-items:flex-start">
             <canvas id="v3-canvas" style="width:480px;max-width:100%;aspect-ratio:4/3;height:auto;border-radius:8px;cursor:crosshair"></canvas>

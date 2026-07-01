@@ -23,7 +23,7 @@ function sine(hz: number, sampleRate: number, secs: number, amp = 0.6): Float32A
 }
 
 function blob(): Blob {
-  // bytes are irrelevant — the injected decoder ignores them
+  // bytes are irrelevant - the injected decoder ignores them
   return new Blob([new Uint8Array([1, 2, 3])]);
 }
 
@@ -78,7 +78,7 @@ describe("analyzeFileAudio", () => {
     expect(notes[0]!.note).toBe(15);
   });
 
-  it("returns [] (no music) when the decoder throws — e.g. a video with no audio track", async () => {
+  it("returns [] (no music) when the decoder throws - e.g. a video with no audio track", async () => {
     const decoder: AudioDecoder = async () => {
       throw new Error("EncodingError: no audio");
     };

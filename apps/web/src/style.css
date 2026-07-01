@@ -1,25 +1,25 @@
 /*
- * Blockdream design system — tokens + base layer.
+ * Blockdream design system - tokens + base layer.
  *
  * Grounded in Japanese design tradition (rationale + citations in docs/design-notes.md):
  *  - Kenya Hara / MUJI "emptiness" (ku 空) + restraint: prune to the essential; one quiet accent.
- *  - Ma (間): negative space is an active element — generous spacing scale + large section rhythm.
+ *  - Ma (間): negative space is an active element - generous spacing scale + large section rhythm.
  *  - Kanso (簡素) / Shibui (渋い): plain, uncluttered, understated; muted sumi-ink ground, washi-paper ink.
  *  - Wabi-sabi: natural, slightly warm neutrals over cold tech-navy; an off-white, not a pure #fff.
- *  - tha ltd / Yugo Nakamura: motion "modeled on the natural world" — natural ease-out, restrained, purposeful.
+ *  - tha ltd / Yugo Nakamura: motion "modeled on the natural world" - natural ease-out, restrained, purposeful.
  *
  * D4 ships the token + base layer (this file). D5 applies it to the page. Old var names (--panel/--dim/
- * --acc/--link) are aliased onto the new system so existing styles keep working through the migration —
+ * --acc/--link) are aliased onto the new system so existing styles keep working through the migration -
  * and --link folds into the single accent (no more competing cyan), satisfying "exactly one accent".
  *
- * Editorial serif (081): one display face — Fraunces, a high-contrast old-style with a display optical
- * size — carries the hero wordmark, section titles, and big numerals. It is the single move that lifts
+ * Editorial serif (081): one display face - Fraunces, a high-contrast old-style with a display optical
+ * size - carries the hero wordmark, section titles, and big numerals. It is the single move that lifts
  * the page from "clean dev README" to "crafted studio page" (drawn from live-up.co.jp's giant-serif
  * headlines). Self-hosted woff2 (no CDN → works offline, honoring "everything runs locally"); body text
  * stays system-sans, so there is no webfont cost on the reading copy and no layout shift on the fold.
  */
 
-/* Fraunces variable — display headings only. font-optical-sizing:auto drives the opsz axis from
+/* Fraunces variable - display headings only. font-optical-sizing:auto drives the opsz axis from
    font-size, so the huge hero gets maximum thick/thin contrast while a small kicker stays sturdy. */
 @font-face {
   font-family: "Fraunces";
@@ -47,33 +47,33 @@
   --bg: #0f0f11; /* sumi ground (near-black, faintly warm-neutral, no blue cast) */
   --surface: #16171b; /* raised panel */
   --surface-2: #1b1d22; /* input wells, BOM rows */
-  --line: #24262c; /* hairline border (low contrast — restraint) */
+  --line: #24262c; /* hairline border (low contrast - restraint) */
   --line-2: #30333a; /* slightly stronger divider */
-  --ink: #ecebe6; /* washi paper white — warm off-white, not pure #fff (wabi-sabi) */
+  --ink: #ecebe6; /* washi paper white - warm off-white, not pure #fff (wabi-sabi) */
   --ink-dim: #a4a39c; /* secondary text */
   --ink-faint: #74736c; /* captions / meta */
-  --accent: #63bd84; /* jade / froglight green — calmer than neon, the single accent */
+  --accent: #63bd84; /* jade / froglight green - calmer than neon, the single accent */
   --accent-2: #7ccf99; /* hover / active */
   --accent-soft: rgba(99, 189, 132, 0.13); /* tint for focus/hover beds + selection */
 
   /* ---- type: refined system sans + mono, modular ~1.25 scale ---- */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  /* editorial display serif (headings/numerals only) — sturdy classical fallbacks hold the look offline */
+  /* editorial display serif (headings/numerals only) - sturdy classical fallbacks hold the look offline */
   --font-display: "Fraunces", "Hoefler Text", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  --text-4xl: 4.25rem; /* 68 — hero wordmark */
-  --text-5xl: 6rem; /* 96 — hero display / oversized section titles */
-  --text-xs: 0.75rem; /* 12 — meta */
-  --text-sm: 0.8125rem; /* 13 — mono / labels */
-  --text-base: 1rem; /* 16 — body */
-  --text-md: 1.125rem; /* 18 — lede */
-  --text-lg: 1.375rem; /* 22 — h3 */
-  --text-xl: 1.75rem; /* 28 — h2 */
+  --text-4xl: 4.25rem; /* 68 - hero wordmark */
+  --text-5xl: 6rem; /* 96 - hero display / oversized section titles */
+  --text-xs: 0.75rem; /* 12 - meta */
+  --text-sm: 0.8125rem; /* 13 - mono / labels */
+  --text-base: 1rem; /* 16 - body */
+  --text-md: 1.125rem; /* 18 - lede */
+  --text-lg: 1.375rem; /* 22 - h3 */
+  --text-xl: 1.75rem; /* 28 - h2 */
   --text-2xl: 2.25rem; /* 36 */
-  --text-3xl: 3rem; /* 48 — h1 */
+  --text-3xl: 3rem; /* 48 - h1 */
   --leading-tight: 1.15; /* headings */
   --leading-snug: 1.4;
-  --leading: 1.65; /* body — generous vertical Ma */
+  --leading: 1.65; /* body - generous vertical Ma */
   --tracking-tight: -0.02em; /* large headings */
   --tracking-wide: 0.08em; /* small caps / mono labels */
 
@@ -86,8 +86,8 @@
   --space-6: 2rem; /* 32 */
   --space-7: 3rem; /* 48 */
   --space-8: 4.5rem; /* 72 */
-  --space-9: 7rem; /* 112 — between major sections */
-  --space-10: 10rem; /* 160 — hero breathing room */
+  --space-9: 7rem; /* 112 - between major sections */
+  --space-10: 10rem; /* 160 - hero breathing room */
   --measure: 68ch; /* readable line length */
   --container: 1080px; /* content max width */
 
@@ -99,7 +99,7 @@
   /* ---- motion (tha.jp natural easing): purposeful, restrained ---- */
   --ease-out: cubic-bezier(0.22, 0.7, 0.24, 1); /* natural deceleration */
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1); /* subtle overshoot — use sparingly */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1); /* subtle overshoot - use sparingly */
   --dur-fast: 120ms;
   --dur: 240ms;
   --dur-slow: 480ms;
@@ -127,14 +127,14 @@ body {
   font-size: var(--text-base);
   line-height: var(--leading);
   color: var(--ink);
-  /* calm, warm-neutral vignette — NOT the old blue radial glow (that read as AI-slop) */
+  /* calm, warm-neutral vignette - NOT the old blue radial glow (that read as AI-slop) */
   background: radial-gradient(1100px 620px at 50% -12%, #161719, var(--bg)) fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
-/* washi-paper grain: a barely-there fractal-noise tooth over the ground (wabi-sabi — a natural,
+/* washi-paper grain: a barely-there fractal-noise tooth over the ground (wabi-sabi - a natural,
    slightly imperfect surface, not a flat synthetic void). Fixed, behind all content (z-index:-1),
    so it never touches the pixel-art canvases or neon blocks that sit in normal flow above it. */
 body::after {
