@@ -34,6 +34,38 @@ cramped boxes).
 
 **Motion** `--ease-out` / `--ease-in-out` / `--ease-spring`; `--dur-fast/–/–slow` (120/240/480ms).
 
+**Display serif — the editorial voice** `--font-display` = **Fraunces** (a high-contrast old-style with a
+display optical size), self-hosted woff2 (latin + latin-ext, ~124 KB, no CDN → works offline, honoring
+"everything runs locally"). It carries the hero wordmark, the section titles, the big load-step numerals,
+and the footer brand — nothing else. Body/UI/mono stay system fonts, so there is **no** webfont cost on the
+reading copy and no layout shift on the fold. `font-optical-sizing: auto` lets the opsz axis track font-size:
+the giant hero gets maximum thick/thin contrast while a small kicker stays sturdy on the dark ground. This is
+the single move that lifts the page from "clean dev README" to "crafted studio page".
+
+## live-up.co.jp — what we borrowed (and what we deliberately did not)
+
+[live-up.co.jp](https://live-up.co.jp/) is the reference: a Japanese design studio site whose whole identity
+is a **giant high-contrast serif** headline set in acres of negative space, with tiny **bilingual EN/JP
+section labels** ("OUR DOMAIN / 事業領域"), pure-monochrome restraint, and a soft organic gradient ground.
+
+Borrowed, translated onto our dark canvas:
+- **Editorial display serif** (Fraunces) for the wordmark + every section title — the defining lift.
+- **Bilingual section headers**: a tiny mono kicker (`01 · LIVE MODELS`, accent number) over a large serif
+  title over a muted Japanese subtitle. This finally makes the page's *stated* Japanese thesis **visible**
+  instead of only living in these notes.
+- **A commanding hero**: fluid-scaled serif wordmark, a bilingual eyebrow, and a poetic JP line
+  ("ブロックで、夢を見る。" — *dreaming in blocks*), with more Ma around it.
+- **Big serif numerals** for the load-into-Minecraft steps (echoing live-up's numbered `1 / 2` domains).
+- **A washi-paper grain** — a barely-there fractal-noise tooth over the ground (wabi-sabi: a natural,
+  imperfect surface), fixed behind all content so it never touches the pixel-art canvases.
+
+Deliberately NOT borrowed:
+- **live-up is light; we stay dark.** The sumi ground is load-bearing here — the neon Minecraft blocks and
+  the black demo canvases (`canvas{background:#000}`) need a dark stage; a light theme would wash them out.
+- **No color.** live-up is monochrome; we keep our one jade accent and no more (the one-accent rule holds).
+- **No autoplaying silk-gradient hero.** The design-notes already killed a moving glow as AI-slop; the grain
+  gives craft without motion, and honors `prefers-reduced-motion`.
+
 ## Top changes (ranked by visual impact)
 
 1. **Kill the blue radial glow.** Replace the cold navy `radial-gradient(... #18222e ...)` with a calm warm-neutral vignette — the single biggest "stop looking AI-generated" move.
