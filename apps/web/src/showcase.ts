@@ -13,19 +13,24 @@ import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 import { JAVA_DATAPACK_SUPPORTED } from "@blockdream/palette/versions";
 import {
   imageToSolid,
+  imageToFlat,
   objToVolume,
   objSequenceToFrames,
   gltfToFrames,
   glbToFrames,
   generateSequence,
   generateSequenceOverFrames,
+  spinSequence,
   TRANSFORM_ANIMS,
+  EMPTY,
   type SequenceAnimName,
   type VoxelVolume,
 } from "@blockdream/voxel";
-import { rgbFramesToFlat3d } from "./video3d";
+import { rgbFramesToFlat3d, rgbFramesToAnimated3d } from "./video3d";
 import { isVideoFile, decodeVideo } from "./video";
+import { ClipAudio, type ClipAudioMode } from "./clip-audio";
 import { analyzeFileAudio } from "./audio";
+import { NotePreview } from "./note-preview";
 import type { NoteEvent } from "@blockdream/audio";
 import { initialArrangeState, arrangeReducer, planDatapackPlacement } from "./canvas-mod";
 import { log } from "./log";
@@ -34,7 +39,17 @@ import { Viewer3D } from "./viewer3d";
 import { localTextureUrl, faceTextureUrl, loadTextureManifest, hasLocalTextures, swatchDataUrl } from "./blocks";
 import { resolveBlock, safeBlockInfo } from "./resolve-block";
 import { volumeBom } from "./bom3d";
-import { downloadDatapack } from "./datapack-export";
+import { downloadDatapack, planTickPlayback } from "./datapack-export";
+import {
+  quantizedToRaster,
+  flatVolumeToRaster,
+  upscaleNearest,
+  padRaster,
+  fitScale,
+  downloadPng,
+  downloadGif,
+  type GifFrame,
+} from "./pixel-export";
 import { decodeGif } from "./gif";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -193,6 +208,16 @@ $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
   downloadDatapack("blockdream-blockart-datapack", pack.files);
 });
 
+// Download the block-art as a crisp PNG (the pixel/block image itself, integer-upscaled so it never
+// blurs) - the "save it as an image" companion to the Minecraft datapack export.
+$<HTMLButtonElement>("ba-png").addEventListener("click", () => {
+  const q = ba.getFrame();
+  if (!q) return;
+  const raster = upscaleNearest(quantizedToRaster(q), fitScale(q.width, q.height, 512));
+  void downloadPng("blockdream-blockart.png", raster);
+  $<HTMLDivElement>("ba-export").textContent = `PNG: ${raster.width}×${raster.height} px`;
+});
+
 // auto-connect both world models so the page "just works"
 mcViewer.connect();
 drViewer.connect();
@@ -211,6 +236,12 @@ const QUANT3D_STILL = { method: "floyd-steinberg", gamutMap: 0.8 } as const;
 // dithered islands that block the flood, leaving the whole rectangle a slab (the mint box around the
 // Snorlax). So 3D-solid builds use this; only the §02 / init flat stills keep QUANT3D_STILL's dither.
 const QUANT3D_SOLID = { method: "none", gamutMap: 0.8 } as const;
+// Flat clips (GIF/video walls) quantize with position-deterministic bayer at low amplitude - the
+// same default rgbFramesToFlat3d uses - so the streaming per-frame path matches the batch path.
+const QUANT_FLAT = { method: "bayer", gamutMap: 0.8, bayerAmplitude: 0.035 } as const;
+// Memory budget (bytes ≈ voxels) for a whole clip's frame volumes. Bounds resolution, wall depth,
+// and dome depth together: frames × w × h × depth must stay under it or the browser tab dies.
+const CLIP_VOXEL_BUDGET = 360e6;
 // Grid width for an imported still image's 3D solid. Well above the old 40px (which made the subject
 // tiny + blocky) - a single still has no per-frame temporal cost, so it can afford detail; bounded so
 // the inflated solid's block count + datapack stay sane. rgbImageFromCanvas clamps to the source width,
@@ -325,6 +356,11 @@ async function setup3dViewer(): Promise<void> {
   const hud = $<HTMLDivElement>("v3-hud");
   const tooltip = $<HTMLDivElement>("v3-tooltip");
   const bomEl = $<HTMLUListElement>("v3-bom");
+  const notePreview = new NotePreview(); // browser-audible note blocks, synced by onFrame below
+  const clipAudio = new ClipAudio(); // the imported clip's ORIGINAL soundtrack, synced by onFrame below
+  const fpsSel = $<HTMLSelectElement>("v3-fps");
+  const resSel = $<HTMLSelectElement>("v3-res");
+  const audioModeSel = $<HTMLSelectElement>("v3-audio-mode");
   await loadTextureManifest();
 
   // bill-of-materials for the built volume - same markup contract as blockart-core's renderBom,
@@ -393,11 +429,24 @@ async function setup3dViewer(): Promise<void> {
     onFrame: (i, n) => {
       scrub.value = String(i);
       hud.textContent = `frame ${i + 1}/${n} · drag to orbit`;
+      // audio, per the audio-mode select. "original": the clip's own soundtrack follows the frame
+      // clock (only when the shown frames carry the clip's real timing - an effect sequence has its
+      // own uniform clock, so the soundtrack pauses rather than desync). "note blocks": the synth
+      // preview of the in-game datapack sound, frame-windowed. Scrubbing while paused stays silent.
+      clipAudio.frameShown(i, viewer.isPlaying && !!current3dDurations);
+      if (viewer.isPlaying && current3dDurations && audioModeSel.value === "noteblocks") {
+        const tpf = Math.max(1, Math.round((current3dDurations[i] ?? 100) / 50));
+        notePreview.frameShown(i, tpf);
+      }
     },
   });
 
   const depth = $<HTMLInputElement>("v3-depth");
   let current3d: VoxelVolume[] = [];
+  // per-frame dwell (ms) of the frames currently shown - the real GIF/video timing, so a pixel-format
+  // GIF export replays at the source's speed. null ⇒ uniform (a baked spin / block-motion sequence).
+  let current3dDurations: Array<number | undefined> | null = null;
+  let flatDurationsMs: Array<number | undefined> | null = null; // the active flat clip's timing (for restore)
   let current3dMusic: NoteEvent[] = []; // note-block music transcribed from an imported video's audio
   let baseVolume: VoxelVolume | null = null; // the single built solid (source for block-motion anims)
 
@@ -419,10 +468,20 @@ async function setup3dViewer(): Promise<void> {
     viewer.selectObject(id);
     arrange = arrangeReducer(arrange, { type: "select", id });
   });
+  // the note-block SYNTH previews the in-game datapack sound: audible only in "note blocks" audio
+  // mode AND with the note-block area toggled on (the toggle also hides the area in the scene).
+  const noteSynthOn = (): boolean => audioModeSel.value === "noteblocks" && musicToggle.checked;
   musicToggle.addEventListener("change", () => {
     viewer.setShowMusic(musicToggle.checked);
+    notePreview.setEnabled(noteSynthOn());
     arrange = arrangeReducer(arrange, { type: "setShowMusic", show: musicToggle.checked });
   });
+  audioModeSel.addEventListener("change", () => {
+    clipAudio.setMode(audioModeSel.value as ClipAudioMode);
+    notePreview.setEnabled(noteSynthOn());
+  });
+  clipAudio.setMode(audioModeSel.value as ClipAudioMode);
+  notePreview.setEnabled(noteSynthOn()); // default mode is "original" → synth starts silent
   let lastSource: ReturnType<typeof quantizeFrame> | null = null;
   let depthMap: Float32Array | null = null; // optional per-pixel depth for the current source
   // The active FLAT import (GIF/video): per-frame RGB, or null when we're showing a single solid /
@@ -464,6 +523,7 @@ async function setup3dViewer(): Promise<void> {
     log.debug("build3d", { dims: [vol.sx, vol.sy, vol.sz], depthMapped: !!depthOf });
     baseVolume = vol;
     current3d = [vol];
+    current3dDurations = null; // a single solid spins live; a GIF export bakes the spin at uniform timing
     renderBom3d(vol);
     viewer.setFrames(current3d); // single solid → live transform animation (no baked frames)
     // re-apply the chosen live animation (setFrames defaults a single volume to "spin")
@@ -482,14 +542,35 @@ async function setup3dViewer(): Promise<void> {
     rebuildVolume();
   }
 
+  // Reconstruct an RGB image from a flat wall frame's FRONT layer (palette colour per block).
+  // Whole-video clips are too long to keep their raw decoded RGB in memory; the wall itself is the
+  // compact record, and its palette colours are exactly what any re-quantize would land on anyway.
+  function rgbFromFlatVol(v: VoxelVolume): RgbImage {
+    const { sx, sy } = v;
+    const data = new Uint8Array(sx * sy * 3);
+    for (let iy = 0; iy < sy; iy++) {
+      const wy = sy - 1 - iy; // world Y is flipped vs image rows (imageToFlat keeps builds upright)
+      for (let ix = 0; ix < sx; ix++) {
+        const id = v.data[ix + sx * wy]!;
+        const hex = id === EMPTY ? 0 : hexByMap.get(id) ?? 0x808080;
+        const j = (iy * sx + ix) * 3;
+        data[j] = (hex >> 16) & 255;
+        data[j + 1] = (hex >> 8) & 255;
+        data[j + 2] = hex & 255;
+      }
+    }
+    return { width: sx, height: sy, data };
+  }
+
   // The image "build 3D from image" should solidify: the SUBJECT the user imported (the currently
   // displayed frame of an active GIF/video) when one is loaded, else the §02 block-art source. This is
   // the fix for "build 3D from image builds an unrelated image" - it now follows the §03 import.
   function build3dSource(): RgbImage | null {
-    if (flatFramesRgb && flatFramesRgb.length) {
+    const clip = flatFramesRgb ?? flatVolFrames;
+    if (clip && clip.length) {
       const i = Math.round(Number(scrub.value));
-      const idx = Math.min(flatFramesRgb.length - 1, Math.max(0, Number.isFinite(i) ? i : 0));
-      return flatFramesRgb[idx] ?? flatFramesRgb[0]!;
+      const idx = Math.min(clip.length - 1, Math.max(0, Number.isFinite(i) ? i : 0));
+      return flatFramesRgb ? flatFramesRgb[idx] ?? flatFramesRgb[0]! : rgbFromFlatVol(flatVolFrames![idx] ?? flatVolFrames![0]!);
     }
     return ba.getSourceRgb(40);
   }
@@ -506,15 +587,89 @@ async function setup3dViewer(): Promise<void> {
   img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
   img.src = "/test-assets/pixelart.png";
 
+  // Re-extrude a flat wall frame to a new thickness: copy the front layer (z=0) into every layer of
+  // a fresh volume. Pure array work - no re-decode, no re-quantize - so the depth slider is instant
+  // even on a whole-video clip.
+  function reExtrudeFlat(v: VoxelVolume, depthN: number): VoxelVolume {
+    const { sx, sy } = v;
+    const layer = sx * sy;
+    const data = new Uint8Array(layer * depthN).fill(EMPTY);
+    for (let i = 0; i < layer; i++) {
+      const c = v.data[i]!;
+      if (c === EMPTY) continue;
+      for (let z = 0; z < depthN; z++) data[i + z * layer] = c;
+    }
+    return { sx, sy, sz: depthN, data };
+  }
+
+  // Largest per-frame depth the clip can afford under the voxel budget (≥1).
+  function clipDepthBudget(frames: VoxelVolume[]): number {
+    const v0 = frames[0]!;
+    return Math.max(1, Math.floor(CLIP_VOXEL_BUDGET / (frames.length * v0.sx * v0.sy)));
+  }
+
   // "build 3D from image" re-quantizes the SOURCE colors in the 3D palette - not a nearest
-  // subsample of the already-dithered 2D map-palette frame (which compounds two quantizers). With a
-  // GIF/video imported, it solidifies that subject's current frame; otherwise the §02 block-art source.
+  // subsample of the already-dithered 2D map-palette frame (which compounds two quantizers).
+  // With a multi-frame clip imported it builds the WHOLE ANIMATION in 3D (subject-isolated dome
+  // per frame, temporally stabilized) - not the old behaviour of freezing a single frame. With a
+  // still (or the §02 source) it builds the single spinning solid as before.
   $<HTMLButtonElement>("v3-rebuild").addEventListener("click", () => {
-    if (flatFramesRgb) animSel.value = "spin"; // a flat clip parks the dropdown at "still" for head-on
+    if (flatVolFrames && flatVolFrames.length > 1) {
+      const clip = flatVolFrames;
+      const n = clip.length;
+      // dome volumes are dense (w×h×maxDepth bytes per frame): the affordable depth shrinks with
+      // clip length. Below a useful dome, keep the flat wall and say so instead of a fake build.
+      const maxDepth = Math.min(Math.max(4, Number(depth.value)), clipDepthBudget(clip));
+      if (maxDepth < 4) {
+        hud.textContent = `${flatLabel} · clip too long for a 3D dome build - use the depth slider to thicken the wall`;
+        return;
+      }
+      hud.textContent = `building 3D animation: ${n} frames at depth ${maxDepth}…`;
+      setTimeout(() => {
+        // (timeout lets the HUD paint before the synchronous per-frame build)
+        const rgbFrames = flatFramesRgb ?? clip.map(rgbFromFlatVol);
+        const domed = rgbFramesToAnimated3d(rgbFrames, pal3d, { maxDepth });
+        current3d = domed;
+        current3dDurations = flatDurationsMs;
+        if (domed[0]) renderBom3d(domed[0]);
+        animSel.value = "none"; // the frames are the motion; 3/4 view makes the new depth read
+        viewer.setFrames(domed, { durationsMs: flatDurationsMs ?? undefined, faceOn: false });
+        scrub.max = String(domed.length - 1);
+        $<HTMLButtonElement>("v3-download").disabled = false;
+        viewer.play();
+        playBtn.textContent = "pause";
+        hud.textContent = `${flatLabel} · 3D · ${n} frames · drag to orbit`;
+      }, 30);
+      return;
+    }
+    if (flatVolFrames) animSel.value = "spin"; // a flat clip parks the dropdown at "still" for head-on
     // playback; a freshly built solid should turntable-spin like the section copy promises.
-    buildSolidFrom(build3dSource(), flatFramesRgb ? QUANT3D_SOLID : QUANT3D_STILL);
+    buildSolidFrom(build3dSource(), flatVolFrames ? QUANT3D_SOLID : QUANT3D_STILL);
   });
-  depth.addEventListener("input", () => rebuildVolume());
+  depth.addEventListener("input", () => {
+    if (flatVolFrames && flatVolFrames.length) {
+      // clip active: the slider re-extrudes the WALL thickness per frame. (It used to rebuild the
+      // default still solid - discarding the playing animation - the "resets to default" bug.)
+      const d = Math.max(1, Math.min(Math.round(Number(depth.value) / 3), clipDepthBudget(flatVolFrames)));
+      if (d === flatVolFrames[0]!.sz) return;
+      const playing = viewer.isPlaying;
+      const thick = flatVolFrames.map((v) => reExtrudeFlat(v, d));
+      flatVolFrames = thick;
+      current3d = thick;
+      current3dDurations = flatDurationsMs;
+      if (thick[0]) renderBom3d(thick[0]);
+      viewer.setFrames(thick, { durationsMs: flatDurationsMs ?? undefined, faceOn: animSel.value === "none" });
+      scrub.max = String(thick.length - 1);
+      if (isTransformAnim(animSel.value)) viewer.setAnim(animSel.value);
+      if (playing) {
+        viewer.play();
+        playBtn.textContent = "pause";
+      }
+      hud.textContent = `${flatLabel} · wall ${d} block${d > 1 ? "s" : ""} thick`;
+      return;
+    }
+    rebuildVolume();
+  });
 
   // animation selector: live transform anims (spin/bob/rock/tumble/pulse/orbit/none) apply instantly;
   // block-motion anims (explode/wave/buildup) regenerate a frame sequence from the built solid.
@@ -524,12 +679,13 @@ async function setup3dViewer(): Promise<void> {
     // animation WITHOUT discarding the import: a transform anim rides live on top of the playing frames
     // (camera swings to 3/4 so a rotation reads in depth; "still" restores head-on), while a sequence
     // anim needs a single solid, so solidify the imported subject's current frame and sequence THAT.
-    if (flatFramesRgb) {
+    if (flatVolFrames) {
       if (isTransformAnim(sel)) {
         // a block-motion effect (wave/explode/buildup) may have replaced the plain clip; restore it so
         // the transform rides on the ACTUAL animation frames, not a frozen effected sequence.
         if (flatVolFrames && current3d !== flatVolFrames) {
           current3d = flatVolFrames;
+          current3dDurations = flatDurationsMs; // restoring the clip restores its real timing
           if (flatVolFrames[0]) renderBom3d(flatVolFrames[0]);
           viewer.setFrames(flatVolFrames, { faceOn: sel === "none" });
           scrub.max = String(flatVolFrames.length - 1);
@@ -545,6 +701,7 @@ async function setup3dViewer(): Promise<void> {
         // behaviour that froze one frame, solidified it, and animated only that (losing the animation).
         const combined = generateSequenceOverFrames(sel as SequenceAnimName, flatVolFrames);
         current3d = combined;
+        current3dDurations = null; // the effect resamples to its own frame count → uniform playback
         if (combined[0]) renderBom3d(combined[0]);
         viewer.setFrames(combined, { faceOn: false }); // 3/4 view so the displacement reads; frames carry the motion
         scrub.max = String(combined.length - 1);
@@ -567,6 +724,7 @@ async function setup3dViewer(): Promise<void> {
 
   function showFrames(frames: VoxelVolume[], label: string, durationsMs?: Array<number | undefined>, faceOn = false): void {
     current3d = frames;
+    current3dDurations = durationsMs && durationsMs.length ? durationsMs : null;
     if (!faceOn) {
       flatFramesRgb = null;
       flatVolFrames = null;
@@ -593,6 +751,8 @@ async function setup3dViewer(): Promise<void> {
     flatFramesRgb = null; // a fresh import invalidates the prior flat import (re-set below on success)
     flatVolFrames = null;
     current3dMusic = []; // a fresh import drops any prior video's note-block music
+    notePreview.setEvents([]);
+    clipAudio.dispose(); // …and its original soundtrack (re-loaded below when the new file has one)
     viewer.setMusicArea([]);
     musicToggle.disabled = true;
     playBtn.textContent = "play";
@@ -629,30 +789,76 @@ async function setup3dViewer(): Promise<void> {
         showFrames(frames, `gif ${gif.name} · flat`, durationsMs, true);
         flatFramesRgb = rgb; // remember the imported frames so build-from-image / transforms follow them
         flatVolFrames = frames; // and the plain flat frames, so a block-motion effect can play over them
+        flatDurationsMs = durationsMs; // and its real per-frame timing, for a faithful GIF export
         flatLabel = `gif ${gif.name}`;
       } else if (video) {
-        // VIDEO → same FLAT faithful per-frame block animation (decoded natively in the browser). Video
-        // has no transparency, so the air mask is empty and the full frame is reproduced as blocks.
-        const { canvases, durationsMs } = await decodeVideo(video, { fps: 12, maxFrames: 48 });
-        if (!canvases.length) throw new Error("no frames decoded from video");
-        const gw = flatGridWidth(canvases.length, (canvases[0]!.height || 9) / (canvases[0]!.width || 16));
-        const decoded = canvases.map((c) => rgbAndAirFromCanvas(c, gw));
-        const rgb = decoded.map((d) => d.rgb);
-        const frames = rgbFramesToFlat3d(rgb, pal3d, {
-          depth: 2,
-          isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
+        // VIDEO → FLAT faithful per-frame block animation at the CHOSEN fps + resolution, decoded
+        // natively in the browser and STREAMED: each decoded frame is quantized to its compact
+        // one-byte-per-voxel wall slice immediately and its pixels dropped, so a whole multi-minute
+        // clip at 30/60 fps (10k+ frames) fits in memory. Playback runs at the clip's real timing;
+        // the datapack export samples down to Minecraft's 20 fps ceiling (1 frame per game tick).
+        const fps = Number(fpsSel.value) || 20;
+        const resChoice = resSel.value; // "auto" or an explicit wall width in blocks
+        const decodeW = resChoice === "auto" ? 160 : Math.max(32, Number(resChoice) || 160);
+        const volFrames: VoxelVolume[] = [];
+        let rgbKeep: RgbImage[] | null = [];
+        let gw = 96;
+        let wallDepth = 2;
+        let resNote = "";
+        const { durationsMs } = await decodeVideo(video, {
+          fps,
+          maxFrames: Math.ceil(fps * 660), // 11-minute ceiling at ANY fps - the count scales with fps
+          targetWidth: decodeW,
+          onFrame: (c, i, total) => {
+            if (i === 0) {
+              const aspect = (c.height || 9) / (c.width || 16);
+              gw =
+                resChoice === "auto"
+                  ? Math.max(Math.min(96, c.width || 96), flatGridWidth(total, aspect))
+                  : Math.min(decodeW, c.width || decodeW);
+              wallDepth = total > 1200 ? 1 : 2; // long clip: thin wall halves memory, reads the same head-on
+              // memory guard: frames × w × h × depth bytes must stay browser-sane. Step the wall down
+              // BEFORE allocating thousands of frames, and say so, instead of dying mid-decode.
+              const gh = (w: number): number => Math.max(1, Math.round(w * aspect));
+              while (gw > 64 && total * gw * gh(gw) * wallDepth > CLIP_VOXEL_BUDGET) {
+                gw = gw > 160 ? 160 : gw > 128 ? 128 : gw > 96 ? 96 : 64;
+                resNote = ` · resolution capped at ${gw} (memory)`;
+              }
+            }
+            const { rgb, air } = rgbAndAirFromCanvas(c, gw);
+            const q = quantizeFrame(rgb, pal3d, QUANT_FLAT);
+            let hasAir = false;
+            for (let k = 0; k < air.length; k++)
+              if (air[k]) {
+                hasAir = true;
+                break;
+              }
+            volFrames.push(imageToFlat(q, { depth: wallDepth, isAir: hasAir ? (x, y) => air[y * rgb.width + x] === 1 : undefined }));
+            // keep the raw RGB frames (for build-3D / re-quantizing) only while the clip is short
+            // enough to afford them; long clips reconstruct RGB from the wall's palette on demand.
+            if (rgbKeep) {
+              if (total <= 1500) rgbKeep.push(rgb);
+              else rgbKeep = null;
+            }
+            if (i % 25 === 0 || i + 1 === total) hud.textContent = `decoding ${video.name} @ ${fps} fps: frame ${i + 1}/${total}…`;
+          },
         });
-        showFrames(frames, `video ${video.name} · flat`, durationsMs, true);
-        flatFramesRgb = rgb; // remember the imported frames so build-from-image / transforms follow them
-        flatVolFrames = frames; // and the plain flat frames, so a block-motion effect can play over them
+        if (!volFrames.length) throw new Error("no frames decoded from video");
+        showFrames(volFrames, `video ${video.name} · flat · ${fps} fps${resNote}`, durationsMs, true);
+        flatFramesRgb = rgbKeep; // may be null for very long clips (memory); synthesized on demand
+        flatVolFrames = volFrames; // the plain flat frames, so effects/depth/3D rebuilds follow the clip
+        flatDurationsMs = durationsMs; // and its real per-frame timing, for a faithful GIF export
+        clipAudio.load(video, durationsMs); // ORIGINAL soundtrack, synced to the frame clock
+        clipAudio.setMode(audioModeSel.value as ClipAudioMode);
         flatLabel = `video ${video.name}`;
         // If the clip carries audio, transcribe it to a note-block music timeline + a draggable music
         // area beside the build (kept on builder state for the toggle + datapack export). Audio never
         // blocks the visual import.
         try {
           current3dMusic = await analyzeFileAudio(video);
+          notePreview.setEvents(current3dMusic);
           if (current3dMusic.length) {
-            const v0 = frames[0];
+            const v0 = volFrames[0];
             const offset = v0 ? Math.max(v0.sx, v0.sy, v0.sz) : 12; // park the music area clear of the build
             viewer.setMusicArea(current3dMusic);
             viewer.setObjectPosition("music", offset, 0);
@@ -729,37 +935,104 @@ async function setup3dViewer(): Promise<void> {
     if (e.key === "Enter") void importUrl();
   });
 
-  // Download a vanilla datapack that builds the 3D spin animation (fill-batched). The export carries
-  // the on-screen arrangement: the build spawns at its dragged origin, and - when the video had audio
-  // AND the note-block toggle is on - the note-block music area + sequencer at ITS dragged origin.
+  // ?src=<url> opens the page WITH an asset already playing (e.g. ?src=/test-assets/badapple.mp4)
+  const autoSrc = new URLSearchParams(location.search).get("src");
+  if (autoSrc) {
+    urlInput.value = autoSrc;
+    document.getElementById("v3-canvas")?.scrollIntoView({ block: "center" });
+    void importUrl();
+  }
+
+  // The frames to EXPORT (datapack + pixel GIF). A multi-frame clip / block-motion sequence exports
+  // as-is. A single solid showing the live turntable bakes spinSequence, so the export actually SPINS -
+  // the live viewer spin is otherwise not in the frames (this is the "export our animations" fix). Any
+  // other live transform (bob/rock/tumble/pulse/orbit) can't bake to discrete blocks, so it exports as
+  // the single still. Returns the timing to replay at (null ⇒ uniform, for a baked spin / sequence).
+  function exportFrames(): { frames: VoxelVolume[]; durationsMs: Array<number | undefined> | null } {
+    if (current3d.length > 1) return { frames: current3d, durationsMs: current3dDurations };
+    if (baseVolume && animSel.value === "spin") return { frames: spinSequence(baseVolume, 24), durationsMs: null };
+    return { frames: current3d, durationsMs: current3dDurations };
+  }
+
+  // Download a vanilla datapack that builds the 3D animation (fill-batched). The export carries the
+  // on-screen arrangement: the build spawns at its dragged origin, and - when the video had audio AND
+  // the note-block toggle is on - the note-block music area + sequencer at ITS dragged origin.
   $<HTMLButtonElement>("v3-download").addEventListener("click", () => {
-    if (!current3d.length) return;
+    const { frames: allFrames, durationsMs } = exportFrames();
+    if (!allFrames.length) return;
+    // HONEST in-game pacing: Minecraft plays one animation step per game tick - 20 fps is the
+    // ceiling. A clip decoded above that is resampled EVENLY so the in-game duration matches the
+    // source; at/below 20 fps every frame keeps its nearest whole-tick dwell.
+    const plan = planTickPlayback(allFrames.length, durationsMs);
+    const frames = plan.resampled ? plan.indices.map((i) => allFrames[i]!) : allFrames;
     // the viewer centers the build + the note-block row on their group positions; pass each object's
     // half-extent so the export lands them centered where they sit on screen (not corner-offset).
-    const v0 = current3d[0];
+    const v0 = frames[0];
     const distinctNotes = new Set(current3dMusic.map((n) => n.note)).size;
     const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 }, {
       buildHalf: v0 ? { x: v0.sx / 2, z: v0.sz / 2 } : undefined,
       musicHalf: { x: (distinctNotes - 1) / 2, z: 0 },
     });
-    const pack = generateVoxelDatapack(current3d, resolveBlock, {
+    const pack = generateVoxelDatapack(frames, resolveBlock, {
       namespace: "blockdream_3d",
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
       origin: placement.origin,
       music: placement.music,
       musicOrigin: placement.musicOrigin,
+      speedTicks: plan.speedTicks,
     });
     const cmds = pack.totalCommands ?? pack.totalSetblocks;
     const musicNote = placement.music ? ` · ${placement.music.length} note-block notes` : "";
+    const paceNote = plan.resampled
+      ? ` · in-game 20 fps (Minecraft's 1-frame-per-tick ceiling; ${allFrames.length} → ${frames.length} frames, same duration)`
+      : ` · in-game ${plan.fps} fps`;
     $<HTMLDivElement>("v3-export").textContent =
-      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote} · /function blockdream_3d:setup`;
+      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote} · /function blockdream_3d:setup`;
     downloadDatapack("blockdream-3d-datapack", pack.files);
+  });
+
+  // Download the animation as an animated GIF in PIXEL/BLOCK format: each frame's front block face,
+  // rendered crisp (integer-upscaled), at the source's real per-frame timing. A video / imported GIF
+  // exports its frames; a single spun solid bakes the turntable so the GIF genuinely rotates.
+  $<HTMLButtonElement>("v3-gif").addEventListener("click", () => {
+    const { frames, durationsMs } = exportFrames();
+    if (!frames.length) return;
+    if (frames.length < 2) {
+      // one still frame - a GIF would not animate; steer the user to PNG (and still emit a 1-frame GIF).
+      hud.textContent = "single still · exporting a 1-frame GIF (use Download PNG for a still image)";
+    }
+    const W = Math.max(...frames.map((f) => f.sx));
+    const H = Math.max(...frames.map((f) => f.sy));
+    const scale = fitScale(W, H, 384);
+    const gif: GifFrame[] = frames.map((f, i) => ({
+      raster: upscaleNearest(padRaster(flatVolumeToRaster(f), W, H), scale),
+      delayMs: durationsMs?.[i] ?? 70,
+    }));
+    try {
+      downloadGif("blockdream-animation.gif", gif);
+      $<HTMLDivElement>("v3-export").textContent =
+        `GIF: ${W * scale}×${H * scale} px · ${gif.length} frame${gif.length > 1 ? "s" : ""}`;
+    } catch (err) {
+      log.warn("GIF export failed", err);
+      $<HTMLDivElement>("v3-export").textContent = `GIF export failed: ${(err as Error).message}`;
+    }
+  });
+
+  // Download the currently-shown frame as a crisp PNG (the block/pixel image).
+  $<HTMLButtonElement>("v3-png").addEventListener("click", () => {
+    const frames = current3d.length ? current3d : baseVolume ? [baseVolume] : [];
+    if (!frames.length) return;
+    const i = Math.min(frames.length - 1, Math.max(0, Math.round(Number(scrub.value)) || 0));
+    const f = frames[i]!;
+    void downloadPng("blockdream-frame.png", upscaleNearest(flatVolumeToRaster(f), fitScale(f.sx, f.sy, 512)));
+    $<HTMLDivElement>("v3-export").textContent = `PNG: frame ${i + 1}/${frames.length}`;
   });
 
   playBtn.addEventListener("click", () => {
     if (viewer.isPlaying) {
       viewer.pause();
+      clipAudio.pause(); // no onFrame fires while paused - stop the soundtrack explicitly
       playBtn.textContent = "play";
     } else {
       viewer.play();
@@ -768,6 +1041,7 @@ async function setup3dViewer(): Promise<void> {
   });
   scrub.addEventListener("input", () => {
     viewer.pause();
+    clipAudio.pause();
     playBtn.textContent = "play";
     viewer.setFrame(Number(scrub.value));
   });
