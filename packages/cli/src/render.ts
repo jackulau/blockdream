@@ -8,6 +8,7 @@ import {
   JAVA_DATAPACK_SUPPORTED,
   BEDROCK_BLOCK_VERSION,
 } from "@blockdream/palette";
+import { cushionMosaicCommands } from "@blockdream/palette/cushions";
 import {
   preparePalette,
   quantizeFrame,
@@ -73,6 +74,7 @@ export interface RenderOptions {
   musicMaxNotes?: number; // cap on emitted music notes (default 1500 playsound / 800 redstone); raise for a full-length song
   wall?: boolean; // voxel3d: FAITHFUL flat video wall (framesToFlat3d, background included) instead of the subject-relief pipeline
   led?: boolean; // voxel3d: invisible minecraft:light[level=15] plane fronting the build face — the wall glows like an LED screen
+  cushionMosaic?: boolean; // voxel3d, EXPERIMENTAL (26.3 SNAPSHOT ONLY): also emit frame 0 as a top-down cushion-entity floor mosaic
   rgbLevels?: number; // rgbscreen: posterize levels per channel for delta stability (default 32; 0 = exact 8-bit)
   pxScale?: { x: number; y: number }; // rgbscreen: per-pixel text_display quad scale override
 }
@@ -436,6 +438,20 @@ export function render(opts: RenderOptions): RenderResult {
     notes.push(
       `3D voxel datapack (${volumes.length} frame(s), ${pack.totalCommands ?? pack.totalSetblocks} cmds): drop ${pack.namespace}.zip into world/datapacks/, /function ${pack.namespace}:setup then :start.`,
     );
+    if (opts.cushionMosaic) {
+      // EXPERIMENTAL side artifact, never inside the datapack zip: cushions are 26.3-snapshot
+      // ENTITIES (flat pads on floors, not blocks) - see docs/cushions-26.3.md. Passing the flag
+      // IS the explicit experimental opt-in the generator requires.
+      const mosaic = cushionMosaicCommands(frames[0]!, { experimental: true, origin: opts.origin });
+      const mosaicPath = join(opts.out, "cushion_mosaic_frame0.mcfunction");
+      writeFile(mosaicPath, mosaic.commands);
+      filesWritten.push(mosaicPath);
+      notes.push(
+        `EXPERIMENTAL cushion floor mosaic (26.3 SNAPSHOT ONLY): frame 0 as ${mosaic.entityCount} summoned cushion entities` +
+          (mosaic.truncated ? " (TRUNCATED at the entity cap)" : "") +
+          ` - cushions are entities laid flat on floors, viewed from above; not blocks, no walls. docs/cushions-26.3.md.`,
+      );
+    }
     return { target: opts.target, frameCount: volumes.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 

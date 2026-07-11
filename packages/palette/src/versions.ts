@@ -23,7 +23,9 @@ export interface McVersion {
 /** Java release line (release builds only, not snapshots). 26.x is the year-based
  *  naming Mojang switched to after 1.21.11 (26.1 "Tiny Takeover", 26.2 "Chaos Cubed");
  *  pack formats grew minor versions there (94.1, 101.1, 107.1) — we stamp the major,
- *  which every release reads. */
+ *  which every release reads. Snapshot-only content (e.g. 26.3's cushion entities)
+ *  deliberately does NOT get a row here: it lives behind an explicit experimental
+ *  gate in ./cushions.ts, with its own snapshot format stamps. */
 export const MC_VERSIONS: readonly McVersion[] = [
   { id: "1.21", packFormat: 48, dataVersion: 3953 },
   { id: "1.21.1", packFormat: 48, dataVersion: 3955 },

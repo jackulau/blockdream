@@ -41,6 +41,10 @@ Options:
                        recreating a whole video in blocks
   --led              voxel3d: invisible minecraft:light[level=15] plane fronting the wall,
                        so it glows like an LED screen at night (placed once in setup)
+  --cushion-mosaic   voxel3d, EXPERIMENTAL (Java 26.3 SNAPSHOT ONLY): also emit frame 0 as a
+                       top-down cushion-entity FLOOR mosaic (16 dye colors, one summoned
+                       cushion per pixel). Cushions are entities on floors - a cushion WALL
+                       is impossible; see docs/cushions-26.3.md
   --animate <a>      3D block-motion of the built solid: explode | wave | buildup | spin
                        (voxel3d/mcstructure3d/model3d; animates a STILL image or a 3D model.
                         For a clip it animates the first frame.)
@@ -106,6 +110,7 @@ export function runCli(argv: string[]): number {
       flat: { type: "boolean" },
       wall: { type: "boolean" },
       led: { type: "boolean" },
+      "cushion-mosaic": { type: "boolean" },
       "max-notes": { type: "string" },
       "rgb-levels": { type: "string" },
       "px-scale": { type: "string" },
@@ -240,8 +245,8 @@ export function runCli(argv: string[]): number {
   ) {
     process.stderr.write(`note: --music/--instrument/--music-origin/--music-engine/--max-notes apply only to --target voxel3d|rgbscreen (ignored for ${target})\n`);
   }
-  if ((values.wall || values.led) && target !== "voxel3d") {
-    process.stderr.write(`note: --wall/--led apply only to --target voxel3d (ignored for ${target})\n`);
+  if ((values.wall || values.led || values["cushion-mosaic"]) && target !== "voxel3d") {
+    process.stderr.write(`note: --wall/--led/--cushion-mosaic apply only to --target voxel3d (ignored for ${target})\n`);
   }
 
   const maxNotes = values["max-notes"] !== undefined ? Number(values["max-notes"]) : undefined;
@@ -298,6 +303,7 @@ export function runCli(argv: string[]): number {
     musicMaxNotes: maxNotes,
     wall: values.wall ? true : undefined,
     led: values.led ? true : undefined,
+    cushionMosaic: values["cushion-mosaic"] ? true : undefined,
     rgbLevels,
     pxScale,
   };
