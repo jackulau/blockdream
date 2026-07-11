@@ -77,6 +77,16 @@ blockdream render badapple.mp4 --target rgbscreen \
   --grid 64x48 --fps 10 --music on --max-notes 8000 --out ./badapple-rgb
 ```
 
+### The 20 fps in-game ceiling (honesty note)
+
+Minecraft executes **one animation step per game tick**, and the game runs at 20 ticks per
+second - so **20 fps is the physical playback ceiling** for a datapack (`--speed 1`). The web
+demo can decode and *preview* a clip at 30 or 60 fps, but a datapack export **resamples evenly
+down to 20 fps** so the in-game clip runs the same wall-clock duration as the source (frames
+are skipped, time is never stretched). The export status line says when this happened. Clips
+at or below 20 fps keep every frame, each dwelling its nearest whole-tick duration. The same
+applies to the CLI: `--fps 20` is the highest rate that plays 1:1 in game.
+
 - **`--wall`** (voxel3d) - every pixel becomes exactly one block, background included
   (`framesToFlat3d`), instead of subject isolation + relief. The frames ARE the video.
 - **`--led`** (voxel3d) - an invisible `minecraft:light[level=15]` plane one block in front of

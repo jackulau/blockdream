@@ -22,7 +22,9 @@ Options:
   --edition <e>      java | bedrock                  (map + model3d targets; default: java)
   --grid <WxH>       block grid size      (default: 128x128 for map, 64x64 otherwise;
                        for model3d the WIDTH is the cube voxel resolution)
-  --fps <n>          sample frame rate    (default: source rate)
+  --fps <n>          sample frame rate    (default: source rate; in-game playback tops out
+                       at 20 fps — Minecraft runs 1 animation step per game tick, so
+                       --fps 20 --speed 1 is the fastest 1:1 datapack playback)
   --max-frames <n>   cap number of frames
   --dither <d>       floyd-steinberg | bayer | none
                        (default: bayer for video, floyd-steinberg for stills)

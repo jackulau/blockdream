@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { unzipSync, strFromU8 } from "fflate";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { createVolume, setVoxel } from "@blockdream/voxel";
-import { zipDatapack, loadInstructions } from "../src/datapack-export";
+import { zipDatapack, loadInstructions, planTickPlayback } from "../src/datapack-export";
 import { resolveBlock } from "../src/resolve-block";
 import { planDatapackPlacement, initialArrangeState, arrangeReducer } from "../src/canvas-mod";
 import type { NoteEvent } from "@blockdream/audio";
@@ -136,5 +136,52 @@ describe("canvas-mod export wiring (note-block music in the web download)", () =
     );
     // a tuned note block sits on the dragged Z plane (z = base 0 + round(-7) = -7)
     expect(setup).toMatch(/setblock 3[0-9] 6[0-9] -7 minecraft:note_block/);
+  });
+});
+
+describe("planTickPlayback (Minecraft's 20 fps / 1-frame-per-tick ceiling)", () => {
+  it("no timing info keeps the legacy 2-ticks-per-frame default (baked spins/effects)", () => {
+    const p = planTickPlayback(24, null);
+    expect(p).toMatchObject({ speedTicks: 2, fps: 10, resampled: false });
+    expect(p.indices).toEqual(Array.from({ length: 24 }, (_, i) => i));
+  });
+
+  it("a 10 fps clip keeps every frame at 2 ticks (100 ms) dwell", () => {
+    const p = planTickPlayback(50, Array.from({ length: 50 }, () => 100));
+    expect(p).toMatchObject({ speedTicks: 2, fps: 10, resampled: false });
+    expect(p.indices.length).toBe(50);
+  });
+
+  it("a 20 fps clip plays 1:1 - one frame per game tick, nothing skipped", () => {
+    const p = planTickPlayback(100, Array.from({ length: 100 }, () => 50));
+    expect(p).toMatchObject({ speedTicks: 1, fps: 20, resampled: false });
+    expect(p.indices.length).toBe(100);
+  });
+
+  it("a 60 fps clip is resampled EVENLY to 20 fps with the SAME wall-clock duration", () => {
+    const n = 600; // 10 s at 60 fps
+    const p = planTickPlayback(n, Array.from({ length: n }, () => 1000 / 60));
+    expect(p.resampled).toBe(true);
+    expect(p.speedTicks).toBe(1);
+    // 10 s at 1 frame/tick = 200 frames → in-game duration still 10 s
+    expect(p.indices.length).toBe(200);
+    // even coverage: strictly non-decreasing, first ~0, last near the end, ~every 3rd frame
+    expect(p.indices[0]).toBe(0);
+    expect(p.indices[p.indices.length - 1]!).toBeGreaterThan(n - 5);
+    for (let i = 1; i < p.indices.length; i++) expect(p.indices[i]!).toBeGreaterThanOrEqual(p.indices[i - 1]!);
+  });
+
+  it("a 30 fps clip halves-ish to 20 fps (2/3 of frames), duration preserved", () => {
+    const n = 300; // 10 s at 30 fps
+    const p = planTickPlayback(n, Array.from({ length: n }, () => 1000 / 30));
+    expect(p.resampled).toBe(true);
+    expect(p.indices.length).toBe(200); // 10 s × 20 fps
+  });
+
+  it("single frame and unknown durations fall back safely", () => {
+    expect(planTickPlayback(1, [40]).indices).toEqual([0]);
+    const p = planTickPlayback(4, [undefined, undefined, undefined, undefined]);
+    expect(p.resampled).toBe(false); // fallback 100 ms/frame = 10 fps
+    expect(p.speedTicks).toBe(2);
   });
 });
