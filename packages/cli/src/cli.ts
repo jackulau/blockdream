@@ -30,7 +30,8 @@ Options:
                        (default: bayer for video, floyd-steinberg for stills)
   --temporal <n>     temporal-coherence threshold for video (e.g. 0.002)
   --gamut <lambda>   hue-rigidity for out-of-gamut colours (e.g. 0.8; keeps source hue)
-  --speed <ticks>    ticks/frame for datapack/behaviorpack playback (default: 2 = 10fps)
+  --speed <ticks>    ticks/frame for datapack/behaviorpack playback (default: matches --fps
+                       so playback runs real-time - e.g. --fps 20 → 1 tick/frame; no --fps → 2)
   --depth <n>        3D build depth in blocks for voxel3d/mcstructure3d (default: 8)
   --smooth <n>       3D video temporal depth smoothing 0..1 (default: 0.35)
   --curve <n>        3D thickness curve exponent (<1 rounds the dome; default: 0.5)

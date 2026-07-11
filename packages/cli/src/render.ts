@@ -262,6 +262,12 @@ export function render(opts: RenderOptions): RenderResult {
   const isVideo = frames.length > 1;
   // default dither: video → bayer (temporally stable), still → floyd-steinberg
   const dither: DitherMethod = opts.dither ?? (isVideo ? "bayer" : "floyd-steinberg");
+  // Playback pace when --speed is NOT given: match the decode fps (1 game tick = 50 ms), so
+  // --fps 20 plays real-time at 1 tick/frame and --fps 10 keeps the historical 2. Without this,
+  // every fps other than 10 silently played at the wrong wall-clock rate - and drifted against
+  // the note-block music, whose clock is real time. Explicit --speed always wins; no --fps
+  // (source-rate stills/models) keeps the emitters' documented default of 2.
+  const speedTicksAuto = opts.speedTicks ?? (opts.fps && opts.fps > 0 ? Math.max(1, Math.round(20 / opts.fps)) : undefined);
 
   if (opts.target === "rgbscreen") {
     // TRUE-RGB screen: exact source colors on a text_display pixel grid — NO palette, NO
@@ -276,7 +282,7 @@ export function render(opts: RenderOptions): RenderResult {
       dataVersion: mc.dataVersion,
       origin: opts.origin,
       facing: opts.facing,
-      speedTicks: opts.speedTicks,
+      speedTicks: speedTicksAuto,
       pxScale: opts.pxScale,
       music,
       musicOrigin: opts.musicOrigin,
@@ -350,7 +356,7 @@ export function render(opts: RenderOptions): RenderResult {
     if (opts.width % MAP_DIM !== 0 || opts.height % MAP_DIM !== 0) {
       throw new Error(`mwframes target requires grid sizes that are multiples of ${MAP_DIM}`);
     }
-    const pool = buildFramePool(q, opts.speedTicks);
+    const pool = buildFramePool(q, speedTicksAuto);
     const binPath = join(opts.out, "frames.bin");
     const mapsPath = join(opts.out, "maps.txt");
     writeFile(binPath, pool.bin);
@@ -409,6 +415,7 @@ export function render(opts: RenderOptions): RenderResult {
       origin: opts.origin,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
+      speedTicks: speedTicksAuto,
       music,
       musicOrigin: opts.musicOrigin,
       musicEngine: opts.musicEngine,
@@ -489,7 +496,7 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   if (opts.target === "bedrock-script") {
-    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: opts.speedTicks });
+    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: speedTicksAuto });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const mcpack = join(opts.out, "blockdream-script.mcpack");
@@ -501,7 +508,7 @@ export function render(opts: RenderOptions): RenderResult {
 
   if (opts.target === "datapack") {
     const pack = generateJavaDatapack(q, resolveBlock, {
-      speedTicks: opts.speedTicks,
+      speedTicks: speedTicksAuto,
       packFormat: mc.packFormat,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
     });
@@ -515,7 +522,7 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   // behaviorpack
-  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: opts.speedTicks });
+  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: speedTicksAuto });
   writePack(pack, opts.out);
   filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
   const mcpack = join(opts.out, "blockdream.mcpack");

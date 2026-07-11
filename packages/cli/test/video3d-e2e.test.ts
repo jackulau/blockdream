@@ -92,3 +92,28 @@ function safeLen(p: string): number {
     return 0;
   }
 }
+
+d("playback speed derives from --fps (real-time playback, no half-speed packs)", () => {
+  // The bug this locks: voxel3d never passed speedTicks, so a --fps 20 render emitted the
+  // default #speed 2 (10 fps playback) - the whole video played at HALF speed and drifted
+  // against the real-time note-block music clock. --speed still wins when given explicitly.
+  const speedOf = (out: string): string => {
+    const setup = readFileSync(join(out, "data", "blockdream_3d", "function", "setup.mcfunction"), "utf8");
+    const m = setup.match(/scoreboard players set #speed ma (\d+)/);
+    return m ? m[1]! : "(missing)";
+  };
+
+  it("--fps 20 → 1 tick/frame; --fps 10 keeps the historical 2; explicit --speed wins", () => {
+    const o20 = join(dir, "spd20");
+    render({ input: clip, out: o20, target: "voxel3d", width: 16, height: 16, fps: 20, wall: true });
+    expect(speedOf(o20)).toBe("1");
+
+    const o10 = join(dir, "spd10");
+    render({ input: clip, out: o10, target: "voxel3d", width: 16, height: 16, fps: 10, wall: true });
+    expect(speedOf(o10)).toBe("2");
+
+    const oExplicit = join(dir, "spdx");
+    render({ input: clip, out: oExplicit, target: "voxel3d", width: 16, height: 16, fps: 20, speedTicks: 4, wall: true });
+    expect(speedOf(oExplicit)).toBe("4");
+  });
+});
