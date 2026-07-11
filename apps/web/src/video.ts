@@ -23,6 +23,15 @@ export interface VideoSampleOptions {
   fps?: number;
   /** hard cap on sampled frames (default 48). Long clips are sampled evenly across the whole duration. */
   maxFrames?: number;
+  /** downscale decoded frames to this width (aspect kept). Essential for LONG clips: thousands of
+   *  full-resolution canvases would exhaust memory; the block grid needs far fewer pixels anyway. */
+  targetWidth?: number;
+  /** decode progress callback (framesDone, framesTotal) - a whole-video decode takes a while. */
+  onProgress?: (done: number, total: number) => void;
+  /** STREAMING mode: called with each decoded frame as it lands. When set, frames are NOT
+   *  accumulated (the returned `canvases` is empty) - the only way a whole video at real fps
+   *  fits in memory. The canvas passed in is reused-safe: consume it synchronously. */
+  onFrame?: (canvas: HTMLCanvasElement, index: number, total: number) => void;
 }
 
 /**
@@ -92,22 +101,32 @@ export async function decodeVideo(file: File, opts: VideoSampleOptions = {}): Pr
       video.addEventListener("error", () => reject(new Error(`cannot decode ${file.name || "video"} in this browser`)), { once: true });
     });
     const duration = video.duration;
-    const w = video.videoWidth || 64;
-    const h = video.videoHeight || 64;
+    const srcW = video.videoWidth || 64;
+    const srcH = video.videoHeight || 64;
+    const w = opts.targetWidth && opts.targetWidth > 0 ? Math.min(srcW, Math.floor(opts.targetWidth)) : srcW;
+    const h = Math.max(1, Math.round((w * srcH) / srcW));
     const times = planFrameTimes(duration, opts);
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
     const canvases: HTMLCanvasElement[] = [];
-    for (const t of times) {
-      await seekTo(video, t);
+    for (let i = 0; i < times.length; i++) {
+      await seekTo(video, times[i]!);
       ctx.drawImage(video, 0, 0, w, h);
-      const frame = document.createElement("canvas");
-      frame.width = w;
-      frame.height = h;
-      frame.getContext("2d")!.drawImage(canvas, 0, 0);
-      canvases.push(frame);
+      if (opts.onFrame) {
+        // STREAMING: hand the shared draw canvas to the consumer and do NOT accumulate a copy.
+        // A whole video at real fps is thousands of frames - copies would exhaust memory; the
+        // consumer quantizes to its compact per-frame form synchronously and drops the pixels.
+        opts.onFrame(canvas, i, times.length);
+      } else {
+        const frame = document.createElement("canvas");
+        frame.width = w;
+        frame.height = h;
+        frame.getContext("2d")!.drawImage(canvas, 0, 0);
+        canvases.push(frame);
+      }
+      opts.onProgress?.(i + 1, times.length);
     }
     return { canvases, durationsMs: durationsFromTimes(times, duration) };
   } finally {

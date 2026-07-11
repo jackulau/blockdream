@@ -48,6 +48,7 @@ export class Viewer3D {
   private readonly matCache = new Map<string, THREE.Material>();
   private frames: VoxelVolume[] = [];
   private groups: Array<THREE.Group | null> = [];
+  private groupLru: number[] = []; // built-frame cache order, oldest first (whole-video clips)
   private index = 0;
   private playing = false;
   private animName = "spin"; // live transform animation applied to the whole object
@@ -247,6 +248,10 @@ export class Viewer3D {
     this.fitCamera(faceOn);
   }
 
+  // Built frames are cached for instant re-show, but a WHOLE-VIDEO clip (1000s of frames) cannot
+  // keep every mesh: cap the cache and evict the oldest-built (short clips never hit the cap).
+  private static readonly GROUP_CACHE = 96;
+
   private showFrame(i: number): void {
     if (this.frames.length === 0) return;
     const n = this.frames.length;
@@ -257,6 +262,22 @@ export class Viewer3D {
       g = this.buildGroup(this.frames[idx]!);
       this.groups[idx] = g;
       this.root.add(g);
+      this.groupLru.push(idx);
+      while (n > Viewer3D.GROUP_CACHE && this.groupLru.length > Viewer3D.GROUP_CACHE) {
+        const old = this.groupLru.shift()!;
+        if (old === idx) {
+          this.groupLru.push(old); // never evict the frame we are about to show
+          break;
+        }
+        const og = this.groups[old];
+        if (og) {
+          og.traverse((o) => {
+            if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose();
+          });
+          this.root.remove(og);
+          this.groups[old] = null;
+        }
+      }
     }
     g.visible = true;
     this.index = idx;
@@ -425,6 +446,7 @@ export class Viewer3D {
       if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose();
     });
     this.root.clear();
+    this.groupLru = [];
   }
 
   dispose(): void {
