@@ -52,6 +52,13 @@ export interface NoteSequencerOptions {
   volume?: number;
   /** Cap on emitted notes so music.mcfunction stays under the command limit (default 1500). */
   maxNotes?: number;
+  /**
+   * Force the sequencer loop length in game ticks. Notes at/after the override tick are
+   * dropped so the melody always fits inside the loop. Use to lock the music clock to an
+   * animation's exact loop (frames × speedTicks): unequal loop lengths re-phase on every
+   * wrap and the audio drifts off the video a little more each cycle.
+   */
+  loopTicksOverride?: number;
 }
 
 export interface NoteSequencer {
@@ -78,9 +85,15 @@ export function noteSequencer(notes: NoteEvent[], opts: NoteSequencerOptions = {
   const baseVol = opts.volume ?? 3;
   const placeKeyboard = opts.placeKeyboard ?? true;
   const maxNotes = Math.max(0, Math.floor(opts.maxNotes ?? 1500));
-  const used = notes.length > maxNotes ? notes.slice(0, maxNotes) : notes;
+  const override =
+    opts.loopTicksOverride && opts.loopTicksOverride > 0 ? Math.floor(opts.loopTicksOverride) : undefined;
+  // trim to the loop BEFORE the cap so out-of-loop notes never eat the note budget
+  const inLoop = override ? notes.filter((e) => e.tick < override) : notes;
+  const used = inLoop.length > maxNotes ? inLoop.slice(0, maxNotes) : inLoop;
 
-  const loopTicks = used.length ? noteTimelineTicks(used) + Math.max(1, opts.loopTailTicks ?? 20) : 0;
+  const loopTicks = used.length
+    ? (override ?? noteTimelineTicks(used) + Math.max(1, opts.loopTailTicks ?? 20))
+    : 0;
 
   // Physical keyboard: one tuned note block per distinct (instrument, note),
   // laid out ascending along +X, each on its instrument-selecting base block.

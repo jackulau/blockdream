@@ -48,6 +48,9 @@ describe("MC version registry", () => {
       "1.21.8": 4440,
       "1.21.9": 4554,
       "1.21.10": 4556,
+      "1.21.11": 4671,
+      "26.1": 4786,
+      "26.2": 4903,
     };
     for (const [id, dv] of Object.entries(expected)) {
       expect(resolveMcVersion(id).dataVersion, id).toBe(dv);
@@ -71,7 +74,7 @@ describe("MC version registry", () => {
 
   it("supported_formats spans the whole line (floor → latest)", () => {
     expect(JAVA_DATAPACK_SUPPORTED.min_inclusive).toBe(48);
-    expect(JAVA_DATAPACK_SUPPORTED.max_inclusive).toBe(88);
+    expect(JAVA_DATAPACK_SUPPORTED.max_inclusive).toBe(107);
     for (const m of MC_VERSIONS) {
       expect(m.packFormat).toBeGreaterThanOrEqual(JAVA_DATAPACK_SUPPORTED.min_inclusive);
       expect(m.packFormat).toBeLessThanOrEqual(JAVA_DATAPACK_SUPPORTED.max_inclusive);

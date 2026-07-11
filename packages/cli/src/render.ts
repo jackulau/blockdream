@@ -22,8 +22,8 @@ import { extractFrames, extractAudioPcm } from "@blockdream/video";
 import { analyzeAudio, type NoteEvent } from "@blockdream/audio";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
-import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
-import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
+import { generateJavaDatapack, generateVoxelDatapack, generateRgbScreenDatapack, rgbImageToScreenFrame, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
+import { framesToAnimated3d, framesToFlat3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -39,7 +39,8 @@ export type RenderTarget =
   | "bedrock-script"
   | "mwframes"
   | "voxel3d"
-  | "model3d";
+  | "model3d"
+  | "rgbscreen";
 export type Edition = "java" | "bedrock";
 
 export interface RenderOptions {
@@ -69,6 +70,11 @@ export interface RenderOptions {
   musicInstrument?: string; // note-block instrument for the music (default harp)
   musicOrigin?: { x: number; y: number; z: number }; // where the note-block music area spawns (default beside the build)
   musicEngine?: "playsound" | "redstone"; // voxel3d: "playsound" clock (default) or a physical "redstone" delay-line that plays the note blocks
+  musicMaxNotes?: number; // cap on emitted music notes (default 1500 playsound / 800 redstone); raise for a full-length song
+  wall?: boolean; // voxel3d: FAITHFUL flat video wall (framesToFlat3d, background included) instead of the subject-relief pipeline
+  led?: boolean; // voxel3d: invisible minecraft:light[level=15] plane fronting the build face — the wall glows like an LED screen
+  rgbLevels?: number; // rgbscreen: posterize levels per channel for delta stability (default 32; 0 = exact 8-bit)
+  pxScale?: { x: number; y: number }; // rgbscreen: per-pixel text_display quad scale override
 }
 
 /** Note-block music inclusion for a video import. auto = on iff the input carries audio. */
@@ -255,6 +261,60 @@ export function render(opts: RenderOptions): RenderResult {
   // default dither: video → bayer (temporally stable), still → floyd-steinberg
   const dither: DitherMethod = opts.dither ?? (isVideo ? "bayer" : "floyd-steinberg");
 
+  if (opts.target === "rgbscreen") {
+    // TRUE-RGB screen: exact source colors on a text_display pixel grid — NO palette, NO
+    // quantization, NO dither. Vanilla has no RGB block (checked through the 2026 drops), but a
+    // text_display background is a full ARGB int, and the grid plays back with the same
+    // scoreboard+macro machinery as the block walls. Full-bright by construction (LED look).
+    const screenFrames = frames.map((f) => rgbImageToScreenFrame(f, opts.rgbLevels ?? 32));
+    const music = analyzeMusicForInput(opts);
+    const pack = generateRgbScreenDatapack(screenFrames, {
+      packFormat: mc.packFormat,
+      supportedFormats: JAVA_DATAPACK_SUPPORTED,
+      dataVersion: mc.dataVersion,
+      origin: opts.origin,
+      facing: opts.facing,
+      speedTicks: opts.speedTicks,
+      pxScale: opts.pxScale,
+      music,
+      musicOrigin: opts.musicOrigin,
+      musicEngine: opts.musicEngine,
+      musicMaxNotes: opts.musicMaxNotes,
+    });
+    pack.files.set(
+      "HOW_TO_LOAD.txt",
+      [
+        `blockdream TRUE-RGB screen — how to load`,
+        ``,
+        `1. Drop ${pack.namespace}.zip into your world's  datapacks/  folder (or unzip it there).`,
+        `2. In game: /reload`,
+        `3. /function ${pack.namespace}:setup    then    /function ${pack.namespace}:start`,
+        ``,
+        `The screen is ${opts.width}x${opts.height} = ${opts.width * opts.height} text_display entities`,
+        `(exact RGB pixels, full-bright). Pause with :stop; REMOVE it with /function ${pack.namespace}:teardown`,
+        `(the entities persist in the world save until torn down).`,
+        `Pixel quads not perfectly flush on your client? Re-render with --px-scale to tune.`,
+      ].join("\n") + "\n",
+    );
+    if (music?.length) {
+      const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
+      notes.push(
+        `note-block music: ${Math.min(music.length, cap)} notes from the audio track` +
+          (music.length > cap ? ` (capped from ${music.length}; raise --max-notes for the full song)` : "") +
+          `; plays on /function ${pack.namespace}:start.`,
+      );
+    }
+    writePack(pack, opts.out);
+    filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
+    const zip = join(opts.out, `${pack.namespace}.zip`);
+    writeFile(zip, Buffer.from(packageJavaDatapack(pack)));
+    filesWritten.push(zip);
+    notes.push(
+      `TRUE-RGB screen datapack (${opts.width}x${opts.height} px, ${screenFrames.length} frame(s), ${pack.totalCommands} delta cmds): drop ${pack.namespace}.zip into world/datapacks/, /function ${pack.namespace}:setup then :start. Teardown with :teardown.`,
+    );
+    return { target: opts.target, frameCount: screenFrames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
+
   if (opts.target === "map") {
     const mapPal =
       edition === "bedrock"
@@ -321,15 +381,20 @@ export function render(opts: RenderOptions): RenderResult {
       shadingGain > 0
         ? (f: number, x: number, y: number) => pal.entries[q[f]!.paletteIndex[y * q[f]!.width + x]!]!.lab.L
         : undefined;
+    // --wall: FAITHFUL flat video wall — every pixel becomes exactly one block, background
+    // included (framesToFlat3d). The default pipeline instead isolates a subject and inflates
+    // relief, which is right for photos but wrong for reproducing a whole video frame.
     let volumes = applyAnimate(
-      framesToAnimated3d(q, {
-        maxDepth: opts.depth ?? 8,
-        smooth: opts.smooth,
-        curve: opts.curve,
-        symmetric: opts.symmetric,
-        shadingForFrame,
-        shadingGain,
-      }),
+      opts.wall
+        ? framesToFlat3d(q, { depth: 1 })
+        : framesToAnimated3d(q, {
+            maxDepth: opts.depth ?? 8,
+            smooth: opts.smooth,
+            curve: opts.curve,
+            symmetric: opts.symmetric,
+            shadingForFrame,
+            shadingGain,
+          }),
       opts,
     );
     assertNonEmpty3d(volumes);
@@ -345,14 +410,20 @@ export function render(opts: RenderOptions): RenderResult {
       music,
       musicOrigin: opts.musicOrigin,
       musicEngine: opts.musicEngine,
+      musicMaxNotes: opts.musicMaxNotes,
+      // --led: glow plane one block outside the face the build looks toward (post-rotation)
+      ledPlane: opts.led ? (opts.facing ?? "south") : undefined,
     });
     if (music?.length) {
       const engine =
         opts.musicEngine === "redstone"
           ? "a physical redstone delay-line plays the note blocks"
           : "a tick-driven playsound clock";
+      const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
       notes.push(
-        `note-block music: ${music.length} notes from the audio track (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`,
+        `note-block music: ${Math.min(music.length, cap)} notes from the audio track` +
+          (music.length > cap ? ` (capped from ${music.length}; raise --max-notes for the full song)` : "") +
+          ` (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`,
       );
     }
     const vv = volumes[0]!;
