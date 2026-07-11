@@ -70,12 +70,18 @@ every pixel exactly one block, `--led` fronts the wall with an invisible always-
 verified through the 2026 drops), `--target rgbscreen` plays **exact 16.7M-color** frames on a
 grid of `text_display` pixels, and `--music on --max-notes 8000` transcribes the full audio
 track to note blocks with the music loop locked to the animation loop (they can never drift
-apart). A 3:39 music video at 10 fps is ~2200 frames and plays back at speed on a stock server:
+apart). A 3:39 music video at 20 fps - Minecraft's 1-frame-per-game-tick ceiling - is ~4400
+frames and plays back at speed on a stock server (give it 4G+ heap and `max-tick-time=-1`):
 
 ```bash
-blockdream render video.mp4 --target voxel3d --wall --led --grid 96x72 --fps 10 --music on --max-notes 8000 --out ./wall
-blockdream render video.mp4 --target rgbscreen --grid 64x48 --fps 10 --music on --max-notes 8000 --out ./rgb
+blockdream render video.mp4 --target voxel3d --wall --led --grid 96x72 --fps 20 --music on --max-notes 8000 --out ./wall
+blockdream render video.mp4 --target rgbscreen --grid 64x48 --fps 20 --music on --max-notes 8000 --out ./rgb
 ```
+
+The web demo (§03) imports the same video with **selectable fps (10/20/30/60), resolution,
+and audio** (the clip's original soundtrack, the note-block transcription, or mute) - decoding
+streams frame-by-frame so a whole 60 fps video fits in browser memory; datapack export
+resamples anything faster than 20 fps down to the in-game ceiling, honestly.
 
 Proven end-to-end on a real vanilla 1.21.1 server (`tools/mineflayer-collector/fullvideo-e2e.mjs`);
 recipe + details: [docs/video-import.md](./docs/video-import.md).

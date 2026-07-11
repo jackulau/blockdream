@@ -68,14 +68,18 @@ The relief pipeline above is for lifting a *subject* into 3D. To reproduce a **w
 frame-for-frame** (the "play Bad Apple!! in Minecraft" use case), use the faithful modes:
 
 ```bash
-# 3:39 video → 2191-frame block wall at 10 fps + the FULL song on note blocks + LED glow
+# 3:39 video → 4381-frame block wall at 20 fps (the in-game ceiling) + FULL song + LED glow
 blockdream render badapple.mp4 --target voxel3d --wall --led \
-  --grid 96x72 --fps 10 --music on --max-notes 8000 --out ./badapple-wall
+  --grid 96x72 --fps 20 --music on --max-notes 8000 --out ./badapple-wall
 
 # same video as a TRUE-RGB screen: exact source colors, no palette, no dither
 blockdream render badapple.mp4 --target rgbscreen \
-  --grid 64x48 --fps 10 --music on --max-notes 8000 --out ./badapple-rgb
+  --grid 64x48 --fps 20 --music on --max-notes 8000 --out ./badapple-rgb
 ```
+
+Packs this size are ~1.6-1.8M commands: give the server **4G+ heap** and
+**`max-tick-time=-1`** (`scripts/vanilla-server.sh` sets both) or `/reload` will OOM or trip
+the watchdog. Prefer lighter packs? Drop to `--fps 10` for half the commands.
 
 ### The 20 fps in-game ceiling (honesty note)
 
