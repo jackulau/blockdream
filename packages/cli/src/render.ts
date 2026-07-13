@@ -265,13 +265,15 @@ export function render(opts: RenderOptions): RenderResult {
   // (identical algorithm to the web exporter via the shared planTickPlayback) so duration is
   // preserved and frames are skipped instead. Explicit --speed opts out: raw pacing requested.
   let frames = rawFrames;
+  let resampledSpeedTicks: number | undefined;
   if (rawFrames.length > 1 && opts.speedTicks == null && opts.fps != null && opts.fps > 20) {
     const plan = planTickPlayback(rawFrames.length, rawFrames.map(() => 1000 / opts.fps!));
     if (plan.resampled) {
       frames = plan.indices.map((i) => rawFrames[i]!);
+      resampledSpeedTicks = plan.speedTicks;
       notes.push(
         `--fps ${opts.fps} is above Minecraft's 20 fps in-game ceiling (1 frame per game tick): ` +
-          `resampled ${rawFrames.length} → ${frames.length} frames at 20 fps (same duration, frames skipped evenly).`,
+          `resampled ${rawFrames.length} → ${frames.length} frames at ${plan.fps} fps (same duration, frames skipped evenly).`,
       );
     }
   }
@@ -281,11 +283,10 @@ export function render(opts: RenderOptions): RenderResult {
   // Playback pace when --speed is NOT given: match the decode fps (1 game tick = 50 ms), so
   // --fps 20 plays real-time at 1 tick/frame and --fps 10 keeps the historical 2. Without this,
   // every fps other than 10 silently played at the wrong wall-clock rate - and drifted against
-  // the note-block music, whose clock is real time. Explicit --speed always wins; no --fps
-  // (source-rate stills/models) keeps the emitters' documented default of 2. Above 20 fps the
-  // resample block earlier already reduced the clip to the 20 fps ceiling, so the floor of 1
-  // tick/frame here is exact, not a silent slowdown.
-  const speedTicksAuto = opts.speedTicks ?? (opts.fps && opts.fps > 0 ? Math.max(1, Math.round(20 / opts.fps)) : undefined);
+  // the note-block music, whose clock is real time. Explicit --speed always wins; a resampled
+  // clip takes the plan's own pacing (structurally tied to the resample target, not to a
+  // round(20/fps) coincidence); no --fps (stills/models) keeps the documented default of 2.
+  const speedTicksAuto = opts.speedTicks ?? resampledSpeedTicks ?? (opts.fps && opts.fps > 0 ? Math.max(1, Math.round(20 / opts.fps)) : undefined);
 
   if (opts.target === "rgbscreen") {
     // TRUE-RGB screen: exact source colors on a text_display pixel grid — NO palette, NO
