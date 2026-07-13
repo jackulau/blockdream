@@ -24,7 +24,9 @@ Options:
                        for model3d the WIDTH is the cube voxel resolution)
   --fps <n>          sample frame rate    (default: source rate; in-game playback tops out
                        at 20 fps — Minecraft runs 1 animation step per game tick, so
-                       --fps 20 --speed 1 is the fastest 1:1 datapack playback)
+                       --fps 20 is the fastest 1:1 datapack playback; above 20 the pack is
+                       resampled evenly to 20 fps — same duration, frames skipped — unless
+                       an explicit --speed asks for raw pacing)
   --max-frames <n>   cap number of frames
   --dither <d>       floyd-steinberg | bayer | none
                        (default: bayer for video, floyd-steinberg for stills)

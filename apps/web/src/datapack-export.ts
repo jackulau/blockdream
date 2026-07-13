@@ -4,45 +4,9 @@
 
 import { zipSync, strToU8 } from "fflate";
 
-/** How a clip plays back IN GAME. Minecraft executes one animation step per game tick, so 20 fps
- *  is the physical playback ceiling - a datapack cannot show frames faster, only skip them. */
-export interface TickPlan {
-  /** which source frames to emit (identity when nothing is skipped) */
-  indices: number[];
-  /** game ticks each emitted frame is held (1 tick = 50 ms) */
-  speedTicks: number;
-  /** resulting in-game frame rate */
-  fps: number;
-  /** true when the source was decoded above 20 fps and frames were evenly skipped */
-  resampled: boolean;
-}
-
-/**
- * Plan honest in-game playback for `n` frames with real per-frame timing. At or below 20 fps every
- * frame is kept and dwells its nearest whole-tick duration. ABOVE 20 fps the plan resamples EVENLY
- * down to one frame per tick, so the in-game clip runs the same wall-clock duration as the source
- * (dropping detail, never stretching time). No timing (`durationsMs` null) keeps the legacy default
- * (2 ticks/frame = 10 fps), which is what baked spins/effect sequences have always used. Pure.
- */
-export function planTickPlayback(n: number, durationsMs: ReadonlyArray<number | undefined | null> | null, fallbackMs = 100): TickPlan {
-  const identity = Array.from({ length: n }, (_, i) => i);
-  if (n <= 1 || !durationsMs || !durationsMs.length) {
-    return { indices: identity, speedTicks: 2, fps: 10, resampled: false };
-  }
-  let totalMs = 0;
-  for (let i = 0; i < n; i++) {
-    const d = durationsMs[i];
-    totalMs += typeof d === "number" && d > 0 ? d : fallbackMs;
-  }
-  const avg = totalMs / n;
-  if (avg >= 50) {
-    const speedTicks = Math.max(1, Math.round(avg / 50));
-    return { indices: identity, speedTicks, fps: 20 / speedTicks, resampled: false };
-  }
-  const target = Math.max(2, Math.round(totalMs / 50));
-  const indices = Array.from({ length: target }, (_, i) => Math.min(n - 1, Math.floor((i * n) / target)));
-  return { indices, speedTicks: 1, fps: 20, resampled: true };
-}
+// Playback planning moved to @blockdream/emit-commands (tick-plan.ts) so the CLI resamples
+// >20 fps clips identically to this exporter; re-exported here to keep existing imports.
+export { planTickPlayback, type TickPlan } from "@blockdream/emit-commands";
 
 /** Step-by-step in-game load guide, derived from the pack's own namespace, bundled into the zip so
  *  the instructions travel with the download (the "how do I load this" answer ships with it). */

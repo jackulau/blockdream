@@ -88,8 +88,10 @@ second - so **20 fps is the physical playback ceiling** for a datapack (`--speed
 demo can decode and *preview* a clip at 30 or 60 fps, but a datapack export **resamples evenly
 down to 20 fps** so the in-game clip runs the same wall-clock duration as the source (frames
 are skipped, time is never stretched). The export status line says when this happened. Clips
-at or below 20 fps keep every frame, each dwelling its nearest whole-tick duration. The same
-applies to the CLI: `--fps 20` is the highest rate that plays 1:1 in game.
+at or below 20 fps keep every frame, each dwelling its nearest whole-tick duration. The CLI
+does the same (shared planner): a `--fps 30`/`--fps 60` render resamples evenly to 20 fps and
+says so in its output - `--fps 20` is the highest rate that plays 1:1 in game. An explicit
+`--speed` opts out of the resample (raw pacing requested).
 
 - **`--wall`** (voxel3d) - every pixel becomes exactly one block, background included
   (`framesToFlat3d`), instead of subject isolation + relief. The frames ARE the video.

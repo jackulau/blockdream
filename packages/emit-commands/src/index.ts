@@ -1,4 +1,5 @@
 export * from "./block-resolver";
+export * from "./tick-plan";
 export * from "./delta";
 export * from "./chunk";
 export * from "./validate";

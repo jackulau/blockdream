@@ -23,7 +23,7 @@ import { extractFrames, extractAudioPcm } from "@blockdream/video";
 import { analyzeAudio, type NoteEvent } from "@blockdream/audio";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
-import { generateJavaDatapack, generateVoxelDatapack, generateRgbScreenDatapack, rgbImageToScreenFrame, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
+import { generateJavaDatapack, generateVoxelDatapack, generateRgbScreenDatapack, rgbImageToScreenFrame, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId, planTickPlayback } from "@blockdream/emit-commands";
 import { framesToAnimated3d, framesToFlat3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
@@ -252,13 +252,29 @@ export function render(opts: RenderOptions): RenderResult {
     return { target: opts.target, frameCount: volumes.length, width: v0.sx, height: v0.sy, filesWritten, notes };
   }
 
-  const frames = extractFrames(opts.input, {
+  const rawFrames = extractFrames(opts.input, {
     width: opts.width,
     height: opts.height,
     fps: opts.fps,
     maxFrames: opts.maxFrames,
   });
-  if (frames.length === 0) throw new Error("no frames decoded from input");
+  if (rawFrames.length === 0) throw new Error("no frames decoded from input");
+  // Minecraft executes one animation step per game tick (20 tps), so a >20 fps decode can never
+  // play 1:1 - speedTicks floors at 1 and the pack would silently run slow (30 fps → 1.5x the
+  // source duration) and drift against the real-time music clock. Resample evenly to the ceiling
+  // (identical algorithm to the web exporter via the shared planTickPlayback) so duration is
+  // preserved and frames are skipped instead. Explicit --speed opts out: raw pacing requested.
+  let frames = rawFrames;
+  if (rawFrames.length > 1 && opts.speedTicks == null && opts.fps != null && opts.fps > 20) {
+    const plan = planTickPlayback(rawFrames.length, rawFrames.map(() => 1000 / opts.fps!));
+    if (plan.resampled) {
+      frames = plan.indices.map((i) => rawFrames[i]!);
+      notes.push(
+        `--fps ${opts.fps} is above Minecraft's 20 fps in-game ceiling (1 frame per game tick): ` +
+          `resampled ${rawFrames.length} → ${frames.length} frames at 20 fps (same duration, frames skipped evenly).`,
+      );
+    }
+  }
   const isVideo = frames.length > 1;
   // default dither: video → bayer (temporally stable), still → floyd-steinberg
   const dither: DitherMethod = opts.dither ?? (isVideo ? "bayer" : "floyd-steinberg");
@@ -266,7 +282,9 @@ export function render(opts: RenderOptions): RenderResult {
   // --fps 20 plays real-time at 1 tick/frame and --fps 10 keeps the historical 2. Without this,
   // every fps other than 10 silently played at the wrong wall-clock rate - and drifted against
   // the note-block music, whose clock is real time. Explicit --speed always wins; no --fps
-  // (source-rate stills/models) keeps the emitters' documented default of 2.
+  // (source-rate stills/models) keeps the emitters' documented default of 2. Above 20 fps the
+  // resample block earlier already reduced the clip to the 20 fps ceiling, so the floor of 1
+  // tick/frame here is exact, not a silent slowdown.
   const speedTicksAuto = opts.speedTicks ?? (opts.fps && opts.fps > 0 ? Math.max(1, Math.round(20 / opts.fps)) : undefined);
 
   if (opts.target === "rgbscreen") {
