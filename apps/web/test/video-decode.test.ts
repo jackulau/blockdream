@@ -54,4 +54,27 @@ describe("planFrameTimes", () => {
       expect(t[t.length - 1]!).toBeLessThan(dur);
     }
   });
+
+  it("frame count SCALES with the chosen fps for a whole video (no fixed cap in the way)", () => {
+    // the Bad Apple case: 219 s. The import passes maxFrames = fps * 660 (11-minute ceiling),
+    // so the fps selector - not a hardcoded cap - decides the frame count.
+    const dur = 219;
+    for (const fps of [10, 20, 30, 60]) {
+      const t = planFrameTimes(dur, { fps, maxFrames: Math.ceil(fps * 660) });
+      expect(t.length).toBe(Math.floor(dur * fps) + 1); // ~1:1 with the source at that fps
+      expect(t[0]).toBe(0);
+      expect(t[t.length - 1]!).toBeLessThan(dur);
+    }
+    // 60 fps yields exactly 6x the frames of 10 fps (minus rounding on the +1)
+    const n10 = planFrameTimes(dur, { fps: 10, maxFrames: 999999 }).length;
+    const n60 = planFrameTimes(dur, { fps: 60, maxFrames: 999999 }).length;
+    expect(n60).toBeGreaterThan(n10 * 5.9);
+  });
+
+  it("sampled intervals at a chosen fps are uniform (playback timing matches the request)", () => {
+    const t = planFrameTimes(10, { fps: 30, maxFrames: 100000 });
+    const step = t[1]! - t[0]!;
+    expect(step).toBeCloseTo(1 / 30, 3);
+    for (let i = 1; i < t.length; i++) expect(t[i]! - t[i - 1]!).toBeCloseTo(step, 9);
+  });
 });

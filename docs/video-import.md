@@ -62,6 +62,63 @@ Tests: `apps/web/test/video3d.test.ts` (temporal stability, motion-following),
 `packages/cli/test/video3d-e2e.test.ts` (volumes move between frames, full product assertion),
 and `packages/cli/test/animate-cli.test.ts` (explode/wave/buildup wired to voxel3d/mcstructure3d/model3d).
 
+## Recreating a WHOLE video (faithful wall + full-length song)
+
+The relief pipeline above is for lifting a *subject* into 3D. To reproduce a **whole video,
+frame-for-frame** (the "play Bad Apple!! in Minecraft" use case), use the faithful modes:
+
+```bash
+# 3:39 video → 4381-frame block wall at 20 fps (the in-game ceiling) + FULL song + LED glow
+blockdream render badapple.mp4 --target voxel3d --wall --led \
+  --grid 96x72 --fps 20 --music on --max-notes 8000 --out ./badapple-wall
+
+# same video as a TRUE-RGB screen: exact source colors, no palette, no dither
+blockdream render badapple.mp4 --target rgbscreen \
+  --grid 64x48 --fps 20 --music on --max-notes 8000 --out ./badapple-rgb
+```
+
+Packs this size are ~1.6-1.8M commands: give the server **4G+ heap** and
+**`max-tick-time=-1`** (`scripts/vanilla-server.sh` sets both) or `/reload` will OOM or trip
+the watchdog. Prefer lighter packs? Drop to `--fps 10` for half the commands.
+
+### The 20 fps in-game ceiling (honesty note)
+
+Minecraft executes **one animation step per game tick**, and the game runs at 20 ticks per
+second - so **20 fps is the physical playback ceiling** for a datapack (`--speed 1`). The web
+demo can decode and *preview* a clip at 30 or 60 fps, but a datapack export **resamples evenly
+down to 20 fps** so the in-game clip runs the same wall-clock duration as the source (frames
+are skipped, time is never stretched). The export status line says when this happened. Clips
+at or below 20 fps keep every frame, each dwelling its nearest whole-tick duration. The CLI
+does the same (shared planner): a `--fps 30`/`--fps 60` render resamples evenly to 20 fps and
+says so in its output - `--fps 20` is the highest rate that plays 1:1 in game. An explicit
+`--speed` opts out of the resample (raw pacing requested).
+
+- **`--wall`** (voxel3d) - every pixel becomes exactly one block, background included
+  (`framesToFlat3d`), instead of subject isolation + relief. The frames ARE the video.
+- **`--led`** (voxel3d) - an invisible `minecraft:light[level=15]` plane one block in front of
+  the wall (fill mode `keep`, placed once in setup), so the wall reads like a lit LED screen at
+  night. There is no vanilla "RGB/LED block" - this is the honest vanilla equivalent.
+- **`--target rgbscreen`** - vanilla has **no RGB block** (verified against every 2026 drop:
+  26.1 "Tiny Takeover", 26.2 "Chaos Cubed" sulfur/cinnabar, the 26.3 poplar snapshots - all
+  fixed palettes; true 16.7M-color *blocks* exist only in mods). But a `text_display` entity's
+  `background` is a full ARGB int, so a one-entity-per-pixel grid IS an exact-color screen:
+  deterministic per-pixel UUIDs, frames as `data merge entity <uuid> {background:<argb>}`
+  deltas, full-bright (`brightness:{sky:15,block:15}`), `:teardown` removes every entity.
+  `--rgb-levels` (default 32) posterizes so codec noise doesn't bloat deltas; `--px-scale`
+  tunes the quad size if your client's font metrics show seams. Client-side cost scales with
+  pixel count - 64×48 = 3072 display entities is comfortable; go much larger with care.
+- **Full-length music** - `--max-notes` lifts the sequencer cap (default 1500), and the music
+  loop is **locked to the animation loop** (`#mtcount = frames × speedTicks`, notes past the
+  loop trimmed): audio and video wrap together forever instead of drifting apart each cycle.
+- One blockdream animation pack at a time per world: the packs share the `ma` scoreboard
+  clock. Disable one (`/datapack disable`) before setting up another.
+
+Proven end-to-end on a real vanilla 1.21.1 server by
+`tools/mineflayer-collector/fullvideo-e2e.mjs` (boot-load + /reload, cell-exact frame-0, LED
+plane, locked music clock, live macro-dispatched animation for BOTH targets, entity-exact RGB
+pixels, clean teardown). Run it: `node tools/mineflayer-collector/fullvideo-e2e.mjs`; point it
+at a real video with `E2E_INPUT=/path/video.mp4 E2E_GRID=96x72 E2E_FPS=10 E2E_MAX_FRAMES=0`.
+
 ## Audio → note blocks
 
 When the imported video **has an audio track**, the build can come with **Minecraft note blocks that

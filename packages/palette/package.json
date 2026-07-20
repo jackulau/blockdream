@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./versions": "./src/versions.ts",
     "./solid": "./src/solid.ts",
+    "./cushions": "./src/cushions.ts",
     "./data/*": "./data/*"
   },
   "scripts": {

@@ -92,3 +92,47 @@ function safeLen(p: string): number {
     return 0;
   }
 }
+
+d("playback speed derives from --fps (real-time playback, no half-speed packs)", () => {
+  // The bug this locks: voxel3d never passed speedTicks, so a --fps 20 render emitted the
+  // default #speed 2 (10 fps playback) - the whole video played at HALF speed and drifted
+  // against the real-time note-block music clock. --speed still wins when given explicitly.
+  const speedOf = (out: string): string => {
+    const setup = readFileSync(join(out, "data", "blockdream_3d", "function", "setup.mcfunction"), "utf8");
+    const m = setup.match(/scoreboard players set #speed ma (\d+)/);
+    return m ? m[1]! : "(missing)";
+  };
+
+  it("--fps 20 → 1 tick/frame; --fps 10 keeps the historical 2; explicit --speed wins", () => {
+    const o20 = join(dir, "spd20");
+    render({ input: clip, out: o20, target: "voxel3d", width: 16, height: 16, fps: 20, wall: true });
+    expect(speedOf(o20)).toBe("1");
+
+    const o10 = join(dir, "spd10");
+    render({ input: clip, out: o10, target: "voxel3d", width: 16, height: 16, fps: 10, wall: true });
+    expect(speedOf(o10)).toBe("2");
+
+    const oExplicit = join(dir, "spdx");
+    render({ input: clip, out: oExplicit, target: "voxel3d", width: 16, height: 16, fps: 20, speedTicks: 4, wall: true });
+    expect(speedOf(oExplicit)).toBe("4");
+  });
+
+  it("--fps above 20 resamples evenly to the ceiling (same duration) instead of playing slow", () => {
+    // The bug this locks: speedTicks floors at 1 tick/frame, so a 30 fps decode played at
+    // 20 fps = 1.5x the source duration (and 60 fps = 3x), silently, drifting off the music.
+    // The fix resamples to 20 fps exactly like the web exporter (shared planTickPlayback).
+    // explicit --speed = raw pacing requested: no resample, every decoded frame kept
+    const oRaw = join(dir, "spd30raw");
+    const raw = render({ input: clip, out: oRaw, target: "voxel3d", width: 16, height: 16, fps: 30, speedTicks: 1, wall: true });
+    expect(raw.frameCount).toBeGreaterThan(20); // 1 s clip decoded at 30 fps
+    expect(raw.notes.join("\n")).not.toMatch(/resampled/);
+
+    const o30 = join(dir, "spd30");
+    const res = render({ input: clip, out: o30, target: "voxel3d", width: 16, height: 16, fps: 30, wall: true });
+    expect(speedOf(o30)).toBe("1");
+    // even resample to the ceiling: N frames at 30 fps → round(N·(1000/30)/50) at 20 fps,
+    // preserving wall-clock duration (1 s clip → ~20 frames at 1 tick/frame)
+    expect(res.frameCount).toBe(Math.max(2, Math.round((raw.frameCount * (1000 / 30)) / 50)));
+    expect(res.notes.join("\n")).toMatch(/above Minecraft's 20 fps.*resampled \d+ → \d+/s);
+  });
+});

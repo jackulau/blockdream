@@ -4,6 +4,10 @@
 
 import { zipSync, strToU8 } from "fflate";
 
+// Playback planning moved to @blockdream/emit-commands (tick-plan.ts) so the CLI resamples
+// >20 fps clips identically to this exporter; re-exported here to keep existing imports.
+export { planTickPlayback, type TickPlan } from "@blockdream/emit-commands";
+
 /** Step-by-step in-game load guide, derived from the pack's own namespace, bundled into the zip so
  *  the instructions travel with the download (the "how do I load this" answer ships with it). */
 export function loadInstructions(files: Map<string, string>): string {

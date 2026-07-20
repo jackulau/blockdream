@@ -21,13 +21,15 @@
 #   --dir <path>        target dir (default: <repo>/.vanilla-server)
 #   --rcon-pass <pass>  RCON password (default: reuse existing, else random 16-hex printed ONCE)
 #   --datapack <zip>    copy a datapack zip into <dir>/world/datapacks/
+#   --mc-version <v>    Minecraft version to fetch/run (default: 1.21.1; e.g. 26.2).
+#                       Use a separate --dir per version - server.jar is per-dir.
 #   --no-start          prepare everything but do not launch the server
 #
 # Idempotent: the ~50MB jar download is skipped when server.jar is already present
 # and sha1-valid (cached verification in server.jar.sha1 keeps re-runs offline-safe).
 set -euo pipefail
 
-MC_VERSION="1.21.1"   # PINNED - the live Fabric bridge + datapacks target this version
+MC_VERSION="${BD_MC_VERSION:-1.21.1}"   # default PINNED - the live Fabric bridge + datapacks target this; override for e.g. 26.2
 MANIFEST_URL="https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -41,6 +43,7 @@ while [ $# -gt 0 ]; do
     --dir)       DIR="${2:?✗ --dir needs a path}"; shift 2 ;;
     --rcon-pass) RCON_PASS="${2:?✗ --rcon-pass needs a value}"; shift 2 ;;
     --datapack)  DATAPACK="${2:?✗ --datapack needs a zip path}"; shift 2 ;;
+    --mc-version) MC_VERSION="${2:?✗ --mc-version needs a version id}"; shift 2 ;;
     --no-start)  START=0; shift ;;
     -h|--help)   sed -n '2,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "✗ unknown flag: $1 - run with --help for usage" >&2; exit 1 ;;
@@ -58,8 +61,16 @@ SHA_FILE="$DIR/server.jar.sha1"
 # ---------------------------------------------------------------- server.jar
 jar_valid() { [ -s "$JAR" ] && [ "$(shasum -a 1 "$JAR" | awk '{print $1}')" = "$1" ]; }
 
-if [ -s "$SHA_FILE" ] && jar_valid "$(cat "$SHA_FILE")"; then
-  echo "[vanilla-server] ✓ server.jar cached + sha1-valid ($(cat "$SHA_FILE")) - skipping download"
+# server.jar.sha1 records "<version> <sha1>" so a cached jar can never satisfy a
+# DIFFERENT --mc-version. Legacy single-field files (sha only) predate --mc-version
+# and were always 1.21.1.
+REC_VER=""; REC_SHA=""
+if [ -s "$SHA_FILE" ]; then
+  read -r REC_VER REC_SHA < "$SHA_FILE" || true
+  if [ -z "$REC_SHA" ]; then REC_SHA="$REC_VER"; REC_VER="1.21.1"; fi
+fi
+if [ "$REC_VER" = "$MC_VERSION" ] && jar_valid "$REC_SHA"; then
+  echo "[vanilla-server] ✓ server.jar cached + sha1-valid for $MC_VERSION ($REC_SHA) - skipping download"
 else
   echo "[vanilla-server] resolving Minecraft $MC_VERSION server jar via Mojang's official manifest…"
   VERSION_URL="$(curl -fsSL "$MANIFEST_URL" | python3 -c "
@@ -90,7 +101,7 @@ print(d['url'], d['sha1'])
     }
     echo "[vanilla-server] ✓ sha1 verified: $EXPECTED_SHA1"
   fi
-  echo "$EXPECTED_SHA1" > "$SHA_FILE"
+  echo "$MC_VERSION $EXPECTED_SHA1" > "$SHA_FILE"
 fi
 
 # ---------------------------------------------------------------------- EULA
@@ -130,7 +141,10 @@ level-name=world
 online-mode=false
 server-ip=127.0.0.1
 motd=blockdream
+max-tick-time=-1
 EOF
+# max-tick-time=-1 disables the watchdog: /reload of a full-video pack (10^6 commands)
+# legitimately blocks a tick for >60 s and the watchdog would force-kill the healthy server.
 
 cat <<'EOF'
 ================================================================================
@@ -176,5 +190,6 @@ cat <<EOF
   Stop: Ctrl-C here, or 'stop' in the server console, or RCON 'stop'.
 
 EOF
+# 4G default: full-video packs (2000+ frame functions) OOM a 2G heap during /reload.
 cd "$DIR"
-exec "$JAVA" -Xmx2G -jar server.jar nogui
+exec "$JAVA" "-Xmx${BD_JAVA_HEAP:-4G}" -jar server.jar nogui

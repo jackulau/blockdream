@@ -95,4 +95,22 @@ d("--animate flag: block-motion generators wired to CLI", () => {
     const mcs = readdirSync(out).filter((n) => n.endsWith(".mcstructure"));
     expect(mcs.length).toBe(8);
   });
+
+  it("--animate on a >20 fps clip skips the resample (and its note): the pack is the synthetic sequence", () => {
+    // Without the skip, render emitted "resampled 30 → 20 frames" and then --animate replaced
+    // the clip with N synthetic frames — a note describing frames the pack doesn't contain.
+    const clip = join(dir, "clip30.mp4");
+    const r = runFfmpeg(["-v", "error", "-f", "lavfi", "-i", "testsrc2=size=32x32:rate=30:duration=1", "-y", clip]);
+    expect(r.status).toBe(0);
+    const out = join(dir, "anim-fps30");
+    const res = render({ input: clip, out, target: "voxel3d", width: 16, height: 16, fps: 30, animate: "explode", animateFrames: 12 });
+    expect(res.frameCount).toBe(12);
+    expect(res.notes.join("\n")).not.toMatch(/resampled/);
+  });
+
+  it("--animate on a target that cannot animate says so instead of silently ignoring the flag", () => {
+    const out = join(dir, "anim-2d");
+    const res = render({ input: gif, out, target: "datapack", width: 16, height: 16, animate: "explode" });
+    expect(res.notes.join("\n")).toMatch(/--animate only applies to 3D targets.*ignored for --target datapack/);
+  });
 });

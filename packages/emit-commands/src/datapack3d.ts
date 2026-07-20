@@ -89,6 +89,16 @@ export interface VoxelDatapackOptions extends DatapackOptions {
    * byte-identical to a build with no `musicEngine` set.
    */
   musicEngine?: "playsound" | "redstone";
+  /** Cap on emitted music notes (defaults: 1500 playsound / 800 redstone). Raise it for a
+   *  full-length song — the playsound sequencer is one `execute if score` line per note. */
+  musicMaxNotes?: number;
+  /**
+   * Place an invisible always-lit glow layer (`minecraft:light[level=15]`) one block outside
+   * the named face of the build box, so the wall reads like a lit LED screen at night. Placed
+   * once in setup with fill mode `keep` (never overwrites existing blocks); stop does NOT
+   * remove it (the lights are invisible and non-colliding).
+   */
+  ledPlane?: "north" | "south" | "east" | "west";
 }
 
 function blockOf(id: number, resolveBlock: (id: number) => string | undefined, fallback: string, air: string): string {
@@ -210,13 +220,34 @@ export function generateVoxelDatapack(
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
-          const r = redstoneSequencer(music, { musicOrigin });
+          const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes });
           return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores };
         })()
       : (() => {
-          const n = noteSequencer(music, { musicOrigin });
+          const n = noteSequencer(music, {
+            musicOrigin,
+            maxNotes: opts.musicMaxNotes,
+            // Animation + music: lock the music loop to the animation loop (frames × speed).
+            // Unequal loop lengths re-phase on every wrap and drift a little more each cycle.
+            loopTicksOverride: volumes.length > 1 ? volumes.length * speed : undefined,
+          });
           return { physical: n.keyboard, musicLines: n.musicLines, setupScores: n.setupScores };
         })();
+
+  // Optional LED glow layer: an invisible light plane one block outside the chosen face.
+  const ledBox = opts.ledPlane
+    ? {
+        x0: opts.ledPlane === "east" ? x1 + 1 : opts.ledPlane === "west" ? x0 - 1 : x0,
+        x1: opts.ledPlane === "east" ? x1 + 1 : opts.ledPlane === "west" ? x0 - 1 : x1,
+        z0: opts.ledPlane === "south" ? z1 + 1 : opts.ledPlane === "north" ? z0 - 1 : z0,
+        z1: opts.ledPlane === "south" ? z1 + 1 : opts.ledPlane === "north" ? z0 - 1 : z1,
+      }
+    : undefined;
+  // forceload must cover the LED plane too (it can cross into the next chunk row)
+  const flx0 = Math.min(x0, ledBox?.x0 ?? x0);
+  const flx1 = Math.max(x1, ledBox?.x1 ?? x1);
+  const flz0 = Math.min(z0, ledBox?.z0 ?? z0);
+  const flz1 = Math.max(z1, ledBox?.z1 ?? z1);
 
   files.set(
     `${fnDir}/setup.mcfunction`,
@@ -229,8 +260,10 @@ export function generateVoxelDatapack(
       `scoreboard players set #speed ma ${speed}`,
       `scoreboard players set #count ma ${volumes.length}`,
       ...(seq ? seq.setupScores : []),
-      `forceload add ${x0} ${z0} ${x1} ${z1}`,
+      `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
       ...fillLines(x0, y0, z0, x1, y1, z1, air, "replace"), // clear the build box (split at the 32768 /fill cap)
+      // LED glow layer: invisible full-bright light plane fronting the wall ("keep" never clobbers)
+      ...(ledBox ? fillLines(ledBox.x0, y0, ledBox.z0, ledBox.x1, y1, ledBox.z1, "minecraft:light[level=15]", "keep") : []),
       ...(seq ? seq.physical : []), // place the physical music area (tuned keyboard or redstone track)
       `function ${ns}:frames/0`,
       "",
@@ -242,11 +275,11 @@ export function generateVoxelDatapack(
   // (server-friendly: a paused animation keeps nothing loaded), start gets them back.
   files.set(
     `${fnDir}/start.mcfunction`,
-    [`forceload add ${x0} ${z0} ${x1} ${z1}`, `scoreboard players set #play ma 1`, ""].join("\n"),
+    [`forceload add ${flx0} ${flz0} ${flx1} ${flz1}`, `scoreboard players set #play ma 1`, ""].join("\n"),
   );
   files.set(
     `${fnDir}/stop.mcfunction`,
-    [`scoreboard players set #play ma 0`, `forceload remove ${x0} ${z0} ${x1} ${z1}`, ""].join("\n"),
+    [`scoreboard players set #play ma 0`, `forceload remove ${flx0} ${flz0} ${flx1} ${flz1}`, ""].join("\n"),
   );
   files.set(
     `${fnDir}/driver.mcfunction`,

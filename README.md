@@ -63,6 +63,29 @@ how you ask - whether baked or cast live. `--image` paints a flat wall; `--build
 video animates either way: as a moving 2D wall (`--image`) or as a **real-content 3D animation** -
 every frame its own build (`--build`). Details: [docs/live-cast.md](./docs/live-cast.md).
 
+**Recreate a WHOLE video - with its soundtrack (offline datapack).** The faithful full-video
+modes reproduce a clip frame-for-frame instead of lifting a subject into relief: `--wall` makes
+every pixel exactly one block, `--led` fronts the wall with an invisible always-lit
+`minecraft:light` plane (the honest vanilla "LED screen" - there is no RGB block in vanilla,
+verified through the 2026 drops), `--target rgbscreen` plays **exact 16.7M-color** frames on a
+grid of `text_display` pixels, and `--music on --max-notes 8000` transcribes the full audio
+track to note blocks with the music loop locked to the animation loop (they can never drift
+apart). A 3:39 music video at 20 fps - Minecraft's 1-frame-per-game-tick ceiling - is ~4400
+frames and plays back at speed on a stock server (give it 4G+ heap and `max-tick-time=-1`):
+
+```bash
+blockdream render video.mp4 --target voxel3d --wall --led --grid 96x72 --fps 20 --music on --max-notes 8000 --out ./wall
+blockdream render video.mp4 --target rgbscreen --grid 64x48 --fps 20 --music on --max-notes 8000 --out ./rgb
+```
+
+The web demo (§03) imports the same video with **selectable fps (10/20/30/60), resolution,
+and audio** (the clip's original soundtrack, the note-block transcription, or mute) - decoding
+streams frame-by-frame so a whole 60 fps video fits in browser memory; datapack export
+resamples anything faster than 20 fps down to the in-game ceiling, honestly.
+
+Proven end-to-end on a real vanilla 1.21.1 server (`tools/mineflayer-collector/fullvideo-e2e.mjs`);
+recipe + details: [docs/video-import.md](./docs/video-import.md).
+
 **Fabric mod (the high-FPS alternative).** Want smooth video instead? The optional
 [Fabric mod](./mods/java-fabric/README.md) swaps each map's colour array per tick - real
 video on an item-frame map wall (up to ~20 fps), with the same live world-model control:

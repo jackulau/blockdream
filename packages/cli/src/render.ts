@@ -8,6 +8,7 @@ import {
   JAVA_DATAPACK_SUPPORTED,
   BEDROCK_BLOCK_VERSION,
 } from "@blockdream/palette";
+import { cushionMosaicCommands } from "@blockdream/palette/cushions";
 import {
   preparePalette,
   quantizeFrame,
@@ -22,8 +23,8 @@ import { extractFrames, extractAudioPcm } from "@blockdream/video";
 import { analyzeAudio, type NoteEvent } from "@blockdream/audio";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
-import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId } from "@blockdream/emit-commands";
-import { framesToAnimated3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
+import { generateJavaDatapack, generateVoxelDatapack, generateRgbScreenDatapack, rgbImageToScreenFrame, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId, planTickPlayback } from "@blockdream/emit-commands";
+import { framesToAnimated3d, framesToFlat3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -39,7 +40,8 @@ export type RenderTarget =
   | "bedrock-script"
   | "mwframes"
   | "voxel3d"
-  | "model3d";
+  | "model3d"
+  | "rgbscreen";
 export type Edition = "java" | "bedrock";
 
 export interface RenderOptions {
@@ -69,6 +71,12 @@ export interface RenderOptions {
   musicInstrument?: string; // note-block instrument for the music (default harp)
   musicOrigin?: { x: number; y: number; z: number }; // where the note-block music area spawns (default beside the build)
   musicEngine?: "playsound" | "redstone"; // voxel3d: "playsound" clock (default) or a physical "redstone" delay-line that plays the note blocks
+  musicMaxNotes?: number; // cap on emitted music notes (default 1500 playsound / 800 redstone); raise for a full-length song
+  wall?: boolean; // voxel3d: FAITHFUL flat video wall (framesToFlat3d, background included) instead of the subject-relief pipeline
+  led?: boolean; // voxel3d: invisible minecraft:light[level=15] plane fronting the build face — the wall glows like an LED screen
+  cushionMosaic?: boolean; // voxel3d, EXPERIMENTAL (26.3 SNAPSHOT ONLY): also emit frame 0 as a top-down cushion-entity floor mosaic
+  rgbLevels?: number; // rgbscreen: posterize levels per channel for delta stability (default 32; 0 = exact 8-bit)
+  pxScale?: { x: number; y: number }; // rgbscreen: per-pixel text_display quad scale override
 }
 
 /** Note-block music inclusion for a video import. auto = on iff the input carries audio. */
@@ -244,16 +252,103 @@ export function render(opts: RenderOptions): RenderResult {
     return { target: opts.target, frameCount: volumes.length, width: v0.sx, height: v0.sy, filesWritten, notes };
   }
 
-  const frames = extractFrames(opts.input, {
+  const rawFrames = extractFrames(opts.input, {
     width: opts.width,
     height: opts.height,
     fps: opts.fps,
     maxFrames: opts.maxFrames,
   });
-  if (frames.length === 0) throw new Error("no frames decoded from input");
+  if (rawFrames.length === 0) throw new Error("no frames decoded from input");
+  // Minecraft executes one animation step per game tick (20 tps), so a >20 fps decode can never
+  // play 1:1 - speedTicks floors at 1 and the pack would silently run slow (30 fps → 1.5x the
+  // source duration) and drift against the real-time music clock. Resample evenly to the ceiling
+  // (identical algorithm to the web exporter via the shared planTickPlayback) so duration is
+  // preserved and frames are skipped instead. Explicit --speed opts out: raw pacing requested.
+  // --animate on a 3D target replaces the whole clip with procedural block-motion of frame 0,
+  // so a >20 fps resample would be dead work whose note describes frames the pack doesn't have.
+  const animateConsumesClip = opts.animate != null && (opts.target === "voxel3d" || opts.target === "mcstructure3d");
+  if (opts.animate != null && !animateConsumesClip) {
+    // model3d never reaches here (it returns before frame decode), so this is exactly the
+    // "silently ignored" set: 2D walls, screens, and the Bedrock frame-pool targets.
+    notes.push(`--animate only applies to 3D targets (voxel3d/mcstructure3d/model3d) - ignored for --target ${opts.target}.`);
+  }
+  let frames = rawFrames;
+  let resampledSpeedTicks: number | undefined;
+  if (rawFrames.length > 1 && !animateConsumesClip && opts.speedTicks == null && opts.fps != null && opts.fps > 20) {
+    const plan = planTickPlayback(rawFrames.length, rawFrames.map(() => 1000 / opts.fps!));
+    if (plan.resampled) {
+      frames = plan.indices.map((i) => rawFrames[i]!);
+      resampledSpeedTicks = plan.speedTicks;
+      notes.push(
+        `--fps ${opts.fps} is above Minecraft's 20 fps in-game ceiling (1 frame per game tick): ` +
+          `resampled ${rawFrames.length} → ${frames.length} frames at ${plan.fps} fps (same duration, frames skipped evenly).`,
+      );
+    }
+  }
   const isVideo = frames.length > 1;
   // default dither: video → bayer (temporally stable), still → floyd-steinberg
   const dither: DitherMethod = opts.dither ?? (isVideo ? "bayer" : "floyd-steinberg");
+  // Playback pace when --speed is NOT given: match the decode fps (1 game tick = 50 ms), so
+  // --fps 20 plays real-time at 1 tick/frame and --fps 10 keeps the historical 2. Without this,
+  // every fps other than 10 silently played at the wrong wall-clock rate - and drifted against
+  // the note-block music, whose clock is real time. Explicit --speed always wins; a resampled
+  // clip takes the plan's own pacing (structurally tied to the resample target, not to a
+  // round(20/fps) coincidence); no --fps (stills/models) keeps the documented default of 2.
+  const speedTicksAuto = opts.speedTicks ?? resampledSpeedTicks ?? (opts.fps && opts.fps > 0 ? Math.max(1, Math.round(20 / opts.fps)) : undefined);
+
+  if (opts.target === "rgbscreen") {
+    // TRUE-RGB screen: exact source colors on a text_display pixel grid — NO palette, NO
+    // quantization, NO dither. Vanilla has no RGB block (checked through the 2026 drops), but a
+    // text_display background is a full ARGB int, and the grid plays back with the same
+    // scoreboard+macro machinery as the block walls. Full-bright by construction (LED look).
+    const screenFrames = frames.map((f) => rgbImageToScreenFrame(f, opts.rgbLevels ?? 32));
+    const music = analyzeMusicForInput(opts);
+    const pack = generateRgbScreenDatapack(screenFrames, {
+      packFormat: mc.packFormat,
+      supportedFormats: JAVA_DATAPACK_SUPPORTED,
+      dataVersion: mc.dataVersion,
+      origin: opts.origin,
+      facing: opts.facing,
+      speedTicks: speedTicksAuto,
+      pxScale: opts.pxScale,
+      music,
+      musicOrigin: opts.musicOrigin,
+      musicEngine: opts.musicEngine,
+      musicMaxNotes: opts.musicMaxNotes,
+    });
+    pack.files.set(
+      "HOW_TO_LOAD.txt",
+      [
+        `blockdream TRUE-RGB screen — how to load`,
+        ``,
+        `1. Drop ${pack.namespace}.zip into your world's  datapacks/  folder (or unzip it there).`,
+        `2. In game: /reload`,
+        `3. /function ${pack.namespace}:setup    then    /function ${pack.namespace}:start`,
+        ``,
+        `The screen is ${opts.width}x${opts.height} = ${opts.width * opts.height} text_display entities`,
+        `(exact RGB pixels, full-bright). Pause with :stop; REMOVE it with /function ${pack.namespace}:teardown`,
+        `(the entities persist in the world save until torn down).`,
+        `Pixel quads not perfectly flush on your client? Re-render with --px-scale to tune.`,
+      ].join("\n") + "\n",
+    );
+    if (music?.length) {
+      const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
+      notes.push(
+        `note-block music: ${Math.min(music.length, cap)} notes from the audio track` +
+          (music.length > cap ? ` (capped from ${music.length}; raise --max-notes for the full song)` : "") +
+          `; plays on /function ${pack.namespace}:start.`,
+      );
+    }
+    writePack(pack, opts.out);
+    filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
+    const zip = join(opts.out, `${pack.namespace}.zip`);
+    writeFile(zip, Buffer.from(packageJavaDatapack(pack)));
+    filesWritten.push(zip);
+    notes.push(
+      `TRUE-RGB screen datapack (${opts.width}x${opts.height} px, ${screenFrames.length} frame(s), ${pack.totalCommands} delta cmds): drop ${pack.namespace}.zip into world/datapacks/, /function ${pack.namespace}:setup then :start. Teardown with :teardown.`,
+    );
+    return { target: opts.target, frameCount: screenFrames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
 
   if (opts.target === "map") {
     const mapPal =
@@ -288,7 +383,7 @@ export function render(opts: RenderOptions): RenderResult {
     if (opts.width % MAP_DIM !== 0 || opts.height % MAP_DIM !== 0) {
       throw new Error(`mwframes target requires grid sizes that are multiples of ${MAP_DIM}`);
     }
-    const pool = buildFramePool(q, opts.speedTicks);
+    const pool = buildFramePool(q, speedTicksAuto);
     const binPath = join(opts.out, "frames.bin");
     const mapsPath = join(opts.out, "maps.txt");
     writeFile(binPath, pool.bin);
@@ -321,15 +416,20 @@ export function render(opts: RenderOptions): RenderResult {
       shadingGain > 0
         ? (f: number, x: number, y: number) => pal.entries[q[f]!.paletteIndex[y * q[f]!.width + x]!]!.lab.L
         : undefined;
+    // --wall: FAITHFUL flat video wall — every pixel becomes exactly one block, background
+    // included (framesToFlat3d). The default pipeline instead isolates a subject and inflates
+    // relief, which is right for photos but wrong for reproducing a whole video frame.
     let volumes = applyAnimate(
-      framesToAnimated3d(q, {
-        maxDepth: opts.depth ?? 8,
-        smooth: opts.smooth,
-        curve: opts.curve,
-        symmetric: opts.symmetric,
-        shadingForFrame,
-        shadingGain,
-      }),
+      opts.wall
+        ? framesToFlat3d(q, { depth: 1 })
+        : framesToAnimated3d(q, {
+            maxDepth: opts.depth ?? 8,
+            smooth: opts.smooth,
+            curve: opts.curve,
+            symmetric: opts.symmetric,
+            shadingForFrame,
+            shadingGain,
+          }),
       opts,
     );
     assertNonEmpty3d(volumes);
@@ -342,17 +442,24 @@ export function render(opts: RenderOptions): RenderResult {
       origin: opts.origin,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
       optimize: (cells, r) => greedyBoxes(cells, r),
+      speedTicks: speedTicksAuto,
       music,
       musicOrigin: opts.musicOrigin,
       musicEngine: opts.musicEngine,
+      musicMaxNotes: opts.musicMaxNotes,
+      // --led: glow plane one block outside the face the build looks toward (post-rotation)
+      ledPlane: opts.led ? (opts.facing ?? "south") : undefined,
     });
     if (music?.length) {
       const engine =
         opts.musicEngine === "redstone"
           ? "a physical redstone delay-line plays the note blocks"
           : "a tick-driven playsound clock";
+      const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
       notes.push(
-        `note-block music: ${music.length} notes from the audio track (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`,
+        `note-block music: ${Math.min(music.length, cap)} notes from the audio track` +
+          (music.length > cap ? ` (capped from ${music.length}; raise --max-notes for the full song)` : "") +
+          ` (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`,
       );
     }
     const vv = volumes[0]!;
@@ -365,6 +472,20 @@ export function render(opts: RenderOptions): RenderResult {
     notes.push(
       `3D voxel datapack (${volumes.length} frame(s), ${pack.totalCommands ?? pack.totalSetblocks} cmds): drop ${pack.namespace}.zip into world/datapacks/, /function ${pack.namespace}:setup then :start.`,
     );
+    if (opts.cushionMosaic) {
+      // EXPERIMENTAL side artifact, never inside the datapack zip: cushions are 26.3-snapshot
+      // ENTITIES (flat pads on floors, not blocks) - see docs/cushions-26.3.md. Passing the flag
+      // IS the explicit experimental opt-in the generator requires.
+      const mosaic = cushionMosaicCommands(frames[0]!, { experimental: true, origin: opts.origin });
+      const mosaicPath = join(opts.out, "cushion_mosaic_frame0.mcfunction");
+      writeFile(mosaicPath, mosaic.commands);
+      filesWritten.push(mosaicPath);
+      notes.push(
+        `EXPERIMENTAL cushion floor mosaic (26.3 SNAPSHOT ONLY): frame 0 as ${mosaic.entityCount} summoned cushion entities` +
+          (mosaic.truncated ? " (TRUNCATED at the entity cap)" : "") +
+          ` - cushions are entities laid flat on floors, viewed from above; not blocks, no walls. docs/cushions-26.3.md.`,
+      );
+    }
     return { target: opts.target, frameCount: volumes.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
@@ -402,7 +523,7 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   if (opts.target === "bedrock-script") {
-    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: opts.speedTicks });
+    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: speedTicksAuto });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const mcpack = join(opts.out, "blockdream-script.mcpack");
@@ -414,7 +535,7 @@ export function render(opts: RenderOptions): RenderResult {
 
   if (opts.target === "datapack") {
     const pack = generateJavaDatapack(q, resolveBlock, {
-      speedTicks: opts.speedTicks,
+      speedTicks: speedTicksAuto,
       packFormat: mc.packFormat,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
     });
@@ -428,7 +549,7 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   // behaviorpack
-  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: opts.speedTicks });
+  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: speedTicksAuto });
   writePack(pack, opts.out);
   filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
   const mcpack = join(opts.out, "blockdream.mcpack");
