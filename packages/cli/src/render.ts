@@ -264,9 +264,17 @@ export function render(opts: RenderOptions): RenderResult {
   // source duration) and drift against the real-time music clock. Resample evenly to the ceiling
   // (identical algorithm to the web exporter via the shared planTickPlayback) so duration is
   // preserved and frames are skipped instead. Explicit --speed opts out: raw pacing requested.
+  // --animate on a 3D target replaces the whole clip with procedural block-motion of frame 0,
+  // so a >20 fps resample would be dead work whose note describes frames the pack doesn't have.
+  const animateConsumesClip = opts.animate != null && (opts.target === "voxel3d" || opts.target === "mcstructure3d");
+  if (opts.animate != null && !animateConsumesClip) {
+    // model3d never reaches here (it returns before frame decode), so this is exactly the
+    // "silently ignored" set: 2D walls, screens, and the Bedrock frame-pool targets.
+    notes.push(`--animate only applies to 3D targets (voxel3d/mcstructure3d/model3d) - ignored for --target ${opts.target}.`);
+  }
   let frames = rawFrames;
   let resampledSpeedTicks: number | undefined;
-  if (rawFrames.length > 1 && opts.speedTicks == null && opts.fps != null && opts.fps > 20) {
+  if (rawFrames.length > 1 && !animateConsumesClip && opts.speedTicks == null && opts.fps != null && opts.fps > 20) {
     const plan = planTickPlayback(rawFrames.length, rawFrames.map(() => 1000 / opts.fps!));
     if (plan.resampled) {
       frames = plan.indices.map((i) => rawFrames[i]!);
