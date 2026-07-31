@@ -2,7 +2,7 @@
 
 Deterministic disc input. `pnpm exec tsx packages/voxel/bench/voxel-bench.ts`.
 
-## Absolute timings (machine + load dependent — reference only, NOT a before/after delta)
+## Absolute timings (machine + load dependent - reference only, NOT a before/after delta)
 
 | stage                      |   med (ms) |  M elem/s |
 | -------------------------- | ---------: | --------: |
@@ -13,7 +13,7 @@ Deterministic disc input. `pnpm exec tsx packages/voxel/bench/voxel-bench.ts`.
 | solidify(shell)            |     3.442 |     257.1 |
 | forEachSolid               |     1.953 |     805.4 |
 
-## A/B: optimized vs bounds-checked reference (same run — the rigorous comparison)
+## A/B: optimized vs bounds-checked reference (same run - the rigorous comparison)
 
 | stage            | ref (ms) | opt (ms) | speedup |
 | ---------------- | -------: | -------: | ------: |
