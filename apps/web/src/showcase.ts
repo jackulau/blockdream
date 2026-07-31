@@ -8,7 +8,8 @@ import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt, wireBlockArtDrop } from "./blockart-core";
 import { planGifExport, packingHudText, reportPngDownload } from "./export-plan";
-import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage } from "@blockdream/color-core";
+import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage, type DitherMethod } from "@blockdream/color-core";
+import { quantizeForDatapack } from "./blockart-export";
 import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 // Pure-data subpath (no node:fs/url) so the browser bundle never pulls in the fs-based palette loaders.
 import { JAVA_DATAPACK_SUPPORTED } from "@blockdream/palette/versions";
@@ -207,15 +208,21 @@ ba.loadUrl("/test-assets/pixelart.png"); // preload sample so the section is ali
 // drag & drop an image onto the block-art canvases - shared wiring (same helper as blockart.html)
 wireBlockArtDrop($<HTMLDivElement>("ba-drop"), $<HTMLDivElement>("ba-stats"), (f) => ba.loadFile(f));
 
-// Download a vanilla datapack that builds the current image as a block-wall.
+// Download a vanilla datapack that builds the current image as a block-wall. Export parity:
+// the pack RE-QUANTIZES the source against the placeable solid-block palette (the preview's
+// map-palette frame resolved through the solid resolver left air holes + collapsed blocks),
+// so every emitted cell places a real block - the wall is exactly a solid-palette preview.
 $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
-  const q = ba.getFrame();
-  if (!q) return;
+  const rgb = ba.getSourceRgb(Number($<HTMLInputElement>("ba-grid").value) || 128);
+  if (!rgb) return;
+  const q = quantizeForDatapack(rgb, $<HTMLSelectElement>("ba-dither").value as DitherMethod);
   const pack = generateJavaDatapack([q], resolveBlock, {
     namespace: "blockdream",
     supportedFormats: JAVA_DATAPACK_SUPPORTED,
   });
-  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream:setup`;
+  const animatedNote =
+    ba.getFrameCount() > 1 ? " · animated GIF: current frame only - use section 03 for the full animation" : "";
+  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream:setup${animatedNote}`;
   downloadDatapack("blockdream-blockart-datapack", pack.files);
 });
 
