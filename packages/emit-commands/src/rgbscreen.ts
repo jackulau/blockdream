@@ -316,30 +316,54 @@ export function generateRgbScreenDatapack(
   // alone degenerates the rect to a single chunk for north/east screens.
   const corner0 = pixelPos(origin, facing, W, H, 0, 0);
   const corner1 = pixelPos(origin, facing, W, H, W - 1, 0);
-  const flx0 = Math.min(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
-  const flx1 = Math.max(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
-  const flz0 = Math.min(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
-  const flz1 = Math.max(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
+  const scrX0 = Math.min(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
+  const scrX1 = Math.max(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
+  const scrZ0 = Math.min(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
+  const scrZ1 = Math.max(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
 
   // Optional note-block music, identical wiring to the voxel datapack (shared #play clock,
-  // music loop locked to the animation loop so audio and video never re-phase).
+  // music loop locked to the animation loop on BOTH engines so audio/video never re-phase).
   const music = opts.music && opts.music.length ? opts.music : undefined;
-  const musicOrigin = opts.musicOrigin ?? { x: flx1 + 2, y: origin.y, z: flz1 };
+  const musicOrigin = opts.musicOrigin ?? { x: scrX1 + 2, y: origin.y, z: scrZ1 };
+  const loopTicksOverride = frames.length > 1 ? frames.length * speed : undefined;
   const seq = !music
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
-          const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes });
-          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores, noteCount: r.noteCount, loopTicks: r.loopTicks };
+          const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes, loopTicksOverride });
+          return {
+            physical: r.blocks,
+            musicLines: r.musicLines,
+            setupScores: r.setupScores,
+            noteCount: r.noteCount,
+            loopTicks: r.loopTicks,
+            // input cell at x-1; spine spans `length` cells; note-block tap row at z+1
+            bounds: r.noteCount
+              ? { x0: r.inputPos.x, x1: musicOrigin.x + r.length - 1, z0: musicOrigin.z, z1: musicOrigin.z + 1 }
+              : undefined,
+          };
         })()
       : (() => {
-          const nn = noteSequencer(music, {
-            musicOrigin,
-            maxNotes: opts.musicMaxNotes,
-            loopTicksOverride: frames.length > 1 ? frames.length * speed : undefined,
-          });
-          return { physical: nn.keyboard, musicLines: nn.musicLines, setupScores: nn.setupScores, noteCount: nn.noteCount, loopTicks: nn.loopTicks };
+          const nn = noteSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes, loopTicksOverride });
+          return {
+            physical: nn.keyboard,
+            musicLines: nn.musicLines,
+            setupScores: nn.setupScores,
+            noteCount: nn.noteCount,
+            loopTicks: nn.loopTicks,
+            // one keyboard cell per distinct (instrument, note) along +X
+            bounds: nn.keyboardNotes
+              ? { x0: musicOrigin.x, x1: musicOrigin.x + nn.keyboardNotes - 1, z0: musicOrigin.z, z1: musicOrigin.z }
+              : undefined,
+          };
         })();
+
+  // forceload rect: the screen plane PLUS the physical music area (setblock into an
+  // unloaded chunk fails, and a redstone delay line only ticks in loaded chunks)
+  const flx0 = Math.min(scrX0, seq?.bounds?.x0 ?? scrX0);
+  const flx1 = Math.max(scrX1, seq?.bounds?.x1 ?? scrX1);
+  const flz0 = Math.min(scrZ0, seq?.bounds?.z0 ?? scrZ0);
+  const flz1 = Math.max(scrZ1, seq?.bounds?.z1 ?? scrZ1);
 
   files.set(
     `${fnDir}/setup.mcfunction`,
@@ -512,30 +536,54 @@ export function generateRgbScreenDatapackReference(
   // alone degenerates the rect to a single chunk for north/east screens.
   const corner0 = pixelPos(origin, facing, W, H, 0, 0);
   const corner1 = pixelPos(origin, facing, W, H, W - 1, 0);
-  const flx0 = Math.min(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
-  const flx1 = Math.max(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
-  const flz0 = Math.min(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
-  const flz1 = Math.max(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
+  const scrX0 = Math.min(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
+  const scrX1 = Math.max(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
+  const scrZ0 = Math.min(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
+  const scrZ1 = Math.max(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
 
   // Optional note-block music, identical wiring to the voxel datapack (shared #play clock,
-  // music loop locked to the animation loop so audio and video never re-phase).
+  // music loop locked to the animation loop on BOTH engines so audio/video never re-phase).
   const music = opts.music && opts.music.length ? opts.music : undefined;
-  const musicOrigin = opts.musicOrigin ?? { x: flx1 + 2, y: origin.y, z: flz1 };
+  const musicOrigin = opts.musicOrigin ?? { x: scrX1 + 2, y: origin.y, z: scrZ1 };
+  const loopTicksOverride = frames.length > 1 ? frames.length * speed : undefined;
   const seq = !music
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
-          const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes });
-          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores, noteCount: r.noteCount, loopTicks: r.loopTicks };
+          const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes, loopTicksOverride });
+          return {
+            physical: r.blocks,
+            musicLines: r.musicLines,
+            setupScores: r.setupScores,
+            noteCount: r.noteCount,
+            loopTicks: r.loopTicks,
+            // input cell at x-1; spine spans `length` cells; note-block tap row at z+1
+            bounds: r.noteCount
+              ? { x0: r.inputPos.x, x1: musicOrigin.x + r.length - 1, z0: musicOrigin.z, z1: musicOrigin.z + 1 }
+              : undefined,
+          };
         })()
       : (() => {
-          const nn = noteSequencer(music, {
-            musicOrigin,
-            maxNotes: opts.musicMaxNotes,
-            loopTicksOverride: frames.length > 1 ? frames.length * speed : undefined,
-          });
-          return { physical: nn.keyboard, musicLines: nn.musicLines, setupScores: nn.setupScores, noteCount: nn.noteCount, loopTicks: nn.loopTicks };
+          const nn = noteSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes, loopTicksOverride });
+          return {
+            physical: nn.keyboard,
+            musicLines: nn.musicLines,
+            setupScores: nn.setupScores,
+            noteCount: nn.noteCount,
+            loopTicks: nn.loopTicks,
+            // one keyboard cell per distinct (instrument, note) along +X
+            bounds: nn.keyboardNotes
+              ? { x0: musicOrigin.x, x1: musicOrigin.x + nn.keyboardNotes - 1, z0: musicOrigin.z, z1: musicOrigin.z }
+              : undefined,
+          };
         })();
+
+  // forceload rect: the screen plane PLUS the physical music area (setblock into an
+  // unloaded chunk fails, and a redstone delay line only ticks in loaded chunks)
+  const flx0 = Math.min(scrX0, seq?.bounds?.x0 ?? scrX0);
+  const flx1 = Math.max(scrX1, seq?.bounds?.x1 ?? scrX1);
+  const flz0 = Math.min(scrZ0, seq?.bounds?.z0 ?? scrZ0);
+  const flz1 = Math.max(scrZ1, seq?.bounds?.z1 ?? scrZ1);
 
   files.set(
     `${fnDir}/setup.mcfunction`,
