@@ -89,6 +89,21 @@ class RconConn {
   }
 }
 
+/**
+ * Per-shard accounting attached to a failed {@link RconPool.sendBatch} rejection as
+ * `err.shards` (one entry per connection, in shard order). `sent` counts commands whose
+ * RCON reply was confirmed (they LANDED in the live world); `failed` counts the rest of
+ * that shard (the failing command plus everything after it - unconfirmed, needs repaint).
+ */
+export interface BatchShardReport {
+  /** Shard / connection index. */
+  index: number;
+  /** Commands confirmed landed on this shard. */
+  sent: number;
+  /** Commands not confirmed on this shard (0 on a healthy shard). */
+  failed: number;
+}
+
 export interface RconPoolOptions {
   host: string;
   port: number;
@@ -131,22 +146,45 @@ export class RconPool {
 
   /**
    * Send every command, sharded round-robin across the pool and run concurrently. Resolves
-   * once all have been sent; rejects (after in-flight sends settle) if any failed.
+   * once all have been sent; rejects (after in-flight sends settle) if any failed. A partial
+   * failure leaves the healthy shards' commands ALREADY APPLIED to the live world, so the
+   * rejection carries per-shard accounting - the message spells out landed vs failed counts
+   * per shard plus the aggregate, and `err.shards` holds {@link BatchShardReport}[] (every
+   * shard, in order) for programmatic use - letting the operator tell a corrupt frame from
+   * a sparse delta.
    */
   async sendBatch(commands: string[]): Promise<void> {
     if (commands.length === 0) return;
     const n = this.conns.length;
     const shards: string[][] = Array.from({ length: n }, () => []);
     for (let i = 0; i < commands.length; i++) shards[i % n]!.push(commands[i]!);
+    const sent = new Array<number>(n).fill(0); // per-shard confirmed-landed counters
     const results = await Promise.allSettled(
       shards.map(async (shard, i) => {
-        for (const cmd of shard) await this.conns[i]!.send(cmd);
+        for (const cmd of shard) {
+          await this.conns[i]!.send(cmd);
+          sent[i] = sent[i]! + 1;
+        }
       }),
     );
-    const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
-    if (failed.length > 0) {
-      const reasons = failed.map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason)));
-      throw new Error(`rcon batch: ${failed.length}/${n} connection(s) failed: ${reasons.join("; ")}`);
+    const failedCount = results.filter((r) => r.status === "rejected").length;
+    if (failedCount > 0) {
+      const reports: BatchShardReport[] = shards.map((shard, i) => ({ index: i, sent: sent[i]!, failed: shard.length - sent[i]! }));
+      const landedTotal = sent.reduce((a, b) => a + b, 0);
+      const failedTotal = commands.length - landedTotal;
+      const detail = reports
+        .map((s, i) => {
+          const r = results[i]!;
+          return r.status === "rejected"
+            ? `shard ${s.index}: ${s.sent} landed, ${s.failed} failed (${r.reason instanceof Error ? r.reason.message : String(r.reason)})`
+            : `shard ${s.index}: ${s.sent} landed`;
+        })
+        .join("; ");
+      const err = new Error(
+        `rcon batch: ${failedCount}/${n} connection(s) failed, ${landedTotal}/${commands.length} command(s) landed, ${failedTotal} failed; ${detail}`,
+      ) as Error & { shards: BatchShardReport[] };
+      err.shards = reports;
+      throw err;
     }
   }
 
