@@ -51,6 +51,11 @@ function serializePack(pack: GeneratedPack): string {
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
+const median = (xs: number[]): number => {
+  const s = [...xs].sort((a, b) => a - b);
+  return (s[(s.length - 1) >> 1]! + s[s.length >> 1]!) / 2;
+};
+
 describe("generateRgbScreenDatapack (precomputed-prefix optimization)", () => {
   const cases: Array<[string, RgbScreenFrame[], RgbScreenOptions]> = [
     ["multi-frame irregular deltas, defaults", makeClip(48, 36, 24, 0.3), {}],
@@ -91,6 +96,34 @@ describe("generateRgbScreenDatapack (precomputed-prefix optimization)", () => {
       expect(opt.frameCount).toBe(ref.frameCount);
     });
   }
+
+  // The direct-body-build path (goal 087): a frame whose delta fits the per-function limit has
+  // its body string built directly, skipping the line array + join; an over-limit frame falls
+  // back to the array + writeSplitFunction path. This clip pins the BOUNDARY deterministically:
+  // frame 1's delta is EXACTLY the limit (must stay a single file), frame 2's is limit+1 (must
+  // split into parts), and the wrap delta (frame 0) is over the limit too.
+  it("split boundary: a frame at exactly the limit stays single, one past it splits, all byte-identical", () => {
+    const W = 20, H = 10, n = W * H;
+    const limit = 50;
+    const A = argbInt(10, 20, 30), B = argbInt(200, 100, 50), C = argbInt(5, 250, 125);
+    const f0 = new Int32Array(n).fill(A);
+    const f1 = new Int32Array(f0);
+    for (let i = 0; i < limit; i++) f1[i] = B; // delta exactly == limit
+    const f2 = new Int32Array(f1);
+    for (let i = 100; i <= 100 + limit; i++) f2[i] = C; // delta == limit+1
+    const frames: RgbScreenFrame[] = [f0, f1, f2].map((argb) => ({ width: W, height: H, argb }));
+    const opts: RgbScreenOptions = { maxCommandsPerFunction: limit };
+    const opt = generateRgbScreenDatapack(frames, opts);
+    const ref = generateRgbScreenDatapackReference(frames, opts);
+    const fnDir = `data/${opt.namespace}/function`;
+    expect(opt.files.has(`${fnDir}/frames/1.mcfunction`)).toBe(true);
+    expect(opt.files.has(`${fnDir}/frames/1/part0.mcfunction`)).toBe(false); // == limit: single file
+    expect(opt.files.has(`${fnDir}/frames/2/part0.mcfunction`)).toBe(true); // limit+1: split
+    expect(opt.files.has(`${fnDir}/frames/2/part1.mcfunction`)).toBe(true);
+    expect(opt.files.has(`${fnDir}/frames/0/part0.mcfunction`)).toBe(true); // wrap delta (101) splits
+    expect(serializePack(opt)).toBe(serializePack(ref));
+    expect(opt.totalCommands).toBe(ref.totalCommands);
+  });
 
   // Same-run interleaved A/B on the CHANGED loop (same style as bench-smoke.test.ts
   // runAB, which times each optimized loop against its reference): both delta-line
@@ -152,10 +185,6 @@ describe("generateRgbScreenDatapack (precomputed-prefix optimization)", () => {
         refTimes.push(timed(runRef));
       }
     }
-    const median = (xs: number[]): number => {
-      const s = [...xs].sort((a, b) => a - b);
-      return (s[(s.length - 1) >> 1]! + s[s.length >> 1]!) / 2;
-    };
     const refMs = median(refTimes);
     const optMs = median(optTimes);
     expect(optMs).toBeGreaterThan(0);
@@ -163,5 +192,47 @@ describe("generateRgbScreenDatapack (precomputed-prefix optimization)", () => {
     // the optimization changes nothing but speed; measured ~1.3-2x locally, assert only
     // strictly-faster so a busy CI box cannot flake the gate
     expect(optMs).toBeLessThan(refMs);
+  });
+
+  // Goal 087 D12: whole-pack A/B. The delta-line hot-loop test above is the PERF GATE for
+  // this optimization; whole-pack timing stays a no-regression check only. Even with each
+  // timed sample batching 3 whole packs to amortize GC (a single pack's time is bimodal -
+  // a major GC either lands in it or not - measured 0.4x-2.4x single-pack swing), the
+  // end-to-end ratio still dipped to 0.94x-1.21x under a saturated box while the hot loop
+  // held its speedup: whole-pack time is dominated by a shared uuid/prefix/summon/GC floor
+  // that timing cannot attribute fairly (same lesson as the goal 086 GIF encoder gate).
+  // So: byte-identity always, and a 0.8x floor that only catches a real regression.
+  it("whole-pack generation is byte-identical to the reference AND not slower (same-run interleaved batched medians, no-regression floor)", { retry: 2, timeout: 120000 }, () => {
+    const frames = makeClip(64, 48, 96, 0.4); // bench-default workload: 3072 px, 96 frames
+    // byte identity of the full emitted pack (also JIT warmup for both paths)
+    const opt0 = generateRgbScreenDatapack(frames);
+    const ref0 = generateRgbScreenDatapackReference(frames);
+    expect(serializePack(opt0)).toBe(serializePack(ref0));
+    const refTimes: number[] = [];
+    const optTimes: number[] = [];
+    const optBatch = () => {
+      for (let k = 0; k < 3; k++) generateRgbScreenDatapack(frames);
+    };
+    const refBatch = () => {
+      for (let k = 0; k < 3; k++) generateRgbScreenDatapackReference(frames);
+    };
+    const timed = (fn: () => unknown): number => {
+      const t = performance.now();
+      fn();
+      return performance.now() - t;
+    };
+    for (let iter = 0; iter < 8; iter++) {
+      if (iter % 2 === 0) {
+        refTimes.push(timed(refBatch));
+        optTimes.push(timed(optBatch));
+      } else {
+        optTimes.push(timed(optBatch));
+        refTimes.push(timed(refBatch));
+      }
+    }
+    const refMs = median(refTimes);
+    const optMs = median(optTimes);
+    expect(optMs).toBeGreaterThan(0);
+    expect(refMs / optMs).toBeGreaterThanOrEqual(0.8);
   });
 });

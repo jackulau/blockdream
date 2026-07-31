@@ -55,9 +55,11 @@
       .card .sub { color: var(--ink-dim); font-size: var(--text-sm); margin: 0 0 var(--space-4); line-height: var(--leading-snug); }
       .stage { display: flex; gap: var(--space-4); align-items: flex-start; flex-wrap: wrap; }
       canvas { image-rendering: pixelated; background: #000; border: 1px solid var(--line); border-radius: var(--radius); max-width: 100%; }
-      .mc-canvas { width: 320px; height: 320px; }
-      .dr-rgb { width: 260px; height: 260px; }
-      .dr-bev { width: 150px; height: 150px; }
+      /* square canvases: aspect-ratio (not a fixed height) so the global max-width:100%
+         shrink on narrow phones keeps them square instead of squashing them vertically */
+      .mc-canvas { width: 320px; aspect-ratio: 1; height: auto; }
+      .dr-rgb { width: 260px; aspect-ratio: 1; height: auto; }
+      .dr-bev { width: 150px; aspect-ratio: 1; height: auto; }
       .row { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin-top: var(--space-3); }
       select, input[type="range"], input[type="file"], input[type="url"], input[type="text"], button.ui {
         background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--radius); padding: var(--space-2) var(--space-3); font-size: var(--text-sm); font-family: inherit;
@@ -73,7 +75,9 @@
       button.ui:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
       button.ui:disabled { opacity: 0.4; cursor: not-allowed; }
       #ba-drop.drag, #v3-drop.drag { outline: 2px dashed var(--accent); outline-offset: 6px; border-radius: var(--radius-lg); }
-      .hud { font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.5; color: var(--accent-2); white-space: pre; margin-top: var(--space-2); min-height: 3em; }
+      /* pre-wrap (not pre): long one-line HUD errors wrap instead of forcing the whole document
+         to scroll sideways on mobile; the \n two-line stats lines still break as written */
+      .hud { font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.5; color: var(--accent-2); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: var(--space-2); min-height: 3em; }
       .pill { font-family: var(--font-mono); font-size: var(--text-xs); padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-dim); }
       .pill.ok { color: var(--accent); border-color: rgba(99, 189, 132, 0.4); } .pill.err { color: #e8a097; border-color: #6b2b25; } .pill.idle { color: var(--ink-faint); }
       .keyhint { color: var(--ink-faint); font-size: var(--text-xs); margin-top: var(--space-2); }
@@ -167,6 +171,7 @@
                 </select>
               </label>
               <button id="mc-reset" class="ui">reset</button>
+              <button id="mc-connect" class="ui">reconnect</button>
             </div>
             <div id="mc-hud" class="hud">idle</div>
           </div>
@@ -184,11 +189,12 @@
                 <figcaption>LiDAR - n/a (camera-only)</figcaption>
               </figure>
             </div>
-            <div class="row"><button id="dr-reset" class="ui">reset</button></div>
+            <div class="row"><button id="dr-reset" class="ui">reset</button> <button id="dr-connect" class="ui">reconnect</button></div>
             <div id="dr-hud" class="hud">idle</div>
           </div>
         </div>
         <p class="keyhint">Tip: click a canvas, then use the keys. Both worlds keep generating even with no input.</p>
+        <p class="keyhint">Standalone testers (server URL + engine controls): <a href="/world-model.html">world-model</a> · <a href="/driving.html">driving</a> · <a href="/blockart.html">block-art</a></p>
       </section>
 
       <section class="block" data-reveal>
@@ -218,7 +224,7 @@
             <h3>Blocks used</h3>
             <div class="row" style="margin-bottom:.5rem">
               <button id="ba-download" class="ui" disabled>Download datapack (.zip)</button>
-              <button id="ba-png" class="ui">Download PNG</button>
+              <button id="ba-png" class="ui" disabled>Download PNG</button>
             </div>
             <div id="ba-export" style="font-size:.74rem;color:var(--dim);margin-bottom:.5rem"></div>
             <ul id="ba-bom" class="bom"></ul>
@@ -346,6 +352,7 @@
 
       <footer data-reveal>
         <span><span class="brand">blockdream</span> · neural Minecraft &amp; driving world models + block-art · runs locally</span>
+        <span>testers: <a href="/world-model.html">world-model</a> · <a href="/driving.html">driving</a> · <a href="/blockart.html">block-art</a></span>
         <span>by <strong>Jack Lau</strong> · <a href="https://github.com/jackulau/blockdream" target="_blank" rel="noopener">GitHub</a> · <a href="https://www.linkedin.com/in/-jacklau/" target="_blank" rel="noopener">LinkedIn</a></span>
       </footer>
     </div>

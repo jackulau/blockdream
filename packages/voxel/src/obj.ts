@@ -49,6 +49,9 @@ export function parseObj(obj: string): { verts: V3[]; tris: Tri[]; colors?: V3[]
         const n = parseInt(s.split("/")[0]!, 10);
         return n < 0 ? verts.length + n : n - 1; // OBJ is 1-indexed; negatives are relative
       });
+      // a row like "f //1 //2 //3" parses to NaN indices (parseInt("") = NaN), which sail past the
+      // rasterizer's range guard (every NaN comparison is false) and crash on verts[NaN] - skip it
+      if (idx.some((n) => !Number.isFinite(n))) continue;
       for (let i = 1; i + 1 < idx.length; i++) tris.push([idx[0]!, idx[i]!, idx[i + 1]!]); // fan-triangulate
     }
   }
@@ -100,6 +103,9 @@ export function trisToVolume(verts: V3[], tris: Tri[], opts: RasterOptions = {})
   const vol = createVolume(res, res, res);
   for (let t = 0; t < tris.length; t++) {
     const [ia, ib, ic] = tris[t]!;
+    // Number.isInteger also rejects NaN, which passes every < / >= comparison (defense for callers
+    // that build tris without parseObj - gltf.ts and direct trisToVolume use)
+    if (!Number.isInteger(ia) || !Number.isInteger(ib) || !Number.isInteger(ic)) continue;
     if (ia < 0 || ib < 0 || ic < 0 || ia >= verts.length || ib >= verts.length || ic >= verts.length) continue;
     const color = opts.colorOf?.(t) ?? fallback;
     const a = grid(verts[ia]!);

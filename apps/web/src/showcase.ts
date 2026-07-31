@@ -6,7 +6,8 @@ import "./style.css"; // design system: tokens (sumi/washi palette, type/space/m
 import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
-import { createBlockArt } from "./blockart-core";
+import { createBlockArt, blockArtDropMessage } from "./blockart-core";
+import { planGifExport, packingHudText, reportPngDownload } from "./export-plan";
 import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage } from "@blockdream/color-core";
 import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 // Pure-data subpath (no node:fs/url) so the browser bundle never pulls in the fs-based palette loaders.
@@ -96,6 +97,10 @@ const mcViewer = new Viewer({
   onStatus: (t, cls) => pill(mcStatus, cls === "ok" ? `live · ${mcSkill.value}` : t, cls),
 });
 $<HTMLButtonElement>("mc-reset").addEventListener("click", () => mcViewer.reset());
+// retry affordance: without local servers the auto-connect fails once and the section used to be
+// a dead end - reconnect re-runs the same connect the page does on load (Connect-button pattern
+// from the standalone driving.html / world-model.html testers).
+$<HTMLButtonElement>("mc-connect").addEventListener("click", () => mcViewer.connect());
 mcSkill.addEventListener("change", () => {
   if (mcViewer.connected) {
     mcViewer.reset();
@@ -159,6 +164,7 @@ const drViewer = new Viewer({
   onStatus: (t, cls) => pill(drStatus, cls === "ok" ? "live" : t, cls),
 });
 $<HTMLButtonElement>("dr-reset").addEventListener("click", () => drViewer.reset());
+$<HTMLButtonElement>("dr-connect").addEventListener("click", () => drViewer.connect());
 
 // --- block art -----------------------------------------------------------------
 const ba = createBlockArt({
@@ -173,8 +179,10 @@ const ba = createBlockArt({
   tooltip: $<HTMLDivElement>("ba-tooltip"),
 }, {
   onRender: (q) => {
-    const dl = $<HTMLButtonElement>("ba-download");
-    dl.disabled = false;
+    // both exports need a frame: enable them together (PNG used to ship enabled and silently
+    // no-op when clicked before the first render)
+    $<HTMLButtonElement>("ba-download").disabled = false;
+    $<HTMLButtonElement>("ba-png").disabled = false;
     $<HTMLDivElement>("ba-export").textContent = `${q.width}×${q.height} = ${q.width * q.height} blocks · 1 frame`;
   },
 });
@@ -194,7 +202,12 @@ for (const e of ["dragleave", "drop"]) {
 baDrop.addEventListener("drop", (ev) => {
   ev.preventDefault();
   const f = (ev as DragEvent).dataTransfer?.files?.[0];
-  if (f && f.type.startsWith("image/")) void ba.loadFile(f); // GIF → animated, else static
+  if (!f) return;
+  // extension-first routing (classifyImportFile): an OS drag with an empty MIME type still
+  // loads by its name, and a non-image gets a helpful message instead of a silent no-op.
+  const msg = blockArtDropMessage(f);
+  if (msg) $<HTMLDivElement>("ba-stats").textContent = msg;
+  else void ba.loadFile(f); // GIF → animated, else static
 });
 
 // Download a vanilla datapack that builds the current image as a block-wall.
@@ -215,8 +228,13 @@ $<HTMLButtonElement>("ba-png").addEventListener("click", () => {
   const q = ba.getFrame();
   if (!q) return;
   const raster = upscaleNearest(quantizedToRaster(q), fitScale(q.width, q.height, 512));
-  void downloadPng("blockdream-blockart.png", raster);
-  $<HTMLDivElement>("ba-export").textContent = `PNG: ${raster.width}×${raster.height} px`;
+  // honest status: success text only once the encode resolved; a rejection ("PNG encode
+  // failed") lands in the same line instead of an unhandled rejection under a success claim.
+  void reportPngDownload(
+    downloadPng("blockdream-blockart.png", raster),
+    $<HTMLDivElement>("ba-export"),
+    `PNG: ${raster.width}×${raster.height} px`,
+  );
 });
 
 // auto-connect both world models so the page "just works"
@@ -810,6 +828,9 @@ async function setup3dViewer(): Promise<void> {
         // front face of each thin slab IS the source frame, block-for-block - the frames ARE the motion,
         // played at the GIF's real per-frame timing. Transparent pixels (canvas alpha) map to air.
         const { canvases, durationsMs } = await decodeGif(gif);
+        // a 0-frame decode (ImageDecoder reports frameCount 0 for a truncated/corrupt GIF) would
+        // dereference canvases[0] below - fail with a clean message instead of a TypeError.
+        if (!canvases.length) throw new Error(`couldn't decode ${gif.name} (the GIF has no frames)`);
         const gw = flatGridWidth(canvases.length, (canvases[0]!.height || 3) / (canvases[0]!.width || 4));
         const decoded = canvases.map((c) => rgbAndAirFromCanvas(c, gw));
         const rgb = decoded.map((d) => d.rgb);
@@ -1023,34 +1044,41 @@ async function setup3dViewer(): Promise<void> {
     const plan = planTickPlayback(allFrames.length, durationsMs);
     const frames = plan.resampled ? plan.indices.map((i) => allFrames[i]!) : allFrames;
     // Export-budget guard: one .mcfunction per frame; warn (do not block) past the tested budget.
+    // The warning + "packing…" go to the HUD BEFORE the synchronous generate+zip (which can take
+    // seconds on a long clip), not only into the after-text of a freeze the user already sat through.
     const budget = planExportBudget(frames.length);
     if (budget.warn) console.warn(`blockdream export: ${budget.message}`);
-    // the viewer centers the build + the note-block row on their group positions; pass each object's
-    // half-extent so the export lands them centered where they sit on screen (not corner-offset).
-    const v0 = frames[0];
-    const distinctNotes = new Set(current3dMusic.map((n) => n.note)).size;
-    const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 }, {
-      buildHalf: v0 ? { x: v0.sx / 2, z: v0.sz / 2 } : undefined,
-      musicHalf: { x: (distinctNotes - 1) / 2, z: 0 },
-    });
-    const pack = generateVoxelDatapack(frames, resolveBlock, {
-      namespace: "blockdream_3d",
-      supportedFormats: JAVA_DATAPACK_SUPPORTED,
-      optimize: (cells, r) => greedyBoxes(cells, r),
-      origin: placement.origin,
-      music: placement.music,
-      musicOrigin: placement.musicOrigin,
-      speedTicks: plan.speedTicks,
-    });
-    const cmds = pack.totalCommands ?? pack.totalSetblocks;
-    const musicNote = placement.music ? ` · ${placement.music.length} note-block notes` : "";
-    const paceNote = plan.resampled
-      ? ` · in-game 20 fps (Minecraft's 1-frame-per-tick ceiling; ${allFrames.length} → ${frames.length} frames, same duration)`
-      : ` · in-game ${plan.fps} fps`;
-    const budgetNote = budget.warn ? ` · WARNING: ${budget.message}` : "";
-    $<HTMLDivElement>("v3-export").textContent =
-      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote}${budgetNote} · /function blockdream_3d:setup`;
-    downloadDatapack("blockdream-3d-datapack", pack.files);
+    hud.textContent = packingHudText(budget, frames.length);
+    setTimeout(() => {
+      // (timeout lets the HUD paint before the synchronous per-frame generation)
+      // the viewer centers the build + the note-block row on their group positions; pass each object's
+      // half-extent so the export lands them centered where they sit on screen (not corner-offset).
+      const v0 = frames[0];
+      const distinctNotes = new Set(current3dMusic.map((n) => n.note)).size;
+      const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 }, {
+        buildHalf: v0 ? { x: v0.sx / 2, z: v0.sz / 2 } : undefined,
+        musicHalf: { x: (distinctNotes - 1) / 2, z: 0 },
+      });
+      const pack = generateVoxelDatapack(frames, resolveBlock, {
+        namespace: "blockdream_3d",
+        supportedFormats: JAVA_DATAPACK_SUPPORTED,
+        optimize: (cells, r) => greedyBoxes(cells, r),
+        origin: placement.origin,
+        music: placement.music,
+        musicOrigin: placement.musicOrigin,
+        speedTicks: plan.speedTicks,
+      });
+      const cmds = pack.totalCommands ?? pack.totalSetblocks;
+      const musicNote = placement.music ? ` · ${placement.music.length} note-block notes` : "";
+      const paceNote = plan.resampled
+        ? ` · in-game 20 fps (Minecraft's 1-frame-per-tick ceiling; ${allFrames.length} → ${frames.length} frames, same duration)`
+        : ` · in-game ${plan.fps} fps`;
+      const budgetNote = budget.warn ? ` · WARNING: ${budget.message}` : "";
+      $<HTMLDivElement>("v3-export").textContent =
+        `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote}${budgetNote} · /function blockdream_3d:setup`;
+      hud.textContent = `datapack packed · ${pack.frameCount} frames`;
+      downloadDatapack("blockdream-3d-datapack", pack.files);
+    }, 30);
   });
 
   // Download the animation as an animated GIF in PIXEL/BLOCK format: each frame's front block face,
@@ -1059,25 +1087,39 @@ async function setup3dViewer(): Promise<void> {
   $<HTMLButtonElement>("v3-gif").addEventListener("click", () => {
     const { frames, durationsMs } = exportFrames();
     if (!frames.length) return;
-    if (frames.length < 2) {
-      // one still frame - a GIF would not animate; steer the user to PNG (and still emit a 1-frame GIF).
-      hud.textContent = "single still · exporting a 1-frame GIF (use Download PNG for a still image)";
+    // Memory-budget guard BEFORE any per-frame raster is allocated: a long high-fps clip
+    // (up to 13200 frames) padded + upscaled to RGBA is gigabytes - that synchronous path
+    // froze or killed the tab with no warning. Hard cap with the honest math in the HUD.
+    const plan = planGifExport(frames.map((f) => ({ sx: f.sx, sy: f.sy })));
+    if (!plan.ok) {
+      hud.textContent = plan.message;
+      return;
     }
-    const W = Math.max(...frames.map((f) => f.sx));
-    const H = Math.max(...frames.map((f) => f.sy));
-    const scale = fitScale(W, H, 384);
-    const gif: GifFrame[] = frames.map((f, i) => ({
-      raster: upscaleNearest(padRaster(flatVolumeToRaster(f), W, H), scale),
-      delayMs: durationsMs?.[i] ?? 70,
-    }));
-    try {
-      downloadGif("blockdream-animation.gif", gif);
-      $<HTMLDivElement>("v3-export").textContent =
-        `GIF: ${W * scale}×${H * scale} px · ${gif.length} frame${gif.length > 1 ? "s" : ""}`;
-    } catch (err) {
-      log.warn("GIF export failed", err);
-      $<HTMLDivElement>("v3-export").textContent = `GIF export failed: ${(err as Error).message}`;
-    }
+    hud.textContent =
+      frames.length < 2
+        ? // one still frame - a GIF would not animate; steer the user to PNG (and still emit a 1-frame GIF).
+          "single still · exporting a 1-frame GIF (use Download PNG for a still image)"
+        : plan.message; // "encoding N GIF frames at WxH…"
+    setTimeout(() => {
+      // (timeout lets the HUD paint before the synchronous rasterize + encode)
+      const W = Math.max(...frames.map((f) => f.sx));
+      const H = Math.max(...frames.map((f) => f.sy));
+      const scale = fitScale(W, H, 384);
+      const gif: GifFrame[] = frames.map((f, i) => ({
+        raster: upscaleNearest(padRaster(flatVolumeToRaster(f), W, H), scale),
+        delayMs: durationsMs?.[i] ?? 70,
+      }));
+      try {
+        downloadGif("blockdream-animation.gif", gif);
+        $<HTMLDivElement>("v3-export").textContent =
+          `GIF: ${W * scale}×${H * scale} px · ${gif.length} frame${gif.length > 1 ? "s" : ""}`;
+        hud.textContent = `GIF ready · ${gif.length} frame${gif.length > 1 ? "s" : ""}`;
+      } catch (err) {
+        log.warn("GIF export failed", err);
+        $<HTMLDivElement>("v3-export").textContent = `GIF export failed: ${(err as Error).message}`;
+        hud.textContent = `GIF export failed: ${(err as Error).message}`;
+      }
+    }, 30);
   });
 
   // Download the currently-shown frame as a crisp PNG (the block/pixel image).
@@ -1086,8 +1128,12 @@ async function setup3dViewer(): Promise<void> {
     if (!frames.length) return;
     const i = Math.min(frames.length - 1, Math.max(0, Math.round(Number(scrub.value)) || 0));
     const f = frames[i]!;
-    void downloadPng("blockdream-frame.png", upscaleNearest(flatVolumeToRaster(f), fitScale(f.sx, f.sy, 512)));
-    $<HTMLDivElement>("v3-export").textContent = `PNG: frame ${i + 1}/${frames.length}`;
+    // honest status: report success only after the encode resolves, failure into the same line
+    void reportPngDownload(
+      downloadPng("blockdream-frame.png", upscaleNearest(flatVolumeToRaster(f), fitScale(f.sx, f.sy, 512))),
+      $<HTMLDivElement>("v3-export"),
+      `PNG: frame ${i + 1}/${frames.length}`,
+    );
   });
 
   playBtn.addEventListener("click", () => {

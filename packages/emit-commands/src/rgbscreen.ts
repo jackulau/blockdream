@@ -168,11 +168,13 @@ function fmtF(n: number): string {
 }
 
 /**
- * HOT LOOP: one frame's delta lines from precomputed per-pixel command prefixes.
+ * One frame's delta lines from precomputed per-pixel command prefixes.
  * `mergePrefix[i]` is `data merge entity <uuid> {background:` for pixel i, so each
  * changed pixel costs one prefix + int + "}" concat instead of rebuilding the whole
- * template (~2x faster line building; on a 2,191-frame clip this loop emits millions
- * of lines). Byte-identical to referenceRgbScreenDeltaLines (locked by
+ * template (~2x faster line building). Since the direct-body-build optimization in
+ * generateRgbScreenDatapack, this array form serves the SPLIT case (a frame whose
+ * delta exceeds the per-function limit and must be chunked into part files) and the
+ * bench A/B. Byte-identical to referenceRgbScreenDeltaLines (locked by
  * rgbscreen-perf.test.ts).
  */
 export function rgbScreenDeltaLines(cur: Int32Array, prev: Int32Array, mergePrefix: string[]): string[] {
@@ -202,10 +204,12 @@ export function referenceRgbScreenDeltaLines(cur: Int32Array, prev: Int32Array, 
  * Hot path: on a real clip (e.g. 2,191 frames) the delta loop emits millions of
  * `data merge entity <uuid> {background:<argb>}` lines. Rebuilding that template per
  * changed pixel per frame re-concatenates the constant prefix millions of times, so the
- * per-pixel prefix is precomputed ONCE (`mergePrefix`) and each delta line is built by
- * rgbScreenDeltaLines as a single prefix + int + "}" concat. Same for the summon loop:
- * every part of the summon string except position, UUID, and frame-0 color is
- * loop-invariant and hoisted. Output is byte-for-byte identical to
+ * per-pixel prefix is precomputed ONCE (`mergePrefix`). A frame that fits one function
+ * file (the common case) has its body string built DIRECTLY - one += per changed pixel -
+ * skipping the intermediate line array + join that writeSplitFunction would do; only an
+ * over-limit frame takes the array + split path (via rgbScreenDeltaLines). Same for the
+ * summon loop: every part of the summon string except position, UUID, and frame-0 color
+ * is loop-invariant and hoisted. Output is byte-for-byte identical to
  * generateRgbScreenDatapackReference (locked by rgbscreen-perf.test.ts).
  */
 export function generateRgbScreenDatapack(
@@ -265,17 +269,43 @@ export function generateRgbScreenDatapack(
   }
   writeSplitFunction(files, `${fnDir}/screen`, summons, limit, (k) => `function ${ns}:screen/part${k}`, `# summon the ${W}x${H} pixel grid (frame 0 baked in)`);
 
-  // per-frame deltas; frames/0 is the WRAP delta (last → 0)
+  // per-frame deltas; frames/0 is the WRAP delta (last → 0).
+  // One cheap diff scan per frame collects the CHANGED pixel indexes (reusable Int32Array, no
+  // per-frame allocation): the count fixes the header AND picks the write path. In the common
+  // case the frame fits ONE function file, so the body string is built directly (one += of the
+  // precomputed prefix + int + "}\n" per changed pixel) instead of pushing ~100k lines into an
+  // array that writeSplitFunction immediately joins. Byte-identical: `join("\n") + "\n"` over N
+  // lines IS the concatenation of `line + "\n"`, and the zero-line body is exactly one extra
+  // "\n". A frame over the limit falls back to the array + writeSplitFunction path unchanged
+  // (the split case).
   let totalSetblocks = 0;
   let totalCommands = 0;
+  const changedIdx = new Int32Array(n);
   for (let f = 0; f < frames.length; f++) {
     const cur = frames[f]!.argb;
     const prev = frames[(f - 1 + frames.length) % frames.length]!.argb;
-    const lines: string[] = frames.length > 1 ? rgbScreenDeltaLines(cur, prev, mergePrefix) : [];
-    totalSetblocks += lines.length;
-    totalCommands += lines.length;
-    const header = `# frame ${f}${f === 0 ? " (wrap Δ from last)" : ""} (Δ ${lines.length})`;
-    writeSplitFunction(files, `${fnDir}/frames/${f}`, lines, limit, (k) => `function ${ns}:frames/${f}/part${k}`, header);
+    let changed = 0;
+    if (frames.length > 1) {
+      for (let i = 0; i < n; i++) if (cur[i] !== prev[i]) changedIdx[changed++] = i;
+    }
+    totalSetblocks += changed;
+    totalCommands += changed;
+    const header = `# frame ${f}${f === 0 ? " (wrap Δ from last)" : ""} (Δ ${changed})`;
+    if (changed <= limit) {
+      let body = header + "\n";
+      if (changed > 0) {
+        for (let k = 0; k < changed; k++) {
+          const i = changedIdx[k]!;
+          body += mergePrefix[i]! + cur[i] + "}\n";
+        }
+      } else {
+        body += "\n"; // the reference join over ZERO lines still appends its one trailing newline
+      }
+      files.set(`${fnDir}/frames/${f}.mcfunction`, body);
+    } else {
+      const lines = rgbScreenDeltaLines(cur, prev, mergePrefix);
+      writeSplitFunction(files, `${fnDir}/frames/${f}`, lines, limit, (k) => `function ${ns}:frames/${f}/part${k}`, header);
+    }
   }
 
   files.set(`${fnDir}/play.mcfunction`, `$function ${ns}:frames/$(idx)\n`);

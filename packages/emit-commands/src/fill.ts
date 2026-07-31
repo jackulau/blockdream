@@ -103,15 +103,32 @@ export function greedyBoxes(cells: PlacedCell[], resolve: (mapColorId: number) =
   // for the bounded solid palette, but keeps the Uint16 grid honest).
   const blockList: string[] = [];
   const blockId = new Map<string, number>();
+  // Per-call memo: mapColorId → 1-based palette id. `resolve` takes ONLY the map-colour id (a
+  // byte: ≤256 distinct values in practice), yet the old loop called it - building a fresh block
+  // string - and re-hashed that string through `blockId` for EVERY cell (~300k times on a real
+  // build). Memoized, `resolve` runs once per DISTINCT id, and only that first sight goes through
+  // the string Map, so the palette dedup stays exact: two ids resolving to the SAME block string
+  // still share one palette id, assigned in the same first-seen order, and output is
+  // byte-identical. The memo is fresh per call (a caller-supplied resolver is never assumed
+  // stable across calls); a non-byte id (outside 0..255, or fractional) skips the memo and takes
+  // the original per-cell path.
+  const idByColor = new Int32Array(256); // 0 = unseen (palette ids are 1-based)
   const grid = new Uint16Array(vol);
   for (const c of cells) {
-    const b = resolve(c.mapColorId);
-    let id = blockId.get(b);
-    if (id === undefined) {
-      id = blockList.length + 1;
-      if (id > 0xffff) return greedyBoxesSparse(cells, resolve);
-      blockId.set(b, id);
-      blockList.push(b);
+    const m = c.mapColorId;
+    const memoable = m >= 0 && m < 256 && Number.isInteger(m);
+    let id = memoable ? idByColor[m]! : 0;
+    if (id === 0) {
+      const b = resolve(m);
+      let got = blockId.get(b);
+      if (got === undefined) {
+        got = blockList.length + 1;
+        if (got > 0xffff) return greedyBoxesSparse(cells, resolve);
+        blockId.set(b, got);
+        blockList.push(b);
+      }
+      id = got;
+      if (memoable) idByColor[m] = id;
     }
     grid[((c.z - minZ) * H + (c.y - minY)) * W + (c.x - minX)] = id;
   }

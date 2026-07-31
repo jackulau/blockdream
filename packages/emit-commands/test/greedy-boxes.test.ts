@@ -28,6 +28,12 @@ describe("greedyBoxes (typed-array grid optimization)", () => {
     ["mixed runs + singletons", [{ x: 0, y: 0, z: 0, mapColorId: 1 }, { x: 1, y: 0, z: 0, mapColorId: 1 }, { x: 5, y: 5, z: 5, mapColorId: 2 }]],
     ["uniform solid over the /fill cap (fillLines split)", block(40, 40, 40, () => 3)], // 64000 > 32768 → splits
     ["checkerboard (many tiny boxes)", block(12, 12, 4, (x, y, z) => (x + y + z) % 2)],
+    // resolve is id%5, so ids 1/6/11 (and 2/7) are DISTINCT map-colour ids resolving to the SAME
+    // block string: the per-call mapColorId memo must give them ONE palette id (string-Map dedup
+    // preserved) or boxes would stop merging across them.
+    ["distinct ids, same resolved block", block(10, 6, 3, (x, y) => (y % 2 === 0 ? [1, 2][x % 2]! : [6, 7, 11][x % 3]!))],
+    // ids outside the byte memo (300, -4, 2.5) must skip it and still match the reference.
+    ["non-byte map-colour ids (memo bypass)", block(8, 4, 2, (x, y, z) => [300, -4, 2.5, 1][(x + y + z) % 4]!)],
   ];
 
   for (const [name, cells] of cases) {
@@ -35,6 +41,25 @@ describe("greedyBoxes (typed-array grid optimization)", () => {
       expect(greedyBoxes(cells, resolve)).toEqual(greedyBoxesSparse(cells, resolve));
     });
   }
+
+  it("merges a run of DISTINCT map-colour ids that resolve to the same block into one fill", () => {
+    // ids 1 and 6 both resolve to minecraft:b1; if the memo broke the string-Map dedup they would
+    // get different palette ids and this row would emit two commands instead of one fill.
+    const cells: PlacedCell[] = [1, 6, 1, 6, 1, 6].map((id, x) => ({ x, y: 0, z: 0, mapColorId: id }));
+    const out = greedyBoxes(cells, resolve);
+    expect(out).toEqual(["fill 0 0 0 5 0 0 minecraft:b1 replace"]);
+    expect(out).toEqual(greedyBoxesSparse(cells, resolve));
+  });
+
+  it("calls resolve once per distinct byte map-colour id, not once per cell", () => {
+    let calls = 0;
+    const counting = (id: number): string => {
+      calls++;
+      return "minecraft:b" + (id % 5);
+    };
+    greedyBoxes(block(16, 16, 4, (x, y, z) => (x + y + z) % 7), counting); // 1024 cells, 7 distinct ids
+    expect(calls).toBe(7);
+  });
 
   it("falls back correctly when the bounding box exceeds the dense-grid cap", () => {
     // two cells 4000 apart → a 4001³ bounding box ≫ GREEDY_GRID_CAP → must use the string-key path

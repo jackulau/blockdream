@@ -25,7 +25,8 @@ export interface ExtractOptions {
  */
 export function extractFrames(input: string, opts: ExtractOptions): RgbImage[] {
   const { width, height } = opts;
-  if (width <= 0 || height <= 0) throw new Error("width/height must be > 0");
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+    throw new Error("width/height must be > 0");
   const flags = opts.scaleFlags ?? "area";
   const vf: string[] = [];
   if (opts.fps && opts.fps > 0) vf.push(`fps=${opts.fps}`);
