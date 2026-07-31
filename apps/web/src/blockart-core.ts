@@ -12,6 +12,7 @@ import {
 } from "@blockdream/color-core";
 import javaMapPalette from "@blockdream/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@blockdream/palette";
+import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 import { blockForBase, swatchDataUrl, localTextureUrl, hasLocalTextures, loadTextureManifest } from "./blocks";
 import { decodeGif, isGif } from "./gif";
 import { buildSchedule, frameAtElapsed, type FrameSchedule } from "./anim";
@@ -43,6 +44,54 @@ export function blockArtDropMessage(f: { name?: string; type?: string }): string
   if (kind === "video") return `${name} is a video · the 3D voxel builder (section 03) plays videos as block animations`;
   if (kind === "glb" || kind === "gltf" || kind === "obj") return `${name} is a 3D model · import it in the 3D voxel builder (section 03)`;
   return `couldn't import ${name} · drop an image (.png/.jpg/.webp/.gif)`;
+}
+
+/** Shared drag & drop wiring for a block-art zone: highlight while a drag is over it, then route
+ *  the dropped file extension-first (blockArtDropMessage) - images/GIFs load, everything else gets
+ *  a helpful message instead of the browser navigating away to the raw file. ONE helper wires both
+ *  the index §02 zone (showcase.ts) and the standalone tester (main.ts), byte-same behavior. */
+export function wireBlockArtDrop(
+  zone: HTMLElement,
+  stats: { textContent: string | null },
+  loadFile: (f: File) => Promise<void>,
+): void {
+  for (const e of ["dragenter", "dragover"]) {
+    zone.addEventListener(e, (ev) => {
+      ev.preventDefault();
+      zone.classList.add("drag");
+    });
+  }
+  for (const e of ["dragleave", "drop"]) {
+    zone.addEventListener(e, () => zone.classList.remove("drag"));
+  }
+  zone.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    const f = (ev as DragEvent).dataTransfer?.files?.[0];
+    if (!f) return;
+    // extension-first routing (classifyImportFile): an OS drag with an empty MIME type still
+    // loads by its name, and a non-image gets a helpful message instead of a silent no-op.
+    const msg = blockArtDropMessage(f);
+    if (msg) stats.textContent = msg;
+    else void loadFile(f); // GIF → animated, else static
+  });
+}
+
+/** Palette choices the block-art preview can quantize against: the 244-colour MAP palette
+ *  (what a map item / the default preview shows) or the placeable SOLID-block gamut (every
+ *  entry resolves to a real block - the palette the CLI's solid builds use). Prepared once
+ *  per choice, module-memoized (preparePalette builds OKLab tables - not per-render work). */
+export type BlockArtPaletteChoice = "map" | "block";
+const PREPARED_PALETTES = new Map<BlockArtPaletteChoice, PreparedPalette>();
+export function paletteForChoice(choice: BlockArtPaletteChoice): PreparedPalette {
+  let pal = PREPARED_PALETTES.get(choice);
+  if (!pal) {
+    pal =
+      choice === "block"
+        ? preparePalette(getSolidBlockMapPalette().palette)
+        : preparePalette(javaMapPalette as unknown as MapPalette);
+    PREPARED_PALETTES.set(choice, pal);
+  }
+  return pal;
 }
 
 /** Incremental bill-of-materials renderer. The markup per row is byte-identical to a full
@@ -133,6 +182,8 @@ export interface BlockArtEls {
   out: HTMLCanvasElement;
   bom: HTMLElement;
   tooltip: HTMLElement;
+  /** Optional palette select ("map" | "block") - re-quantizes on change (standalone tester). */
+  palette?: HTMLSelectElement;
 }
 
 export interface BlockArtOpts {
@@ -146,11 +197,14 @@ export function createBlockArt(
   loadUrl: (url: string) => void;
   loadFile: (file: File) => Promise<void>;
   getFrame: () => QuantizedFrame | null;
+  /** Frames in the loaded clip: 0 = nothing loaded, 1 = still image, >1 = animated GIF. */
+  getFrameCount: () => number;
   /** Current SOURCE image as RGB at ≤maxW - lets the 3D builder re-quantize the original
    *  colors in its own palette instead of inheriting this path's dithered map-palette ids. */
   getSourceRgb: (maxW: number) => RgbImage | null;
 } {
-  const pal: PreparedPalette = preparePalette(javaMapPalette as unknown as MapPalette);
+  const paletteChoice = (): BlockArtPaletteChoice => (els.palette?.value === "block" ? "block" : "map");
+  let pal: PreparedPalette = paletteForChoice(paletteChoice());
   let lastImage: Source | null = null;
   let lastQ: QuantizedFrame | null = null;
   // animated-GIF playback (single-image path is unchanged when frames is empty)
@@ -330,6 +384,12 @@ export function createBlockArt(
     render();
   });
   els.dither.addEventListener("change", render);
+  // palette select (standalone tester): switch the quantization palette and re-render. The
+  // hover tooltip + BOM read the live `pal`, so they track the switch automatically.
+  els.palette?.addEventListener("change", () => {
+    pal = paletteForChoice(paletteChoice());
+    render();
+  });
   els.gridVal.textContent = `${els.grid.value} px`;
 
   // always use real block textures when present (auto-falls back to generated swatches only if the
@@ -353,6 +413,7 @@ export function createBlockArt(
     loadUrl,
     loadFile,
     getFrame: () => lastQ,
+    getFrameCount: () => (frames.length ? frames.length : lastImage ? 1 : 0),
     getSourceRgb: (maxW: number) => {
       const src = currentSource();
       return src ? toRgbImage(src, Math.min(maxW, Number(els.grid.value) || maxW)) : null;

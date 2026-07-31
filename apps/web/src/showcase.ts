@@ -6,7 +6,7 @@ import "./style.css"; // design system: tokens (sumi/washi palette, type/space/m
 import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
-import { createBlockArt, blockArtDropMessage } from "./blockart-core";
+import { createBlockArt, wireBlockArtDrop } from "./blockart-core";
 import { planGifExport, packingHudText, reportPngDownload } from "./export-plan";
 import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage } from "@blockdream/color-core";
 import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
@@ -188,27 +188,8 @@ const ba = createBlockArt({
 });
 ba.loadUrl("/test-assets/pixelart.png"); // preload sample so the section is alive on load
 
-// drag & drop an image onto the block-art canvases
-const baDrop = $<HTMLDivElement>("ba-drop");
-for (const e of ["dragenter", "dragover"]) {
-  baDrop.addEventListener(e, (ev) => {
-    ev.preventDefault();
-    baDrop.classList.add("drag");
-  });
-}
-for (const e of ["dragleave", "drop"]) {
-  baDrop.addEventListener(e, () => baDrop.classList.remove("drag"));
-}
-baDrop.addEventListener("drop", (ev) => {
-  ev.preventDefault();
-  const f = (ev as DragEvent).dataTransfer?.files?.[0];
-  if (!f) return;
-  // extension-first routing (classifyImportFile): an OS drag with an empty MIME type still
-  // loads by its name, and a non-image gets a helpful message instead of a silent no-op.
-  const msg = blockArtDropMessage(f);
-  if (msg) $<HTMLDivElement>("ba-stats").textContent = msg;
-  else void ba.loadFile(f); // GIF → animated, else static
-});
+// drag & drop an image onto the block-art canvases - shared wiring (same helper as blockart.html)
+wireBlockArtDrop($<HTMLDivElement>("ba-drop"), $<HTMLDivElement>("ba-stats"), (f) => ba.loadFile(f));
 
 // Download a vanilla datapack that builds the current image as a block-wall.
 $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
