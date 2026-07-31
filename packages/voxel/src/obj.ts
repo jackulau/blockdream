@@ -98,8 +98,18 @@ export interface RasterOptions extends ObjVoxelizeOptions {
   colorOf?: (triIndex: number) => number;
 }
 
+// Module-local so the rasterizer's per-triangle edge lengths cost neither a closure allocation
+// (the old `dist` arrow was re-created for EVERY triangle) nor, under vite-node, an
+// exports-object getter lookup. Operand order matches the old dist(p, q) exactly: p[k] - q[k].
+function dist3(px: number, py: number, pz: number, qx: number, qy: number, qz: number): number {
+  return Math.hypot(px - qx, py - qy, pz - qz);
+}
+
 /** Rasterize a triangle mesh into a res³ volume. With `bounds` supplied, the mesh is normalized into
- *  that shared box (uniform scale, preserving aspect) so a sequence of meshes lands in one world frame. */
+ *  that shared box (uniform scale, preserving aspect) so a sequence of meshes lands in one world frame.
+ *  Byte-identical to `trisToVolumeReference` (locked by obj-perf.test.ts): same sample order, same
+ *  float expressions, minus the per-vertex grid() arrays, per-triangle dist closure, per-sample
+ *  uu = i/n recompute and per-sample setVoxel call. */
 export function trisToVolume(verts: V3[], tris: Tri[], opts: RasterOptions = {}): VoxelVolume {
   const res = Math.max(2, Math.floor(opts.resolution ?? 32));
   const fallback = opts.mapColorId ?? DEFAULT_MODEL_MAP_COLOR_ID;
@@ -108,9 +118,11 @@ export function trisToVolume(verts: V3[], tris: Tri[], opts: RasterOptions = {})
   const b = opts.bounds ?? meshBounds(verts);
   const extent = Math.max(b.max[0]! - b.min[0]!, b.max[1]! - b.min[1]!, b.max[2]! - b.min[2]!) || 1;
   const scale = (res - 1) / extent;
-  const grid = (v: V3): V3 => [(v[0]! - b.min[0]!) * scale, (v[1]! - b.min[1]!) * scale, (v[2]! - b.min[2]!) * scale];
+  // scratch scalars replace the old grid() 3-array-per-vertex-per-triangle; same (v[k] - min[k]) * scale
+  const m0 = b.min[0]!, m1 = b.min[1]!, m2 = b.min[2]!;
 
   const vol = createVolume(res, res, res);
+  const data = vol.data;
   for (let t = 0; t < tris.length; t++) {
     const [ia, ib, ic] = tris[t]!;
     // Number.isInteger also rejects NaN, which passes every < / >= comparison (defense for callers
@@ -118,23 +130,24 @@ export function trisToVolume(verts: V3[], tris: Tri[], opts: RasterOptions = {})
     if (!Number.isInteger(ia) || !Number.isInteger(ib) || !Number.isInteger(ic)) continue;
     if (ia < 0 || ib < 0 || ic < 0 || ia >= verts.length || ib >= verts.length || ic >= verts.length) continue;
     const color = opts.colorOf?.(t) ?? fallback;
-    const a = grid(verts[ia]!);
-    const bb = grid(verts[ib]!);
-    const c = grid(verts[ic]!);
-    const dist = (p: V3, q: V3) => Math.hypot(p[0]! - q[0]!, p[1]! - q[1]!, p[2]! - q[2]!);
-    const n = Math.max(2, Math.ceil(Math.max(dist(a, bb), dist(a, c), dist(bb, c))) * 2);
+    const va = verts[ia]!, vb = verts[ib]!, vc = verts[ic]!;
+    const ax = (va[0]! - m0) * scale, ay = (va[1]! - m1) * scale, az = (va[2]! - m2) * scale;
+    const bx = (vb[0]! - m0) * scale, by = (vb[1]! - m1) * scale, bz = (vb[2]! - m2) * scale;
+    const cx = (vc[0]! - m0) * scale, cy = (vc[1]! - m1) * scale, cz = (vc[2]! - m2) * scale;
+    const n = Math.max(
+      2,
+      Math.ceil(Math.max(dist3(ax, ay, az, bx, by, bz), dist3(ax, ay, az, cx, cy, cz), dist3(bx, by, bz, cx, cy, cz))) * 2,
+    );
     for (let i = 0; i <= n; i++) {
+      const uu = i / n; // loop-invariant in j (do NOT rewrite the divisions as * (1/n): that changes bits)
       for (let j = 0; i + j <= n; j++) {
-        const uu = i / n;
         const w = j / n;
         const s = 1 - uu - w;
-        setVoxel(
-          vol,
-          Math.round(a[0]! * s + bb[0]! * uu + c[0]! * w),
-          Math.round(a[1]! * s + bb[1]! * uu + c[1]! * w),
-          Math.round(a[2]! * s + bb[2]! * uu + c[2]! * w),
-          color,
-        );
+        const x = Math.round(ax * s + bx * uu + cx * w);
+        const y = Math.round(ay * s + by * uu + cy * w);
+        const z = Math.round(az * s + bz * uu + cz * w);
+        // inlined setVoxel: identical bounds check + x-fastest index, minus the per-sample call
+        if (x >= 0 && y >= 0 && z >= 0 && x < res && y < res && z < res) data[x + res * (y + res * z)] = color;
       }
     }
   }
@@ -166,8 +179,125 @@ export function objToVolume(obj: string, opts: ObjVoxelizeOptions = {}): VoxelVo
 /**
  * Fill a watertight shell's interior. Flood-fills EMPTY from the grid boundary (6-connected)
  * to mark "outside"; every EMPTY cell the flood never reaches is interior → set to `color`.
+ *
+ * Byte-identical to `solidifyReference` (locked by obj-perf.test.ts): the flood's reached SET is
+ * order-independent and the final pass is a linear scan, so seeding only the 6 boundary planes
+ * (instead of a full O(volume) scan), an Int32Array stack of linear indices (instead of x,y,z
+ * triple-pushes into a number[]) and inlined neighbor checks (instead of a closure called 6x per
+ * popped cell) change visit ORDER only, never the output volume.
  */
 export function solidify(vol: VoxelVolume, color: number): void {
+  const { sx, sy, sz } = vol;
+  const data = vol.data;
+  const air = EMPTY; // local capture: an imported binding is an exports-getter lookup under vite-node
+  const total = sx * sy * sz;
+  const zStride = sx * sy;
+  const outside = new Uint8Array(total);
+  // Each cell is marked `outside` before it is pushed, so it enters the stack at most once and
+  // `total` bounds the stack exactly.
+  const stack = new Int32Array(total);
+  let top = 0;
+  // seed the 6 boundary planes only (edge/corner cells appear in several planes; the outside[]
+  // guard dedups them, exactly like the old full-scan seed did)
+  for (let y = 0; y < sy; y++) {
+    const lo = sx * y; // z = 0
+    const hi = lo + zStride * (sz - 1); // z = sz - 1
+    for (let x = 0; x < sx; x++) {
+      let i = lo + x;
+      if (!outside[i] && data[i] === air) { outside[i] = 1; stack[top++] = i; }
+      i = hi + x;
+      if (!outside[i] && data[i] === air) { outside[i] = 1; stack[top++] = i; }
+    }
+  }
+  for (let z = 0; z < sz; z++) {
+    const lo = zStride * z; // y = 0
+    const hi = lo + sx * (sy - 1); // y = sy - 1
+    for (let x = 0; x < sx; x++) {
+      let i = lo + x;
+      if (!outside[i] && data[i] === air) { outside[i] = 1; stack[top++] = i; }
+      i = hi + x;
+      if (!outside[i] && data[i] === air) { outside[i] = 1; stack[top++] = i; }
+    }
+  }
+  for (let z = 0; z < sz; z++) {
+    const base = zStride * z;
+    for (let y = 0; y < sy; y++) {
+      let i = base + sx * y; // x = 0
+      if (!outside[i] && data[i] === air) { outside[i] = 1; stack[top++] = i; }
+      i += sx - 1; // x = sx - 1
+      if (!outside[i] && data[i] === air) { outside[i] = 1; stack[top++] = i; }
+    }
+  }
+  while (top > 0) {
+    const i = stack[--top]!;
+    // recover coords from the linear index for the edge guards
+    const x = i % sx;
+    const rest = (i - x) / sx; // == y + sy * z
+    const y = rest % sy;
+    const z = (rest - y) / sy;
+    if (x + 1 < sx) { const j = i + 1; if (!outside[j] && data[j] === air) { outside[j] = 1; stack[top++] = j; } }
+    if (x > 0) { const j = i - 1; if (!outside[j] && data[j] === air) { outside[j] = 1; stack[top++] = j; } }
+    if (y + 1 < sy) { const j = i + sx; if (!outside[j] && data[j] === air) { outside[j] = 1; stack[top++] = j; } }
+    if (y > 0) { const j = i - sx; if (!outside[j] && data[j] === air) { outside[j] = 1; stack[top++] = j; } }
+    if (z + 1 < sz) { const j = i + zStride; if (!outside[j] && data[j] === air) { outside[j] = 1; stack[top++] = j; } }
+    if (z > 0) { const j = i - zStride; if (!outside[j] && data[j] === air) { outside[j] = 1; stack[top++] = j; } }
+  }
+  // full-volume scan in x-fastest order → the linear index `i` IS voxelIndex(x,y,z); read/write directly.
+  for (let i = 0; i < data.length; i++) if (data[i] === air && !outside[i]) data[i] = color;
+}
+
+// ---- verbatim pre-optimization reference twins (goal 088 D16, locked by obj-perf.test.ts) -------
+
+/**
+ * Reference rasterizer, kept verbatim from before the scratch-scalar/hoisting optimization.
+ * Produces byte-identical output to `trisToVolume`; solid fills go through `solidifyReference`
+ * so the whole reference pipeline is pre-optimization.
+ */
+export function trisToVolumeReference(verts: V3[], tris: Tri[], opts: RasterOptions = {}): VoxelVolume {
+  const res = Math.max(2, Math.floor(opts.resolution ?? 32));
+  const fallback = opts.mapColorId ?? DEFAULT_MODEL_MAP_COLOR_ID;
+  if (verts.length === 0 || tris.length === 0) throw new Error("empty mesh (need vertices + triangles)");
+
+  const b = opts.bounds ?? meshBounds(verts);
+  const extent = Math.max(b.max[0]! - b.min[0]!, b.max[1]! - b.min[1]!, b.max[2]! - b.min[2]!) || 1;
+  const scale = (res - 1) / extent;
+  const grid = (v: V3): V3 => [(v[0]! - b.min[0]!) * scale, (v[1]! - b.min[1]!) * scale, (v[2]! - b.min[2]!) * scale];
+
+  const vol = createVolume(res, res, res);
+  for (let t = 0; t < tris.length; t++) {
+    const [ia, ib, ic] = tris[t]!;
+    if (!Number.isInteger(ia) || !Number.isInteger(ib) || !Number.isInteger(ic)) continue;
+    if (ia < 0 || ib < 0 || ic < 0 || ia >= verts.length || ib >= verts.length || ic >= verts.length) continue;
+    const color = opts.colorOf?.(t) ?? fallback;
+    const a = grid(verts[ia]!);
+    const bb = grid(verts[ib]!);
+    const c = grid(verts[ic]!);
+    const dist = (p: V3, q: V3) => Math.hypot(p[0]! - q[0]!, p[1]! - q[1]!, p[2]! - q[2]!);
+    const n = Math.max(2, Math.ceil(Math.max(dist(a, bb), dist(a, c), dist(bb, c))) * 2);
+    for (let i = 0; i <= n; i++) {
+      for (let j = 0; i + j <= n; j++) {
+        const uu = i / n;
+        const w = j / n;
+        const s = 1 - uu - w;
+        setVoxel(
+          vol,
+          Math.round(a[0]! * s + bb[0]! * uu + c[0]! * w),
+          Math.round(a[1]! * s + bb[1]! * uu + c[1]! * w),
+          Math.round(a[2]! * s + bb[2]! * uu + c[2]! * w),
+          color,
+        );
+      }
+    }
+  }
+  if (opts.solid) solidifyReference(vol, fallback);
+  return vol;
+}
+
+/**
+ * Reference flood-fill, kept verbatim from before the Int32Array-stack/boundary-plane-seed
+ * optimization. Produces byte-identical output to `solidify`.
+ */
+export function solidifyReference(vol: VoxelVolume, color: number): void {
   const { sx, sy, sz } = vol;
   const data = vol.data;
   const outside = new Uint8Array(sx * sy * sz);
