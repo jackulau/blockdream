@@ -132,7 +132,10 @@ export function noteSequencer(notes: NoteEvent[], opts: NoteSequencerOptions = {
     `execute unless score #play ma matches 1 run return 0`,
   ];
   for (const e of used) {
-    const vol = Math.max(0.5, Math.min(baseVol, baseVol * e.velocity));
+    // clamp velocity-scaled volume into [0.5, baseVol] with the CAP applied last:
+    // the old max(0.5, min(base, product)) inverted when baseVol < 0.5 and emitted
+    // LOUDER than the requested base. Identical result for baseVol >= 0.5.
+    const vol = Math.min(baseVol, Math.max(0.5, baseVol * e.velocity));
     musicLines.push(
       `execute if score #mt ma matches ${e.tick} run playsound minecraft:block.note_block.${e.instrument} ${cat} @a ${origin.x} ${origin.y} ${origin.z} ${fmt(vol)} ${fmt(noteBlockPitch(e.note))}`,
     );

@@ -62,6 +62,25 @@ describe("noteSequencer", () => {
     expect(seq.noteCount).toBe(0);
   });
 
+  it("velocity scaling never exceeds the base volume (clamp cap applied last)", () => {
+    // repro: baseVol 0.3, velocity 0.5 -> old max(0.5, min(0.3, 0.15)) = 0.5,
+    // LOUDER than the requested base. The cap must win: result <= baseVol always.
+    const quiet = noteSequencer([{ tick: 0, note: 10, instrument: "harp", velocity: 0.5 }], {
+      volume: 0.3,
+    });
+    const qline = quiet.musicLines.find((l) => l.includes("playsound"))!;
+    const qvol = Number(qline.split(" ").at(-2));
+    expect(qvol).toBeLessThanOrEqual(0.3);
+    // default base keeps the audibility floor: velocity 0.01 at base 3 emits 0.5
+    const def = noteSequencer([{ tick: 0, note: 10, instrument: "harp", velocity: 0.01 }]);
+    const dvol = Number(def.musicLines.find((l) => l.includes("playsound"))!.split(" ").at(-2));
+    expect(dvol).toBe(0.5);
+    // and a normal velocity at the default base is plain base x velocity
+    const mid = noteSequencer([{ tick: 0, note: 10, instrument: "harp", velocity: 0.8 }]);
+    const mvol = Number(mid.musicLines.find((l) => l.includes("playsound"))!.split(" ").at(-2));
+    expect(mvol).toBeCloseTo(2.4, 5);
+  });
+
   it("caps the number of notes so the function stays under the command limit", () => {
     const many: NoteEvent[] = Array.from({ length: 5000 }, (_, i) => ({
       tick: i,
