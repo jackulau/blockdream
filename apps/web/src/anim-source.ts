@@ -63,3 +63,18 @@ export function animSourceFor(selection: string, s: AnimSourceState): AnimSource
   if (s.baseVolume) return { kind: "base-sequence", volume: s.baseVolume };
   return { kind: "none" };
 }
+
+/**
+ * The volume a baked-spin EXPORT must turntable. exportFrames bakes spinSequence(volume) when a
+ * single still volume is shown with "spin" selected - and that volume must follow the SAME source
+ * preference as animSourceFor: the active flat clip, else the active model import, else the built
+ * solid. Without this, an export after a model import baked a turntable of the STALE baseVolume
+ * (the solid built BEFORE the import) - the export twin of the selector bug fixed above.
+ */
+export function spinExportVolume(
+  s: Pick<AnimSourceState, "flatVolFrames" | "importedFrames" | "baseVolume">,
+): VoxelVolume | null {
+  if (s.flatVolFrames && s.flatVolFrames.length) return s.flatVolFrames[0]!;
+  if (s.importedFrames && s.importedFrames.length) return s.importedFrames[0]!;
+  return s.baseVolume;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { animSourceFor, isTransformAnim, type AnimSourceState } from "../src/anim-source";
+import { animSourceFor, isTransformAnim, spinExportVolume, type AnimSourceState } from "../src/anim-source";
 import type { VoxelVolume } from "@blockdream/voxel";
 
 // tiny distinct volumes: identity (===) is what the decision hands back, so a unique data
@@ -122,5 +122,30 @@ describe("animSourceFor: flat clip sequence path unchanged", () => {
     const s = state({ flatVolFrames: clip, importedFrames: [vol(3)], baseVolume: vol(1), current3d: clip });
     expect(animSourceFor("explode", s)).toEqual({ kind: "clip-sequence", frames: clip });
     expect(animSourceFor("none", s)).toEqual({ kind: "clip-transform", frames: clip, restore: false });
+  });
+});
+
+describe("spinExportVolume: what a baked-spin export must turntable (export-spin-after-import)", () => {
+  it("prefers the active model import over the stale built solid", () => {
+    const stale = vol(1); // the solid built BEFORE the import - the old export spun THIS
+    const imported = [vol(2)]; // a single .obj/.glb model import
+    const v = spinExportVolume({ flatVolFrames: null, importedFrames: imported, baseVolume: stale });
+    expect(v).toBe(imported[0]); // the import, by identity
+    expect(v).not.toBe(stale);
+  });
+
+  it("uses baseVolume when no import is active (the previously-correct path)", () => {
+    const base = vol(1);
+    expect(spinExportVolume({ flatVolFrames: null, importedFrames: null, baseVolume: base })).toBe(base);
+  });
+
+  it("a one-frame flat clip beats both the import and the solid (same priority as animSourceFor)", () => {
+    const clip = [vol(3)];
+    expect(spinExportVolume({ flatVolFrames: clip, importedFrames: [vol(2)], baseVolume: vol(1) })).toBe(clip[0]);
+  });
+
+  it("with nothing loaded there is nothing to bake", () => {
+    expect(spinExportVolume({ flatVolFrames: null, importedFrames: null, baseVolume: null })).toBe(null);
+    expect(spinExportVolume({ flatVolFrames: [], importedFrames: [], baseVolume: null })).toBe(null);
   });
 });

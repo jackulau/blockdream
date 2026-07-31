@@ -25,9 +25,10 @@ import {
   type SequenceAnimName,
   type VoxelVolume,
 } from "@blockdream/voxel";
-import { animSourceFor, isTransformAnim } from "./anim-source";
+import { animSourceFor, isTransformAnim, spinExportVolume } from "./anim-source";
+import { classifyImportFile } from "./import-files";
 import { rgbFramesToFlat3d, rgbFramesToAnimated3d } from "./video3d";
-import { isVideoFile, decodeVideo } from "./video";
+import { decodeVideo } from "./video";
 import { ClipAudio, type ClipAudioMode } from "./clip-audio";
 import { analyzeFileAudio } from "./audio";
 import { NotePreview } from "./note-preview";
@@ -785,12 +786,15 @@ async function setup3dViewer(): Promise<void> {
     playBtn.textContent = "play";
     hud.textContent = `importing ${files.length > 1 ? `${files.length} files` : files[0]!.name}…`;
     try {
-      const objs = files.filter((f) => /\.obj$/i.test(f.name));
-      const glb = files.find((f) => /\.glb$/i.test(f.name));
-      const gltf = files.find((f) => /\.gltf$/i.test(f.name));
-      const gif = files.find((f) => /\.gif$/i.test(f.name) || f.type === "image/gif");
-      const video = files.find((f) => isVideoFile(f));
-      const image = files.find((f) => f.type.startsWith("image/")); // any still image (gif handled above)
+      // ONE pure classifier (import-files.ts, unit-tested) decides what each file is - the picker,
+      // the canvas drag & drop, and the URL box all reach this dispatch, so every entry point
+      // accepts exactly the same set.
+      const objs = files.filter((f) => classifyImportFile(f) === "obj");
+      const glb = files.find((f) => classifyImportFile(f) === "glb");
+      const gltf = files.find((f) => classifyImportFile(f) === "gltf");
+      const gif = files.find((f) => classifyImportFile(f) === "gif");
+      const video = files.find((f) => classifyImportFile(f) === "video");
+      const image = files.find((f) => classifyImportFile(f) === "image"); // any still image (gif handled above)
       if (glb) {
         showImported(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glb ${glb.name}`);
       } else if (gltf) {
@@ -941,7 +945,27 @@ async function setup3dViewer(): Promise<void> {
   }
 
   $<HTMLInputElement>("v3-import").addEventListener("change", (ev) => {
-    void importFiles(Array.from((ev.target as HTMLInputElement).files ?? []));
+    const input = ev.target as HTMLInputElement;
+    void importFiles(Array.from(input.files ?? []));
+    input.value = ""; // allow re-selecting the SAME file (e.g. retry after a failed import) to re-fire "change"
+  });
+
+  // drag & drop any importable asset (model / GIF / video / image) onto the 3D canvas area - the
+  // same affordance §02 trains, funneled through the SAME importFiles pipeline as the picker + URL.
+  const v3Drop = $<HTMLDivElement>("v3-drop");
+  for (const e of ["dragenter", "dragover"]) {
+    v3Drop.addEventListener(e, (ev) => {
+      ev.preventDefault();
+      v3Drop.classList.add("drag");
+    });
+  }
+  for (const e of ["dragleave", "drop"]) {
+    v3Drop.addEventListener(e, () => v3Drop.classList.remove("drag"));
+  }
+  v3Drop.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    const files = Array.from((ev as DragEvent).dataTransfer?.files ?? []);
+    if (files.length) void importFiles(files); // multiple files supported (an .obj-per-frame sequence)
   });
 
   // paste a link (the Dribbble GIF, a video, any CORS-friendly image) → fetched → same block pipeline
@@ -977,7 +1001,13 @@ async function setup3dViewer(): Promise<void> {
   // the single still. Returns the timing to replay at (null ⇒ uniform, for a baked spin / sequence).
   function exportFrames(): { frames: VoxelVolume[]; durationsMs: Array<number | undefined> | null } {
     if (current3d.length > 1) return { frames: current3d, durationsMs: current3dDurations };
-    if (baseVolume && animSel.value === "spin") return { frames: spinSequence(baseVolume, 24), durationsMs: null };
+    if (animSel.value === "spin") {
+      // bake the turntable of the volume the user is actually looking at: an active import beats
+      // the stale baseVolume (same source preference as anim-source.ts - after a model import,
+      // baseVolume still points at the PREVIOUSLY built solid; spinning it exported stale content).
+      const v = spinExportVolume({ flatVolFrames, importedFrames, baseVolume });
+      if (v) return { frames: spinSequence(v, 24), durationsMs: null };
+    }
     return { frames: current3d, durationsMs: current3dDurations };
   }
 
