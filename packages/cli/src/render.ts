@@ -143,8 +143,12 @@ function writeFile(path: string, data: Buffer | string): void {
 }
 
 /** Loader notes bundled into a 3D datapack zip (Minecraft ignores the .txt). Mirrors the web export,
- *  including the force-clear warning the CLI zip previously lacked. */
-function howToLoad3d(namespace: string, sx: number, sy: number, sz: number): string {
+ *  including the force-clear warning the CLI zip previously lacked. `origin` is the ACTUAL --origin
+ *  the emitter builds at (default 0,64,0, matching generateVoxelDatapack) - the text used to
+ *  hardcode x=0 y=64 z=0, sending --origin users to clear-check the wrong coordinates. */
+function howToLoad3d(namespace: string, sx: number, sy: number, sz: number, origin?: { x: number; y: number; z: number }): string {
+  const o = origin ?? { x: 0, y: 64, z: 0 };
+  const at = `x=${o.x} y=${o.y} z=${o.z}`;
   return [
     `blockdream 3D build — how to load`,
     ``,
@@ -152,7 +156,9 @@ function howToLoad3d(namespace: string, sx: number, sy: number, sz: number): str
     `2. In game: /reload`,
     `3. /function ${namespace}:setup    then    /function ${namespace}:start`,
     ``,
-    `WARNING: setup force-CLEARS a ${sx}×${sy}×${sz} box at x=0 y=64 z=0 (fill ... air) before building.`,
+    `The build appears at ${at} (its --origin corner).`,
+    ``,
+    `WARNING: setup force-CLEARS a ${sx}×${sy}×${sz} box at ${at} (fill ... air) before building.`,
     `Run it somewhere safe (a flat/empty area), not on top of anything you want to keep.`,
     `Stop with /function ${namespace}:stop (frees the force-loaded chunks).`,
   ].join("\n") + "\n";
@@ -259,7 +265,7 @@ export function render(opts: RenderOptions): RenderResult {
         supportedFormats: JAVA_DATAPACK_SUPPORTED, optimize: (cells, r) => greedyBoxes(cells, r),
       });
       const mv = volumes[0]!;
-      pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, mv.sx, mv.sy, mv.sz));
+      pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, mv.sx, mv.sy, mv.sz, opts.origin));
       writePack(pack, opts.out);
       filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
       const zip = join(opts.out, `${pack.namespace}.zip`);
@@ -490,7 +496,7 @@ export function render(opts: RenderOptions): RenderResult {
       );
     }
     const vv = volumes[0]!;
-    pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, vv.sx, vv.sy, vv.sz));
+    pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, vv.sx, vv.sy, vv.sz, opts.origin));
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const zip = join(opts.out, `${pack.namespace}.zip`);
