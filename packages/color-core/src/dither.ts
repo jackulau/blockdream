@@ -155,12 +155,282 @@ export function quantizeNearest(
   return frame;
 }
 
+// ---------------------------------------------------------------------------
+// Floyd-Steinberg hot-path matchers (allocation-free).
+//
+// matchLinear -> linearRgbToOklab -> nearestByLab(/Hue) allocates a fresh {L,a,b} and a fresh
+// {index,color,dist2} PER PIXEL. Floyd-Steinberg is the DEFAULT still-image quantizer (see
+// quantizeFrame), so on the hero web path that is two short-lived objects per pixel of pure GC
+// pressure. These twins run the SAME arithmetic in the SAME order (the OKLab constants are
+// copied verbatim from oklab.ts and the L-band-prune walks verbatim from match.ts) but pass the
+// OKLab triple through module scratch scalars and return only the index. Byte-identical, locked
+// against quantizeFloydSteinbergReference by dither-perf.test.ts.
+// ---------------------------------------------------------------------------
+
+let labL = 0;
+let labA = 0;
+let labB = 0;
+
+/** linearRgbToOklab with scratch-scalar output (identical constants and operation order). */
+function linearToLabScratch(r: number, g: number, b: number): void {
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  const l_ = Math.cbrt(l);
+  const m_ = Math.cbrt(m);
+  const s_ = Math.cbrt(s);
+  labL = 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_;
+  labA = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_;
+  labB = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_;
+}
+
+/** lowerBoundL twin (private in match.ts): lowest index p with sortedL[p] >= L. */
+function lowerBound(pal: PreparedPalette, L: number): number {
+  const sL = pal.sortedL;
+  let lo = 0;
+  let hi = pal.sortedOrigIdx.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sL[mid]! < L) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * nearestByLab with scalar query and index-only return (identical walk, no Match object).
+ * `dL*dL` is computed once per entry (the reference computes it in both the break check and
+ * dist2): same operands, same value, so dist2 is bit-identical.
+ */
+function nearestIdxByLab(qL: number, qa: number, qb: number, pal: PreparedPalette): number {
+  const sL = pal.sortedL;
+  const sA = pal.sortedA;
+  const sB = pal.sortedB;
+  const oi = pal.sortedOrigIdx;
+  const n = oi.length;
+  const start = lowerBound(pal, qL);
+  let bestIdx = 0;
+  let best = Infinity;
+  for (let p = start; p < n; p++) {
+    const dL = sL[p]! - qL;
+    const dL2 = dL * dL;
+    if (dL2 >= best) break;
+    const da = sA[p]! - qa;
+    const db = sB[p]! - qb;
+    const d = dL2 + da * da + db * db;
+    const k = oi[p]!;
+    if (d < best || (d === best && k < bestIdx)) {
+      best = d;
+      bestIdx = k;
+    }
+  }
+  for (let p = start - 1; p >= 0; p--) {
+    const dL = qL - sL[p]!;
+    const dL2 = dL * dL;
+    if (dL2 >= best) break;
+    const da = sA[p]! - qa;
+    const db = sB[p]! - qb;
+    const d = dL2 + da * da + db * db;
+    const k = oi[p]!;
+    if (d < best || (d === best && k < bestIdx)) {
+      best = d;
+      bestIdx = k;
+    }
+  }
+  return bestIdx;
+}
+
+/**
+ * hueDistance twin, module-LOCAL on purpose: it runs once per visited palette entry (millions of
+ * times per frame), and a cross-module import compiles to an exports-object accessor lookup per
+ * call under the ESM->CJS/SSR transforms, which both costs a getter invocation in the innermost
+ * loop and blocks inlining.
+ *
+ * The `% (2 * Math.PI)` in match.ts's hueDistance is dropped: bit-identical here, and it was
+ * MOST of the whole quantize (JS `%` on doubles is an fmod stub call, ~16M calls per 256px
+ * frame). Proof: both arguments are Math.atan2 outputs in [-pi, pi], so d0 = |h1 - h2| lies in
+ * [0, 2pi]. For d0 < 2pi, fmod is exact, so d0 % 2pi === d0 and the remaining branch is
+ * untouched. For d0 === 2pi (only when the hues are exactly -pi and pi): with the fmod, d = +0
+ * and the branch is skipped, returning +0; without it, d = 2pi > pi, returning 2pi - 2pi = +0.
+ * Identical doubles in every case (atan2 never returns NaN/Infinity for finite inputs).
+ */
+function hueDist(h1: number, h2: number): number {
+  let d = Math.abs(h1 - h2);
+  if (d > Math.PI) d = 2 * Math.PI - d;
+  return d;
+}
+
+/**
+ * Per-FRAME hue array in L-sorted order: sortedHue[p] = entries[sortedOrigIdx[p]].hue, the same
+ * doubles the reference reads through `pal.entries[k]!.hue`, but as stride-1 Float64Array loads
+ * instead of an object-chain dereference per visited entry. Built once per quantize call (a
+ * palette is ~244 entries; the walk visits entries millions of times per frame).
+ */
+function buildSortedHue(pal: PreparedPalette): Float64Array {
+  const oi = pal.sortedOrigIdx;
+  const out = new Float64Array(oi.length);
+  for (let p = 0; p < oi.length; p++) out[p] = pal.entries[oi[p]!]!.hue;
+  return out;
+}
+
+/**
+ * nearestByLabHue with scalar query and index-only return (identical walk, no Match object).
+ * Bit-exact hoists only: `dL*dL` is computed once per entry (same operands, same value), and
+ * `lc = lambda * cT` is hoisted out of the walk: `lambda * cT * hd * hd` associates left, so
+ * `((lambda*cT)*hd)*hd` performs the identical three multiplies either way.
+ */
+function nearestIdxByLabHue(qL: number, qa: number, qb: number, pal: PreparedPalette, lambda: number, sHue: Float64Array): number {
+  const cT = Math.hypot(qa, qb);
+  const hT = Math.atan2(qb, qa);
+  const lc = lambda * cT;
+  const sL = pal.sortedL;
+  const sA = pal.sortedA;
+  const sB = pal.sortedB;
+  const oi = pal.sortedOrigIdx;
+  const n = oi.length;
+  const start = lowerBound(pal, qL);
+  let bestIdx = 0;
+  let bestPenalty = Infinity;
+  for (let p = start; p < n; p++) {
+    const dL = sL[p]! - qL;
+    const dL2 = dL * dL;
+    if (dL2 >= bestPenalty) break;
+    const da = sA[p]! - qa;
+    const db = sB[p]! - qb;
+    const dist2 = dL2 + da * da + db * db;
+    const k = oi[p]!;
+    const hd = hueDist(hT, sHue[p]!);
+    const penalty = dist2 + lc * hd * hd;
+    if (penalty < bestPenalty || (penalty === bestPenalty && k < bestIdx)) {
+      bestPenalty = penalty;
+      bestIdx = k;
+    }
+  }
+  for (let p = start - 1; p >= 0; p--) {
+    const dL = qL - sL[p]!;
+    const dL2 = dL * dL;
+    if (dL2 >= bestPenalty) break;
+    const da = sA[p]! - qa;
+    const db = sB[p]! - qb;
+    const dist2 = dL2 + da * da + db * db;
+    const k = oi[p]!;
+    const hd = hueDist(hT, sHue[p]!);
+    const penalty = dist2 + lc * hd * hd;
+    if (penalty < bestPenalty || (penalty === bestPenalty && k < bestIdx)) {
+      bestPenalty = penalty;
+      bestIdx = k;
+    }
+  }
+  return bestIdx;
+}
+
+// Floyd-Steinberg diffusion weights. Same literals the reference passes to its diffuse closure,
+// hoisted to constants so each write is the identical `cell += err * weight` float op.
+const FS_W7 = 7 / 16;
+const FS_W3 = 3 / 16;
+const FS_W5 = 5 / 16;
+const FS_W1 = 1 / 16;
+
 /**
  * Floyd–Steinberg error diffusion. Matching happens in OKLab (perceptual);
  * error is computed and diffused in LINEAR light so gamma doesn't bias it.
  * Serpentine scan reduces directional worming artifacts.
+ *
+ * HOT LOOP: this is the default still-image quantizer, and at 512x512 with gamutMap the
+ * reference shape was a visible UI stall. Two mechanical changes, no numeric ones:
+ * (a) the per-neighbor diffuse closure (12 calls + 4 bounds comparisons each per pixel) is
+ *     replaced by per-pixel hoisted validity flags and direct error-buffer writes, and
+ * (b) the per-pixel {L,a,b}/{index,color,dist2} allocations in the match are replaced by the
+ *     allocation-free scratch matchers above.
+ * Every float op, its operands, and the cross-pixel write order are unchanged, so the diffused
+ * error cascade is bit-exact. Byte-identical to quantizeFloydSteinbergReference (locked by
+ * dither-perf.test.ts).
  */
 export function quantizeFloydSteinberg(img: RgbImage, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): QuantizedFrame {
+  const { width, height } = img;
+  const frame = emptyFrame(img);
+  const buf = toLinearBuffer(img); // mutated in place with diffused error
+  // one tiny per-frame array (~244 doubles), never per-pixel
+  const sortedHue = gamutMap !== undefined ? buildSortedHue(pal) : null;
+
+  for (let y = 0; y < height; y++) {
+    const leftToRight = y % 2 === 0;
+    const xStart = leftToRight ? 0 : width - 1;
+    const xEnd = leftToRight ? width : -1;
+    const step = leftToRight ? 1 : -1;
+    const rowBase = y * width;
+    const downBase = rowBase + width;
+    const hasDown = y + 1 < height;
+    for (let x = xStart; x !== xEnd; x += step) {
+      const p = rowBase + x;
+      const i = p * 3;
+      const lr = buf[i]!;
+      const lg = buf[i + 1]!;
+      const lb = buf[i + 2]!;
+      // same dispatch order as matchLinear: gamutMap overrides the LUT, LUT beats brute force
+      let index: number;
+      if (gamutMap !== undefined) {
+        linearToLabScratch(lr, lg, lb);
+        index = nearestIdxByLabHue(labL, labA, labB, pal, gamutMap, sortedHue!);
+      } else if (lut) {
+        index = lutNearest(lut, linearToSrgbChannel(lr), linearToSrgbChannel(lg), linearToSrgbChannel(lb));
+      } else {
+        linearToLabScratch(lr, lg, lb);
+        index = nearestIdxByLab(labL, labA, labB, pal);
+      }
+      const entry = pal.entries[index]!;
+      const chosen = entry.lin;
+      writePixel(frame, p, index, entry.color.mapColorId);
+
+      const er = lr - chosen[0];
+      const eg = lg - chosen[1];
+      const eb = lb - chosen[2];
+
+      // Neighbor validity, computed ONCE per pixel (the reference re-checks 4 bounds per diffuse
+      // call, 12 calls per pixel). Forward is +step in x, behind is -step; only y+1 can leave the
+      // image vertically. Writes keep the reference order (fwd(7/16), behind-down(3/16),
+      // down(5/16), fwd-down(1/16), channels r,g,b within each neighbor), though each of the 12
+      // targets is a distinct cell, so the per-cell accumulation order across pixels (the part
+      // float addition cares about) is fixed by the serpentine scan either way.
+      const xf = x + step;
+      const xb = x - step;
+      const fwdOk = xf >= 0 && xf < width;
+      const backOk = xb >= 0 && xb < width;
+      if (fwdOk) {
+        const j = (rowBase + xf) * 3;
+        buf[j]! += er * FS_W7;
+        buf[j + 1]! += eg * FS_W7;
+        buf[j + 2]! += eb * FS_W7;
+      }
+      if (hasDown) {
+        if (backOk) {
+          const j = (downBase + xb) * 3;
+          buf[j]! += er * FS_W3;
+          buf[j + 1]! += eg * FS_W3;
+          buf[j + 2]! += eb * FS_W3;
+        }
+        const j = (downBase + x) * 3;
+        buf[j]! += er * FS_W5;
+        buf[j + 1]! += eg * FS_W5;
+        buf[j + 2]! += eb * FS_W5;
+        if (fwdOk) {
+          const jf = (downBase + xf) * 3;
+          buf[jf]! += er * FS_W1;
+          buf[jf + 1]! += eg * FS_W1;
+          buf[jf + 2]! += eb * FS_W1;
+        }
+      }
+    }
+  }
+  return frame;
+}
+
+/**
+ * Reference Floyd-Steinberg, kept verbatim from before the de-closuring/de-allocation
+ * optimization: per-neighbor diffuse closure + allocating matchLinear per pixel. Exported only
+ * for the same-run opt-vs-ref A/B in dither-perf.test.ts. Do not optimize.
+ */
+export function quantizeFloydSteinbergReference(img: RgbImage, pal: PreparedPalette, lut?: RgbLut, gamutMap?: number): QuantizedFrame {
   const { width, height } = img;
   const frame = emptyFrame(img);
   const buf = toLinearBuffer(img); // mutated in place with diffused error
