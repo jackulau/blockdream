@@ -30,12 +30,25 @@ const dim = () => world.getDimension(POOL.dimension ?? "overworld");
 
 function applyFrame(f) {
   const d = dim(), cells = POOL.frames[f];
+  // Count resolve failures (stale/unregistered block ids) and surface ONE
+  // warning per frame - never per cell.
+  let failed = 0;
+  const failedIds = [];
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i], blockId = POOL.palette[c[2]];
     if (!blockId) continue;
     const loc = { x: POOL.origin.x + c[0], y: POOL.origin.y + (POOL.height - 1 - c[1]), z: POOL.origin.z };
     const block = d.getBlock(loc);
-    if (block) { try { block.setPermutation(BlockPermutation.resolve(blockId)); } catch {} }
+    if (!block) continue;
+    try {
+      block.setPermutation(BlockPermutation.resolve(blockId));
+    } catch {
+      failed++;
+      if (failedIds.length < 3 && !failedIds.includes(blockId)) failedIds.push(blockId);
+    }
+  }
+  if (failed > 0) {
+    console.warn("[blockdream] frame " + f + ": " + failed + " cell(s) failed BlockPermutation.resolve (bad ids: " + failedIds.join(", ") + ")");
   }
 }
 function reset() { frameIndex = 0; tickCounter = 0; applyFrame(0); }
