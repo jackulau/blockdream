@@ -5,14 +5,23 @@
  */
 
 const INT = /^-?\d+$/;
+const NUM = /^-?\d+(\.\d+)?$/;
 const RANGE = /^(-?\d+)?\.\.(-?\d+)?$|^-?\d+$/;
 const BLOCK = /^(minecraft:)?[a-z_][a-z0-9_]*(\[[a-z0-9_=",: ]*\])?$/;
+const ENTITY_ID = /^(minecraft:)?[a-z_][a-z0-9_]*$/;
+const SOUND_ID = /^(minecraft:)?[a-z_][a-z0-9_.]*$/;
+const SELECTOR = /^@[aeprsn](\[[^\]\s]*\])?$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const FN_REF = /^[a-z0-9_]+[:/][a-z0-9_/]+$/;
 const SCORE_OPS = new Set(["<", "<=", "=", ">=", ">"]);
 const SETBLOCK_MODE = new Set(["replace", "destroy", "keep"]);
 
 function isInt(s: string | undefined): boolean {
   return s !== undefined && INT.test(s);
+}
+
+function isNum(s: string | undefined): boolean {
+  return s !== undefined && NUM.test(s);
 }
 
 /** Validate one command line. Returns an error string, or null if valid. */
@@ -49,7 +58,40 @@ export function validateCommand(line: string): string | null {
       return null;
     }
     case "forceload": {
-      if (t[1] !== "add" || ![2, 3, 4, 5].every((i) => isInt(t[i]))) return `forceload bad: ${raw}`;
+      // forceload add|remove x0 z0 x1 z1 (stop/teardown emit `remove`)
+      if ((t[1] !== "add" && t[1] !== "remove") || ![2, 3, 4, 5].every((i) => isInt(t[i])))
+        return `forceload bad: ${raw}`;
+      return null;
+    }
+    case "kill": {
+      // kill @e[type=...,tag=...] (idempotent re-setup / teardown)
+      if (!t[1] || !SELECTOR.test(t[1])) return `kill bad selector: ${raw}`;
+      if (t[2]) return `kill trailing tokens: ${raw}`;
+      return null;
+    }
+    case "summon": {
+      // summon <entity> <x> <y> <z> {nbt} - rgbscreen pixel coords are cell-centered floats
+      if (!t[1] || !ENTITY_ID.test(t[1])) return `summon bad entity: ${raw}`;
+      if (![2, 3, 4].every((i) => isNum(t[i]))) return `summon coords not numbers: ${raw}`;
+      const nbt = t.slice(5).join(" ");
+      if (!nbt.startsWith("{") || !nbt.endsWith("}")) return `summon bad nbt: ${raw}`;
+      return null;
+    }
+    case "data": {
+      // data merge entity <uuid> {nbt} - rgbscreen per-pixel background updates
+      if (t[1] !== "merge" || t[2] !== "entity" || !t[3] || !UUID.test(t[3]))
+        return `data merge bad: ${raw}`;
+      const nbt = t.slice(4).join(" ");
+      if (!nbt.startsWith("{") || !nbt.endsWith("}")) return `data merge bad nbt: ${raw}`;
+      return null;
+    }
+    case "playsound": {
+      // playsound <sound> <category> <selector> <x> <y> <z> <volume> <pitch>
+      if (!t[1] || !SOUND_ID.test(t[1])) return `playsound bad sound: ${raw}`;
+      if (!t[2] || !/^[a-z_]+$/.test(t[2])) return `playsound bad category: ${raw}`;
+      if (!t[3] || !SELECTOR.test(t[3])) return `playsound bad selector: ${raw}`;
+      if (![4, 5, 6].every((i) => isNum(t[i]))) return `playsound coords not numbers: ${raw}`;
+      if (!isNum(t[7]) || !isNum(t[8])) return `playsound bad volume/pitch: ${raw}`;
       return null;
     }
     case "tickingarea": {

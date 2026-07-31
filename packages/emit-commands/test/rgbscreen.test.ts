@@ -8,6 +8,7 @@ import {
   uuidString,
   type RgbScreenFrame,
 } from "../src/rgbscreen";
+import { validatePack } from "../src/validate";
 
 function frameOf(width: number, height: number, px: Array<[number, number, number]>): RgbScreenFrame {
   const argb = new Int32Array(width * height);
@@ -61,6 +62,23 @@ describe("generateRgbScreenDatapack", () => {
     [0, 0, 0],
     [0, 255, 0], // changed
   ]);
+
+  it("every command in an rgbscreen pack is valid (summon/data merge/kill/playsound/forceload heads)", () => {
+    const music = [
+      { tick: 0, note: 12, instrument: "harp", velocity: 1 },
+      { tick: 2, note: 15, instrument: "bell", velocity: 0.4 },
+    ];
+    const cases = [
+      {}, // JSON-in-string text era
+      { dataVersion: 4903, music, facing: "north" as const, autoplay: true }, // SNBT text era
+      { music, musicEngine: "redstone" as const },
+    ];
+    for (const opts of cases) {
+      const pack = generateRgbScreenDatapack([f0, f1], opts);
+      const res = validatePack(pack.files);
+      expect(res.ok, JSON.stringify(res.errors.slice(0, 5))).toBe(true);
+    }
+  });
 
   it("summons one full-bright fixed-billboard pixel per cell with frame 0 baked in", () => {
     const pack = generateRgbScreenDatapack([f0, f1], { dataVersion: 4903 });

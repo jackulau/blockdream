@@ -4,6 +4,7 @@ import type { NoteEvent } from "@blockdream/audio";
 import { noteBlockPitch } from "@blockdream/audio";
 import { noteSequencer } from "../src/note-sequencer";
 import { generateVoxelDatapack } from "../src/datapack3d";
+import { validatePack } from "../src/validate";
 
 const resolve = (id: number) => `minecraft:c${id}`;
 
@@ -102,5 +103,15 @@ describe("generateVoxelDatapack — music is additive", () => {
     const tick = pack.files.get("data/minecraft/tags/function/tick.json")!;
     expect(tick).toContain("blockdream:driver");
     expect(tick).toContain("blockdream:music");
+  });
+
+  it("every command in a music build validates (playsound sequencer + keyboard setblocks)", () => {
+    const pack = generateVoxelDatapack([lineVolume()], resolve, {
+      origin: { x: 0, y: 64, z: 0 },
+      music: NOTES,
+      musicOrigin: { x: 100, y: 64, z: 0 },
+    });
+    const res = validatePack(pack.files);
+    expect(res.ok, JSON.stringify(res.errors.slice(0, 5))).toBe(true);
   });
 });

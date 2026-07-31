@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createVolume, setVoxel } from "@blockdream/voxel";
 import { computeVoxelDeltas, generateVoxelDatapack } from "../src/datapack3d";
 import { fillBatch } from "../src/fill";
+import { validatePack } from "../src/validate";
 
 const resolve = (id: number) => `minecraft:c${id}`;
 
@@ -89,6 +90,27 @@ describe("generateVoxelDatapack (3D)", () => {
     ]);
     // each cell has EXACTLY the four fields (no stray spread leftovers, none missing)
     for (const c of captured) expect(Object.keys(c).sort()).toEqual(["mapColorId", "x", "y", "z"]);
+  });
+});
+
+describe("generateVoxelDatapack pack validation", () => {
+  it("every command in a 3D voxel pack is valid, incl. music, LED plane, and the redstone engine", () => {
+    const v2 = createVolume(3, 1, 1);
+    setVoxel(v2, 0, 0, 0, 2);
+    const music = [
+      { tick: 0, note: 12, instrument: "harp", velocity: 1 },
+      { tick: 3, note: 15, instrument: "bell", velocity: 0.4 },
+    ];
+    const cases = [
+      { origin: { x: 0, y: 64, z: 0 } },
+      { music, ledPlane: "south" as const, autoplay: true },
+      { music, musicEngine: "redstone" as const },
+    ];
+    for (const opts of cases) {
+      const pack = generateVoxelDatapack([lineVolume(), v2], resolve, opts);
+      const res = validatePack(pack.files);
+      expect(res.ok, JSON.stringify(res.errors.slice(0, 5))).toBe(true);
+    }
   });
 });
 
