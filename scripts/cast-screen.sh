@@ -30,7 +30,18 @@ for a in "$@"; do
   prev="$a"
 done
 
-echo "screen-share bridge -> open  http://${HOST}:${PORT}  in your browser, then click \"Share a screen\"."
+# A wildcard bind address is not browsable - print a URL that actually opens. Note the LAN
+# caveat: getDisplayMedia needs a secure origin, so plain http only captures on 127.0.0.1.
+BROWSE_HOST="$HOST"
+case "$HOST" in
+  0.0.0.0|::|"[::]") BROWSE_HOST=127.0.0.1 ;;
+esac
+
+echo "screen-share bridge -> open  http://${BROWSE_HOST}:${PORT}  in your browser, then click \"Share a screen\"."
+if [ "$BROWSE_HOST" != "$HOST" ]; then
+  echo "(bound to ${HOST}: other devices can reach http://<this machine's LAN IP>:${PORT}, but browsers"
+  echo " only allow screen capture on a secure origin - over plain http, capture works on 127.0.0.1 only.)"
+fi
 echo "(Ctrl-C here stops the bridge.)"
 echo
 
