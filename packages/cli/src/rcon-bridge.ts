@@ -374,6 +374,70 @@ export interface WallSetupOptions {
   facing?: WallFacing;
 }
 
+/** The exact box a `--setup` clear overwrites - the disclosure contract. `min`/`max` are the
+ *  INCLUSIVE `/fill` corners; every block inside becomes `clearBlock` (whatever was there is gone). */
+export interface SetupFootprint {
+  min: { x: number; y: number; z: number };
+  max: { x: number; y: number; z: number };
+  /** Total blocks overwritten: (dx+1)(dy+1)(dz+1) over the inclusive box. */
+  volume: number;
+  /** What the box is set to (default minecraft:air). */
+  clearBlock: string;
+}
+
+/**
+ * The wall setup's exact clear box, computed from the SAME inputs {@link buildSetupCommands}
+ * uses (it derives its `/fill` corners from this, so the disclosure can never drift from the
+ * clear). Pure math - safe for `--dry-run` reporting without any connection.
+ */
+export function wallSetupFootprint(
+  origin: { x: number; y: number; z: number },
+  width: number,
+  height: number,
+  opts: WallSetupOptions = {},
+): SetupFootprint {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+    throw new Error(`wall size must be integers ≥ 1×1 (got ${width}×${height})`);
+  }
+  const clearance = Math.max(0, Math.floor(opts.clearance ?? 3));
+  const facing = opts.facing ?? "south";
+  // east/west put the wall in the ZY plane (columns along Z), so width runs Z and clearance runs X;
+  // south/north keep it in the XY plane (width along X, clearance along Z) - the original box.
+  const eastWest = facing === "east" || facing === "west";
+  const min = {
+    x: eastWest ? origin.x - clearance : origin.x,
+    y: origin.y,
+    z: eastWest ? origin.z : origin.z - clearance,
+  };
+  const max = {
+    x: eastWest ? origin.x + clearance : origin.x + width - 1,
+    y: origin.y + height - 1,
+    z: eastWest ? origin.z + width - 1 : origin.z + clearance,
+  };
+  return {
+    min,
+    max,
+    volume: (max.x - min.x + 1) * (max.y - min.y + 1) * (max.z - min.z + 1),
+    clearBlock: opts.clearBlock ?? "minecraft:air",
+  };
+}
+
+/**
+ * Plain console lines disclosing what a `--setup` clear WILL do, printed by the CLIs before the
+ * first `/fill` executes (additive logging only - no prompt, so non-interactive e2e keeps working):
+ * the exact inclusive box corners, its dimensions, the total blocks overwritten, and what they
+ * become. Pointing `--origin` near an existing base is never silent again.
+ */
+export function describeSetupFootprint(what: string, fp: SetupFootprint): string[] {
+  const { min, max } = fp;
+  const dims = `${max.x - min.x + 1}x${max.y - min.y + 1}x${max.z - min.z + 1}`;
+  return [
+    `setup will OVERWRITE every block in the ${what} box with ${fp.clearBlock} (existing builds there are replaced; no undo):`,
+    `  box corners (${min.x},${min.y},${min.z}) -> (${max.x},${max.y},${max.z})  [${dims}]`,
+    `  ${fp.volume} block(s) cleared`,
+  ];
+}
+
 /**
  * Vanilla `/fill … air` commands that carve a clean viewing space for the wall in a RUNNING
  * world - no datapack, no `/reload`, no leaving the world. Clears the wall slab
@@ -389,20 +453,8 @@ export function buildSetupCommands(
   height: number,
   opts: WallSetupOptions = {},
 ): string[] {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
-    throw new Error(`wall size must be integers ≥ 1×1 (got ${width}×${height})`);
-  }
-  const clearance = Math.max(0, Math.floor(opts.clearance ?? 3));
-  const block = opts.clearBlock ?? "minecraft:air";
-  const facing = opts.facing ?? "south";
-  // east/west put the wall in the ZY plane (columns along Z), so width runs Z and clearance runs X;
-  // south/north keep it in the XY plane (width along X, clearance along Z) - the original box.
-  const eastWest = facing === "east" || facing === "west";
-  const x0 = eastWest ? origin.x - clearance : origin.x;
-  const x1 = eastWest ? origin.x + clearance : origin.x + width - 1;
-  const z0 = eastWest ? origin.z : origin.z - clearance;
-  const z1 = eastWest ? origin.z + width - 1 : origin.z + clearance;
-  return fillLines(x0, origin.y, z0, x1, origin.y + height - 1, z1, block, "replace");
+  const fp = wallSetupFootprint(origin, width, height, opts);
+  return fillLines(fp.min.x, fp.min.y, fp.min.z, fp.max.x, fp.max.y, fp.max.z, fp.clearBlock, "replace");
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +606,21 @@ export function videoBuildToLiveFrames(
   return { frameCommands, volume: volumes[0]! };
 }
 
+/** The `--build` box setup's exact clear box - same inputs as {@link buildBoxSetupCommands}
+ *  (which derives its `/fill` corners from this). Pure math, safe for `--dry-run` reporting. */
+export function boxSetupFootprint(
+  origin: { x: number; y: number; z: number },
+  volume: Pick<VoxelVolume, "sx" | "sy" | "sz">,
+  opts: { clearBlock?: string } = {},
+): SetupFootprint {
+  return {
+    min: { x: origin.x, y: origin.y, z: origin.z },
+    max: { x: origin.x + volume.sx - 1, y: origin.y + volume.sy - 1, z: origin.z + volume.sz - 1 },
+    volume: volume.sx * volume.sy * volume.sz,
+    clearBlock: opts.clearBlock ?? "minecraft:air",
+  };
+}
+
 /** `/fill … air` commands that clear a build's W×H×D box at `origin` (split at the 32768 cap) -
  *  the 3D analogue of {@link buildSetupCommands}, run once before casting a build live. */
 export function buildBoxSetupCommands(
@@ -561,15 +628,6 @@ export function buildBoxSetupCommands(
   volume: VoxelVolume,
   opts: { clearBlock?: string } = {},
 ): string[] {
-  const block = opts.clearBlock ?? "minecraft:air";
-  return fillLines(
-    origin.x,
-    origin.y,
-    origin.z,
-    origin.x + volume.sx - 1,
-    origin.y + volume.sy - 1,
-    origin.z + volume.sz - 1,
-    block,
-    "replace",
-  );
+  const fp = boxSetupFootprint(origin, volume, opts);
+  return fillLines(fp.min.x, fp.min.y, fp.min.z, fp.max.x, fp.max.y, fp.max.z, fp.clearBlock, "replace");
 }

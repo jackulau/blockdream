@@ -21,8 +21,10 @@ import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import { joinDashValues } from "./argv";
 import {
   buildSetupCommands,
+  describeSetupFootprint,
   frameToWallCommands,
   isWallFacing,
+  wallSetupFootprint,
   type WallCommands,
   type WallFacing,
   type WallFrame,
@@ -161,6 +163,13 @@ export async function main(argv: string[]): Promise<number> {
   let painted = 0;
   let lastCmdCount = 0;
 
+  // --setup disclosure: print the exact clear box up front, BEFORE any connection or /fill (the
+  // actual clear runs on the first captured frame; if its dims differ from --size, the pump
+  // re-discloses the real box before clearing). Additive logging only - no prompt.
+  if (doSetup) {
+    for (const line of describeSetupFootprint("wall + viewing clearance", wallSetupFootprint(origin, sizeW, sizeH, { clearance: setupClearance, facing: wallFacing }))) log(line);
+  }
+
   const rcon = dryRun ? null : new RconPool({ host: rconHost, port: rconPort, password: rconPass!, conns: rconConns, log });
 
   // ----- HTTP: the capture page + a live stats JSON, both on the one port -----
@@ -256,6 +265,10 @@ export async function main(argv: string[]): Promise<number> {
       if (!usePrev) carry = []; // first frame or a resized capture => keyframe, drop stale carry
       try {
         if (doSetup && !didSetup) {
+          if (frame.width !== sizeW || frame.height !== sizeH) {
+            // the page sent different dims than --size: re-disclose the ACTUAL box before clearing it
+            for (const line of describeSetupFootprint("wall + viewing clearance", wallSetupFootprint(origin, frame.width, frame.height, { clearance: setupClearance, facing: wallFacing }))) log(line);
+          }
           const setupCmds = buildSetupCommands(origin, frame.width, frame.height, { clearance: setupClearance, facing: wallFacing });
           if (!dryRun) await rcon!.sendBatch(setupCmds);
           didSetup = true;
