@@ -113,4 +113,27 @@ d("--animate flag: block-motion generators wired to CLI", () => {
     const res = render({ input: gif, out, target: "datapack", width: 16, height: 16, animate: "explode" });
     expect(res.notes.join("\n")).toMatch(/--animate only applies to 3D targets.*ignored for --target datapack/);
   });
+
+  it("--animate-frames 0 exits 2 at the CLI boundary (D1 validation, before any decode)", () => {
+    const stderr: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (s: string): boolean => { stderr.push(s); return true; };
+    try {
+      const code = runCli(["render", gif, "--target", "voxel3d", "--animate", "explode", "--animate-frames", "0"]);
+      expect(code).toBe(2);
+      expect(stderr.join("")).toContain("--animate-frames must be");
+    } finally {
+      process.stderr.write = orig;
+    }
+  });
+
+  it("model3d + animateFrames 0 via the API throws the clear empty-build error, both editions", () => {
+    // model3d used to assert non-empty BEFORE applyAnimate, so a 0-frame animation produced []:
+    // the Java branch threw a raw "no frames" deep in the datapack emitter and the Bedrock branch
+    // TypeError'd on volumes[0].sx. It now animates-then-asserts like voxel3d/mcstructure3d.
+    expect(() => render({ input: cubeObj, out: join(dir, "af0-java"), target: "model3d", width: 8, animate: "explode", animateFrames: 0 }))
+      .toThrow(/no subject detected/);
+    expect(() => render({ input: cubeObj, out: join(dir, "af0-bedrock"), target: "model3d", edition: "bedrock", width: 8, animate: "explode", animateFrames: 0 }))
+      .toThrow(/no subject detected/);
+  });
 });

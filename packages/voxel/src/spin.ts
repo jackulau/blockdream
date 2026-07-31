@@ -109,7 +109,8 @@ export function padXZToSquare(v: VoxelVolume): VoxelVolume {
 /** A baked full Y-spin: `frames` volumes of the build rotating in place. Cube-pads X/Z first so a
  *  non-cubic build never clips. This is the rotating-build animation for a vanilla datapack. */
 export function spinSequence(v: VoxelVolume, frames = 24): VoxelVolume[] {
-  if (frames <= 0) throw new Error("spinSequence needs frames > 0");
+  // integer check included: NaN slips past a bare `<= 0` (NaN <= 0 is false) and would return []
+  if (!Number.isInteger(frames) || frames <= 0) throw new Error("spinSequence needs an integer frames > 0");
   // Inverse-sample (HOLE-FREE, byte-identical to `spin(..,"y")`) but with the trig HOISTED OUT of the
   // Y loop: a Y-spin's inverse source (sx,sz) is invariant in Y, yet the generic `rotate()` recomputes
   // cos/sin + round for every (x,y,z). Computing them once per (x,z) and copying the whole source
@@ -155,7 +156,8 @@ export function spinSequence(v: VoxelVolume, frames = 24): VoxelVolume[] {
 
 /** A full 360° turn about `axis`, split into nFrames volumes (frame 0 = identity). */
 export function spin(v: VoxelVolume, nFrames: number, axis: SpinAxis = "y"): VoxelVolume[] {
-  if (nFrames <= 0) throw new Error("spin needs nFrames > 0");
+  // same NaN-proof guard as spinSequence (NaN <= 0 is false → a silent [] otherwise)
+  if (!Number.isInteger(nFrames) || nFrames <= 0) throw new Error("spin needs an integer nFrames > 0");
   const out: VoxelVolume[] = [];
   for (let i = 0; i < nFrames; i++) {
     out.push(rotate(v, (2 * Math.PI * i) / nFrames, axis));

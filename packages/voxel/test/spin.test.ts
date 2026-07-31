@@ -70,4 +70,11 @@ describe("spinSequence (baked spin — the optimized --animate spin path)", () =
   it("rejects frames ≤ 0", () => {
     expect(() => spinSequence(createVolume(2, 2, 2), 0)).toThrow(/frames/);
   });
+
+  it("rejects NaN and non-integer frame counts (NaN <= 0 is false, so a bare <=0 guard missed it)", () => {
+    expect(() => spinSequence(createVolume(2, 2, 2), NaN)).toThrow(/frames/);
+    expect(() => spinSequence(createVolume(2, 2, 2), 2.5)).toThrow(/frames/);
+    expect(() => spin(createVolume(2, 2, 2), NaN)).toThrow(/nFrames/);
+    expect(() => spin(createVolume(2, 2, 2), 2.5)).toThrow(/nFrames/);
+  });
 });

@@ -92,6 +92,16 @@ const TARGETS = new Set<RenderTarget>([
 ]);
 const DITHERS = new Set<DitherMethod>(["floyd-steinberg", "bayer", "none"]);
 
+/** Shared --grid shape check for BOTH verbs: "WxH" with positive integers (e.g. 128x128).
+ *  preview used to parseInt with no validation, so `--grid abc` flowed to ffmpeg as scale=NaN:NaN. */
+function parseGrid(raw: string): { width: number; height: number } | null {
+  const m = /^(\d+)x(\d+)$/.exec(raw);
+  if (!m) return null;
+  const width = parseInt(m[1]!, 10);
+  const height = parseInt(m[2]!, 10);
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
 export function runCli(argv: string[]): number {
   const { values, positionals } = parseArgs({
     // let a negative --origin (e.g. -50,70,-50) through node's parseArgs (it else errors "ambiguous")
@@ -141,15 +151,50 @@ export function runCli(argv: string[]): number {
 
   const input = positionals[1];
 
+  // Numeric flags are validated at the parse boundary: a bad value must exit 2 with a message
+  // naming the flag, never flow downstream as NaN. (A NaN --speed used to survive `?? default`
+  // - NaN is not nullish - and reach the emitted datapack as `scoreboard players set #speed ma
+  // NaN` with exit 0: silent corruption.) All bad flags are reported in one run.
+  let badNumeric = false;
+  const numFlag = (name: string, raw: string | undefined, what: string, ok: (n: number) => boolean): number | undefined => {
+    if (raw === undefined) return undefined;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || !ok(n)) {
+      process.stderr.write(`--${name} must be ${what} (got "${raw}")\n`);
+      badNumeric = true;
+      return undefined;
+    }
+    return n;
+  };
+  const fps = numFlag("fps", values.fps, "a number > 0", (n) => n > 0);
+  const maxFrames = numFlag("max-frames", values["max-frames"], "an integer >= 0", (n) => Number.isInteger(n) && n >= 0);
+  const temporal = numFlag("temporal", values.temporal, "a non-negative number", (n) => n >= 0);
+  const speedTicks = numFlag("speed", values.speed, "an integer >= 1 (ticks per frame)", (n) => Number.isInteger(n) && n >= 1);
+  const depth = numFlag("depth", values.depth, "an integer >= 1", (n) => Number.isInteger(n) && n >= 1);
+  const smooth = numFlag("smooth", values.smooth, "a number in 0..1", (n) => n >= 0 && n <= 1);
+  const curve = numFlag("curve", values.curve, "a number > 0 (thickness exponent)", (n) => n > 0);
+  const shading = numFlag("shading", values.shading, "a number in 0..1", (n) => n >= 0 && n <= 1);
+  const gamut = numFlag("gamut", values.gamut, "a non-negative number", (n) => n >= 0);
+  const animateFrames = numFlag("animate-frames", values["animate-frames"], "an integer >= 1", (n) => Number.isInteger(n) && n >= 1);
+  if (badNumeric) return 2;
+
   if (verb === "preview") {
     const out = values.out ?? "preview.png";
-    const grid = values.grid ? parseInt(values.grid.split("x")[0]!, 10) : 128;
+    let grid = 128;
+    if (values.grid) {
+      const g = parseGrid(values.grid); // same shape check as render - exit 2, not scale=NaN:NaN
+      if (!g) {
+        process.stderr.write(`--grid must be WxH (e.g. 128x128)\n`);
+        return 2;
+      }
+      grid = g.width; // preview compares at a square grid: the WIDTH is the resolution
+    }
     try {
       const png = previewPng(input, {
         grid,
         method: values.dither as DitherMethod | undefined,
         palette: values.palette === "block" ? "block" : "map",
-        gamutMap: values.gamut ? Number(values.gamut) : undefined,
+        gamutMap: gamut,
       });
       writeFileSync(out, png);
       process.stdout.write(`✓ preview (source | block-art) → ${out} (${png.length} bytes)\n`);
@@ -169,13 +214,13 @@ export function runCli(argv: string[]): number {
   let width: number;
   let height: number;
   if (values.grid) {
-    const m = /^(\d+)x(\d+)$/.exec(values.grid);
-    if (!m) {
+    const g = parseGrid(values.grid);
+    if (!g) {
       process.stderr.write(`--grid must be WxH (e.g. 128x128)\n`);
       return 2;
     }
-    width = parseInt(m[1]!, 10);
-    height = parseInt(m[2]!, 10);
+    width = g.width;
+    height = g.height;
   } else {
     width = target === "map" ? 128 : 64;
     height = target === "map" ? 128 : 64;
@@ -283,20 +328,20 @@ export function runCli(argv: string[]): number {
     edition,
     width,
     height,
-    fps: values.fps ? Number(values.fps) : undefined,
-    maxFrames: values["max-frames"] ? Number(values["max-frames"]) : undefined,
+    fps,
+    maxFrames,
     dither,
-    temporalThreshold: values.temporal ? Number(values.temporal) : undefined,
-    speedTicks: values.speed ? Number(values.speed) : undefined,
-    depth: values.depth ? Number(values.depth) : undefined,
-    smooth: values.smooth ? Number(values.smooth) : undefined,
-    curve: values.curve ? Number(values.curve) : undefined,
-    shading: values.shading !== undefined ? Number(values.shading) : undefined,
+    temporalThreshold: temporal,
+    speedTicks,
+    depth,
+    smooth,
+    curve,
+    shading,
     symmetric: values.flat ? false : undefined,
-    gamutMap: values.gamut ? Number(values.gamut) : undefined,
+    gamutMap: gamut,
     paletteVersion: values.version,
     animate,
-    animateFrames: values["animate-frames"] ? Number(values["animate-frames"]) : undefined,
+    animateFrames,
     origin,
     facing,
     music,

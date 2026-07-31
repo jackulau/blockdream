@@ -20,6 +20,7 @@ import {
   type PreparedPalette,
 } from "@blockdream/color-core";
 import { extractFrames, extractAudioPcm } from "@blockdream/video";
+import { probeSourceFps } from "./probe";
 import { analyzeAudio, type NoteEvent } from "@blockdream/audio";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
@@ -222,8 +223,11 @@ export function render(opts: RenderOptions): RenderResult {
     } else {
       volumes = [objToVolume(readFileSync(opts.input, "utf8"), { resolution, solid: true, matchColor })];
     }
-    assertNonEmpty3d(volumes);
+    // animate BEFORE the non-empty assert (same order as voxel3d/mcstructure3d): a degenerate
+    // animation (e.g. animateFrames 0 → []) must hit the clear error here, not a deep "no frames"
+    // in the Java emitter or a TypeError on volumes[0] in the Bedrock branch below.
     volumes = applyAnimate(volumes, opts); // --animate: procedural block-motion of the built model
+    assertNonEmpty3d(volumes);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     if (edition === "bedrock") {
       volumes.forEach((vol, fi) => {
@@ -274,15 +278,23 @@ export function render(opts: RenderOptions): RenderResult {
   }
   let frames = rawFrames;
   let resampledSpeedTicks: number | undefined;
-  if (rawFrames.length > 1 && !animateConsumesClip && opts.speedTicks == null && opts.fps != null && opts.fps > 20) {
-    const plan = planTickPlayback(rawFrames.length, rawFrames.map(() => 1000 / opts.fps!));
-    if (plan.resampled) {
-      frames = plan.indices.map((i) => rawFrames[i]!);
-      resampledSpeedTicks = plan.speedTicks;
-      notes.push(
-        `--fps ${opts.fps} is above Minecraft's 20 fps in-game ceiling (1 frame per game tick): ` +
-          `resampled ${rawFrames.length} → ${frames.length} frames at ${plan.fps} fps (same duration, frames skipped evenly).`,
-      );
+  if (rawFrames.length > 1 && !animateConsumesClip && opts.speedTicks == null) {
+    // Effective decode rate: an explicit --fps set the ffmpeg sample filter; with NO --fps the
+    // decode keeps every source frame, so the source's own rate (ffprobe) IS the decoded rate.
+    // Without the probe the default path never resampled - a 60 fps source silently fell back to
+    // the speed-2 default (10 fps playback) = a 6x-slow pack. Probe failure fails open (no resample).
+    const effectiveFps = opts.fps ?? probeSourceFps(opts.input);
+    if (effectiveFps != null && effectiveFps > 20) {
+      const plan = planTickPlayback(rawFrames.length, rawFrames.map(() => 1000 / effectiveFps));
+      if (plan.resampled) {
+        frames = plan.indices.map((i) => rawFrames[i]!);
+        resampledSpeedTicks = plan.speedTicks;
+        const src = opts.fps != null ? `--fps ${opts.fps}` : `the source's ${Math.round(effectiveFps * 100) / 100} fps`;
+        notes.push(
+          `${src} is above Minecraft's 20 fps in-game ceiling (1 frame per game tick): ` +
+            `resampled ${rawFrames.length} → ${frames.length} frames at ${plan.fps} fps (same duration, frames skipped evenly).`,
+        );
+      }
     }
   }
   const isVideo = frames.length > 1;

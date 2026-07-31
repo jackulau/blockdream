@@ -51,6 +51,16 @@ d("extractFrames (ffmpeg)", () => {
   });
 });
 
+describe("extractFrames size guard (offline)", () => {
+  it("rejects NaN and non-positive grid sizes before ffmpeg runs", () => {
+    // NaN <= 0 is false, so the guard needs Number.isFinite - regression for a
+    // preview --grid NaN reaching the ffmpeg scale filter.
+    expect(() => extractFrames("nonexistent.gif", { width: NaN, height: 16 })).toThrow("must be > 0");
+    expect(() => extractFrames("nonexistent.gif", { width: 16, height: NaN })).toThrow("must be > 0");
+    expect(() => extractFrames("nonexistent.gif", { width: 0, height: 16 })).toThrow("must be > 0");
+  });
+});
+
 describe("resizeAreaLinear", () => {
   it("downscales and averages two half-colors in linear light", () => {
     // 2×1 image: left black, right white → 1×1 should be linear-mid (~188 in sRGB)
