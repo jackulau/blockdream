@@ -102,6 +102,30 @@ function analyzeMusicForInput(opts: RenderOptions): NoteEvent[] | undefined {
   return events.length ? events : undefined;
 }
 
+/**
+ * Honest headline for the note-block music CLI note. The emitters trim the melody to the
+ * animation loop (notes at/after frames x speedTicks are dropped via loopTicksOverride) and cap
+ * at --max-notes, so the old `min(music.length, cap)` could report 150 notes when 2 were actually
+ * emitted. Reads the generators' additive musicNoteCount/musicLoopTicks result fields
+ * structurally; while they are absent the text degrades to the old arithmetic.
+ */
+function describeMusicNotes(
+  music: NoteEvent[],
+  pack: { musicNoteCount?: number; musicLoopTicks?: number },
+  opts: RenderOptions,
+): string {
+  const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
+  const requested = Math.min(music.length, cap);
+  const emitted = pack.musicNoteCount ?? requested;
+  let s = `note-block music: ${emitted} notes from the audio track`;
+  if (music.length > cap) s += ` (capped from ${music.length}; raise --max-notes for the full song)`;
+  if (emitted < requested) {
+    const loop = pack.musicLoopTicks != null ? `${pack.musicLoopTicks}-tick ` : "";
+    s += ` (trimmed to the ${loop}animation loop: ${emitted} of ${requested} notes)`;
+  }
+  return s;
+}
+
 /** Compass direction a 3D build faces. south = +Z = the un-rotated default. */
 export type Facing = "north" | "south" | "east" | "west";
 const FACINGS: ReadonlySet<string> = new Set(["north", "south", "east", "west"]);
@@ -365,12 +389,7 @@ export function render(opts: RenderOptions): RenderResult {
       ].join("\n") + "\n",
     );
     if (music?.length) {
-      const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
-      notes.push(
-        `note-block music: ${Math.min(music.length, cap)} notes from the audio track` +
-          (music.length > cap ? ` (capped from ${music.length}; raise --max-notes for the full song)` : "") +
-          `; plays on /function ${pack.namespace}:start.`,
-      );
+      notes.push(describeMusicNotes(music, pack, opts) + `; plays on /function ${pack.namespace}:start.`);
     }
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
@@ -488,10 +507,8 @@ export function render(opts: RenderOptions): RenderResult {
         opts.musicEngine === "redstone"
           ? "a physical redstone delay-line plays the note blocks"
           : "a tick-driven playsound clock";
-      const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
       notes.push(
-        `note-block music: ${Math.min(music.length, cap)} notes from the audio track` +
-          (music.length > cap ? ` (capped from ${music.length}; raise --max-notes for the full song)` : "") +
+        describeMusicNotes(music, pack, opts) +
           ` (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`,
       );
     }
