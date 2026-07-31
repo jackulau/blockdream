@@ -35,6 +35,14 @@ import { analyzeFileAudio } from "./audio";
 import { NotePreview } from "./note-preview";
 import type { NoteEvent } from "@blockdream/audio";
 import { initialArrangeState, arrangeReducer, planDatapackPlacement } from "./canvas-mod";
+import {
+  SECTION3_CONTROL_IDS,
+  viewer3dUnavailableText,
+  AUDIO_BLOCKED_TEXT,
+  settingsChangeNote,
+  blockArtExportText,
+  resetDisabled,
+} from "./ui-feedback";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
@@ -94,7 +102,11 @@ const mcViewer = new Viewer({
   onStats: ({ displayFps, genFps, latencyMs }) => {
     mcHud.textContent = `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(1)} fps · ${latencyMs.toFixed(0)} ms\nmovement: ${mcSkill.value}`;
   },
-  onStatus: (t, cls) => pill(mcStatus, cls === "ok" ? `live · ${mcSkill.value}` : t, cls),
+  onStatus: (t, cls) => {
+    pill(mcStatus, cls === "ok" ? `live · ${mcSkill.value}` : t, cls);
+    // reset only does anything while connected - follow the same transitions as the pill
+    $<HTMLButtonElement>("mc-reset").disabled = resetDisabled(cls);
+  },
 });
 $<HTMLButtonElement>("mc-reset").addEventListener("click", () => mcViewer.reset());
 // retry affordance: without local servers the auto-connect fails once and the section used to be
@@ -161,7 +173,10 @@ const drViewer = new Viewer({
       `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(0)} fps · ${latencyMs.toFixed(0)} ms\n` +
       `speed ${speed.toFixed(1)} m/s · yaw-rate ${yawRate.toFixed(2)}`;
   },
-  onStatus: (t, cls) => pill(drStatus, cls === "ok" ? "live" : t, cls),
+  onStatus: (t, cls) => {
+    pill(drStatus, cls === "ok" ? "live" : t, cls);
+    $<HTMLButtonElement>("dr-reset").disabled = resetDisabled(cls);
+  },
 });
 $<HTMLButtonElement>("dr-reset").addEventListener("click", () => drViewer.reset());
 $<HTMLButtonElement>("dr-connect").addEventListener("click", () => drViewer.connect());
@@ -183,7 +198,8 @@ const ba = createBlockArt({
     // no-op when clicked before the first render)
     $<HTMLButtonElement>("ba-download").disabled = false;
     $<HTMLButtonElement>("ba-png").disabled = false;
-    $<HTMLDivElement>("ba-export").textContent = `${q.width}×${q.height} = ${q.width * q.height} blocks · 1 frame`;
+    // an animated GIF exports its CURRENT frame here - the status says so instead of "1 frame"
+    $<HTMLDivElement>("ba-export").textContent = blockArtExportText(q.width, q.height, ba.getFrameCount());
   },
 });
 ba.loadUrl("/test-assets/pixelart.png"); // preload sample so the section is alive on load
@@ -361,6 +377,15 @@ async function setup3dViewer(): Promise<void> {
   const fpsSel = $<HTMLSelectElement>("v3-fps");
   const resSel = $<HTMLSelectElement>("v3-res");
   const audioModeSel = $<HTMLSelectElement>("v3-audio-mode");
+  // autoplay-policy rejections used to be swallowed - both audio paths now surface one message
+  clipAudio.onAutoplayBlocked = notePreview.onAutoplayBlocked = () => {
+    hud.textContent = AUDIO_BLOCKED_TEXT;
+  };
+  // GIF/PNG ship disabled like the datapack button (index.html) - all three need frames;
+  // every path that produces frames enables them together.
+  function enable3dExports(): void {
+    for (const id of ["v3-download", "v3-gif", "v3-png"]) $<HTMLButtonElement>(id).disabled = false;
+  }
   await loadTextureManifest();
 
   // bill-of-materials for the built volume - same markup contract as blockart-core's renderBom,
@@ -533,7 +558,7 @@ async function setup3dViewer(): Promise<void> {
     // re-apply the chosen live animation (setFrames defaults a single volume to "spin")
     if (isTransformAnim(animSel.value)) viewer.setAnim(animSel.value);
     scrub.max = "0";
-    $<HTMLButtonElement>("v3-download").disabled = false;
+    enable3dExports();
     viewer.play();
     playBtn.textContent = "pause";
     hud.textContent = `solid ${vol.sx}×${vol.sy}×${vol.sz}${depthOf ? " · depth-mapped" : ""} · ${animSel.value} · drag to orbit`;
@@ -589,6 +614,11 @@ async function setup3dViewer(): Promise<void> {
   // initial source = the preloaded sample image (higher res than the old 28px for a sharper solid)
   const img = new Image();
   img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
+  img.onerror = () => {
+    // 404 / undecodable sample used to leave the section at "building…" forever - say what
+    // happened and how to proceed (pattern from blockart-core's loadUrl onerror).
+    hud.textContent = "couldn't load the sample /test-assets/pixelart.png · import an image, GIF, or video to build";
+  };
   img.src = "/test-assets/pixelart.png";
 
   // Re-extrude a flat wall frame to a new thickness: copy the front layer (z=0) into every layer of
@@ -639,7 +669,7 @@ async function setup3dViewer(): Promise<void> {
         animSel.value = "none"; // the frames are the motion; 3/4 view makes the new depth read
         viewer.setFrames(domed, { durationsMs: flatDurationsMs ?? undefined, faceOn: false });
         scrub.max = String(domed.length - 1);
-        $<HTMLButtonElement>("v3-download").disabled = false;
+        enable3dExports();
         viewer.play();
         playBtn.textContent = "pause";
         hud.textContent = `${flatLabel} · 3D · ${n} frames · drag to orbit`;
@@ -693,7 +723,7 @@ async function setup3dViewer(): Promise<void> {
           if (src.frames[0]) renderBom3d(src.frames[0]);
           viewer.setFrames(src.frames, { faceOn: sel === "none" });
           scrub.max = String(src.frames.length - 1);
-          $<HTMLButtonElement>("v3-download").disabled = false;
+          enable3dExports();
           playBtn.textContent = viewer.isPlaying ? "pause" : "play";
         }
         viewer.reframe(sel === "none"); // none → head-on; any motion → 3/4 so it reads in depth
@@ -711,7 +741,7 @@ async function setup3dViewer(): Promise<void> {
         if (combined[0]) renderBom3d(combined[0]);
         viewer.setFrames(combined, { faceOn: false }); // 3/4 view so the displacement reads; frames carry the motion
         scrub.max = String(combined.length - 1);
-        $<HTMLButtonElement>("v3-download").disabled = false;
+        enable3dExports();
         viewer.play();
         playBtn.textContent = "pause";
         hud.textContent = `${flatLabel} · ${sel} · playing · drag to orbit`;
@@ -753,7 +783,7 @@ async function setup3dViewer(): Promise<void> {
     if (faceOn) animSel.value = "none"; // reflect the head-on, no-transform default in the dropdown
     viewer.setFrames(frames, { durationsMs, faceOn }); // faceOn (flat GIF/video) → head-on, no transform
     scrub.max = String(frames.length - 1);
-    $<HTMLButtonElement>("v3-download").disabled = false;
+    enable3dExports();
     viewer.play();
     playBtn.textContent = "pause";
     hud.textContent = `${label} · ${frames.length} frame${frames.length > 1 ? "s" : ""} · drag to orbit`;
@@ -988,6 +1018,15 @@ async function setup3dViewer(): Promise<void> {
     if (e.key === "Enter") void importUrl();
   });
 
+  // fps/resolution are read once at import time - changing them mid-clip used to be a silent
+  // no-op; the HUD now says when the new value takes effect.
+  for (const sel of [fpsSel, resSel]) {
+    sel.addEventListener("change", () => {
+      const note = settingsChangeNote(!!flatVolFrames);
+      if (note) hud.textContent = note;
+    });
+  }
+
   // ?src=<url> opens the page WITH an asset already playing (e.g. ?src=/test-assets/badapple.mp4)
   const autoSrc = new URLSearchParams(location.search).get("src");
   if (autoSrc) {
@@ -1134,7 +1173,15 @@ async function setup3dViewer(): Promise<void> {
     viewer.setFrame(Number(scrub.value));
   });
 }
-void setup3dViewer();
+setup3dViewer().catch((err: unknown) => {
+  // WebGL unavailable (Viewer3D's WebGLRenderer throws) used to leave section 03 at
+  // "building…" forever with every control silently dead - say so and disable them all.
+  $<HTMLDivElement>("v3-hud").textContent = viewer3dUnavailableText((err as Error).message ?? String(err));
+  for (const id of SECTION3_CONTROL_IDS) {
+    const el = document.getElementById(id) as HTMLButtonElement | null;
+    if (el) el.disabled = true;
+  }
+});
 
 // Scroll-reveal: sections fade + rise a little as they enter view (tha.jp - restrained motion
 // modeled on natural deceleration; easing/duration live in style.css). The class is added by JS,

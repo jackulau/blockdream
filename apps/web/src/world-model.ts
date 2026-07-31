@@ -3,6 +3,7 @@
 
 import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
+import { resetDisabled } from "./ui-feedback";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -35,6 +36,9 @@ const skill = () => DEMO_SKILL[demoSel.value] ?? "general";
 function setStatus(text: string, cls: "ok" | "err" | "idle") {
   statusEl.textContent = cls === "ok" ? `connected · ${demoSel.value}` : text;
   statusEl.className = `status ${cls}`;
+  // Reset only does anything while connected (Viewer.reset() early-returns) - the button
+  // follows the same connect/disconnect transitions as the status line.
+  resetBtn.disabled = resetDisabled(cls);
 }
 
 const viewer = new Viewer({
