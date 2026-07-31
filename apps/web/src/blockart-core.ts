@@ -168,6 +168,64 @@ export function createBomRenderer(bomEl: HTMLElement): (counts: Map<number, numb
   };
 }
 
+/** Flat, cache-friendly view of a prepared palette for the per-pixel paint loop: separate
+ *  r/g/b bytes + baseId per entry, built ONCE per palette (WeakMap-memoized by identity).
+ *  The paint loop runs per animated-GIF frame on the rAF thread (65k px × up to 50 fps); the
+ *  old loop's per-pixel `pal.entries[idx]!.color` two-level deref + counts-Map get/set per
+ *  pixel was the hot part. */
+interface FlatPalette {
+  r: Uint8Array;
+  g: Uint8Array;
+  b: Uint8Array;
+  baseId: Int32Array;
+  maxBase: number;
+}
+const FLAT_PALETTES = new WeakMap<PreparedPalette, FlatPalette>();
+function flatPalette(pal: PreparedPalette): FlatPalette {
+  let fp = FLAT_PALETTES.get(pal);
+  if (!fp) {
+    const n = pal.entries.length;
+    fp = { r: new Uint8Array(n), g: new Uint8Array(n), b: new Uint8Array(n), baseId: new Int32Array(n), maxBase: 0 };
+    for (let i = 0; i < n; i++) {
+      const c = pal.entries[i]!.color;
+      fp.r[i] = c.r;
+      fp.g[i] = c.g;
+      fp.b[i] = c.b;
+      fp.baseId[i] = c.baseId;
+      if (c.baseId > fp.maxBase) fp.maxBase = c.baseId;
+    }
+    FLAT_PALETTES.set(pal, fp);
+  }
+  return fp;
+}
+
+/** Paint a quantized frame into an RGBA buffer and tally per-base block counts. Byte-identical
+ *  to the naive per-pixel `pal.entries[...]` loop: same RGBA bytes, and the counts Map is
+ *  materialized AFTER the loop in the SAME first-seen insertion order (createBomRenderer's
+ *  stable count sort keeps tied rows in insertion order, so BOM markup stays byte-identical;
+ *  the stats line only reads counts.size). The loop itself reads flat typed arrays and tallies
+ *  into an Int32Array + a first-seen order list - no Map ops per pixel. */
+export function paintQuantized(q: QuantizedFrame, pal: PreparedPalette, out: Uint8ClampedArray): Map<number, number> {
+  const fp = flatPalette(pal);
+  const { r, g, b, baseId } = fp;
+  const idx = q.paletteIndex;
+  const n = q.width * q.height;
+  const tally = new Int32Array(fp.maxBase + 1);
+  const order: number[] = [];
+  for (let p = 0, o = 0; p < n; p++, o += 4) {
+    const i = idx[p]!;
+    out[o] = r[i]!;
+    out[o + 1] = g[i]!;
+    out[o + 2] = b[i]!;
+    out[o + 3] = 255;
+    const base = baseId[i]!;
+    if (tally[base]!++ === 0) order.push(base);
+  }
+  const counts = new Map<number, number>();
+  for (const base of order) counts.set(base, tally[base]!);
+  return counts;
+}
+
 type Source = HTMLImageElement | HTMLCanvasElement;
 const srcW = (s: Source) => (s instanceof HTMLImageElement ? s.naturalWidth : s.width);
 const srcH = (s: Source) => (s instanceof HTMLImageElement ? s.naturalHeight : s.height);
@@ -262,16 +320,9 @@ export function createBlockArt(
     els.out.height = q.height;
     const ctx = els.out.getContext("2d")!;
     const imgData = ctx.createImageData(q.width, q.height);
-    const counts = new Map<number, number>();
-    for (let p = 0; p < q.width * q.height; p++) {
-      const c = pal.entries[q.paletteIndex[p]!]!.color;
-      const o = p * 4;
-      imgData.data[o] = c.r;
-      imgData.data[o + 1] = c.g;
-      imgData.data[o + 2] = c.b;
-      imgData.data[o + 3] = 255;
-      counts.set(c.baseId, (counts.get(c.baseId) ?? 0) + 1);
-    }
+    // flat-typed-array paint + post-loop counts materialization (byte-identical to the old
+    // per-pixel entries[]/Map loop - locked in blockart-render-perf.test.ts)
+    const counts = paintQuantized(q, pal, imgData.data);
     ctx.putImageData(imgData, 0, 0);
     els.out.style.width = `${Math.min(512, q.width * 4)}px`;
 
