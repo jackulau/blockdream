@@ -1,5 +1,19 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { runBench, runAB } from "../bench/voxel-bench";
+
+const BASELINE_MD = join(dirname(fileURLToPath(import.meta.url)), "..", "bench", "BASELINE.md");
+
+// First column of every data row in a markdown table (skips the header row and the ---- separator).
+function tableStageNames(section: string): string[] {
+  return section
+    .split("\n")
+    .filter((line) => line.startsWith("|"))
+    .map((line) => line.split("|")[1]!.trim())
+    .filter((cell) => cell !== "stage" && !/^[-:]+$/.test(cell));
+}
 
 // The benchmark is a real, runnable harness — not a stub. This guards it against silent rot:
 // it must execute every stage and report a finite, positive timing + a non-zero work count for
@@ -40,6 +54,21 @@ describe("voxel benchmark harness", () => {
       expect(s.refMs, `${s.name} refMs > 0`).toBeGreaterThan(0);
       expect(s.speedup, `${s.name} speedup > 0`).toBeGreaterThan(0);
     }
+  });
+
+  // The committed BASELINE.md snapshot must cover EVERY stage the harness reports, in order.
+  // Both sides are derived programmatically (stage names from the tables vs the harness's own
+  // reported lists), so adding/renaming/removing a stage without refreshing the doc fails here.
+  it("BASELINE.md names every stage the harness reports", () => {
+    const md = readFileSync(BASELINE_MD, "utf8");
+    const absStart = md.indexOf("## Absolute timings");
+    const abStart = md.indexOf("## A/B");
+    expect(absStart, "BASELINE.md has an Absolute timings section").toBeGreaterThanOrEqual(0);
+    expect(abStart, "BASELINE.md has an A/B section").toBeGreaterThan(absStart);
+    expect(tableStageNames(md.slice(absStart, abStart)), "absolute-timings table stages").toEqual(
+      stages.map((s) => s.name),
+    );
+    expect(tableStageNames(md.slice(abStart)), "A/B table stages").toEqual(ab.map((s) => s.name));
   });
 
   // goal 045: the optimized spinSequence must be measurably FASTER than the reference inverse spin
