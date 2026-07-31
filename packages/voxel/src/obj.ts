@@ -6,9 +6,19 @@
 
 import { createVolume, setVoxel, EMPTY, type VoxelVolume } from "./volume";
 
+/**
+ * Default block colour for uncoloured mesh geometry: the light-gray base (baseId 22) at its
+ * canonical full shade (baseId*4 + 2 = 90), which the solid block resolver maps to a real
+ * placeable block (light gray concrete). Id 0 is NOT a usable default: map colour 0 is the
+ * downstream air/transparent sentinel (emit-commands AIR_MAP_COLOR_ID), so an uncoloured mesh
+ * (most real .obj/.glb exports) rasterized with 0 would voxelize "successfully" and then emit
+ * a 100% air pack with exit 0.
+ */
+export const DEFAULT_MODEL_MAP_COLOR_ID = 90;
+
 export interface ObjVoxelizeOptions {
   resolution?: number; // cube grid size (default 32)
-  mapColorId?: number; // block colour id to fill the shell with (default 0)
+  mapColorId?: number; // block colour id to fill the shell with (default DEFAULT_MODEL_MAP_COLOR_ID, a placeable light gray)
   solid?: boolean; // fill the interior too (flood-fill from outside), not just the surface shell
   /** sRGB (0..255) → mapColorId, e.g. a color-core OKLab nearest-match against the placeable
    *  palette. When supplied AND the source carries vertex colors, each triangle gets its own
@@ -92,7 +102,7 @@ export interface RasterOptions extends ObjVoxelizeOptions {
  *  that shared box (uniform scale, preserving aspect) so a sequence of meshes lands in one world frame. */
 export function trisToVolume(verts: V3[], tris: Tri[], opts: RasterOptions = {}): VoxelVolume {
   const res = Math.max(2, Math.floor(opts.resolution ?? 32));
-  const fallback = opts.mapColorId ?? 0;
+  const fallback = opts.mapColorId ?? DEFAULT_MODEL_MAP_COLOR_ID;
   if (verts.length === 0 || tris.length === 0) throw new Error("empty mesh (need vertices + triangles)");
 
   const b = opts.bounds ?? meshBounds(verts);
