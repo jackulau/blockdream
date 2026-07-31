@@ -1,7 +1,10 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { DEFAULT_MODEL_MAP_COLOR_ID } from "@blockdream/voxel";
+import { makeBlockResolver } from "@blockdream/emit-commands";
 import { render } from "../src/render";
 
 // goal 036 D1: a real 3D model (.obj/.gltf/.glb) must be reachable from the CLI render path, with its
@@ -59,5 +62,45 @@ describe("model3d CLI target (D1)", () => {
     const res = render({ input: objPath, out, target: "model3d", edition: "bedrock", width: 10, height: 10 });
     expect(res.filesWritten.some((f) => f.endsWith(".mcstructure"))).toBe(true);
     expect(readdirSync(out).length).toBeGreaterThan(0);
+  });
+});
+
+// goal 088 D1: the SHIPPED sample model (apps/web/public/test-assets/cube.obj) has NO vertex
+// colours, so the voxelizers' fallback mapColorId fills every voxel. That fallback used to be 0 -
+// the AIR sentinel (emit-commands AIR_MAP_COLOR_ID) - so rendering the shipped sample exited 0 and
+// emitted a datapack whose ONLY command was a `fill ... air` (Bedrock: palette ['minecraft:air']).
+// Locked here on the real file, both editions.
+const SHIPPED_CUBE_OBJ = join(
+  dirname(fileURLToPath(import.meta.url)), // file-relative, never CWD-relative (goal 061 lesson)
+  "..", "..", "..", "apps", "web", "public", "test-assets", "cube.obj",
+);
+
+describe("model3d on the shipped colorless cube.obj places real blocks, never an air-only pack (D1)", () => {
+  const defaultBlock = makeBlockResolver()(DEFAULT_MODEL_MAP_COLOR_ID);
+
+  it("the default model map colour resolves to a real placeable block", () => {
+    expect(defaultBlock).not.toBe("minecraft:air");
+    expect(defaultBlock).toMatch(/^minecraft:[a-z_]+$/);
+  });
+
+  it("Java datapack: frames place the default block, not only air", () => {
+    const out = join(dir, "shipped-java");
+    const res = render({ input: SHIPPED_CUBE_OBJ, out, target: "model3d", width: 8, height: 8 });
+    const fnFile = res.filesWritten.find((f) => f.endsWith(".mcfunction") && /frames/.test(f))!;
+    const body = readFileSync(fnFile, "utf8");
+    // real placement commands that place a NON-air block
+    const realPlacements = (body.match(/^(?:setblock|fill) .*/gm) ?? []).filter(
+      (line) => !line.includes("minecraft:air"),
+    );
+    expect(realPlacements.length).toBeGreaterThan(0);
+    expect(body).toContain(defaultBlock);
+  });
+
+  it("Bedrock .mcstructure: the palette contains a non-air block", () => {
+    const out = join(dir, "shipped-bedrock");
+    const res = render({ input: SHIPPED_CUBE_OBJ, out, target: "model3d", edition: "bedrock", width: 8, height: 8 });
+    const structPath = res.filesWritten.find((f) => f.endsWith(".mcstructure"))!;
+    const buf = readFileSync(structPath);
+    expect(buf.includes(defaultBlock)).toBe(true);
   });
 });

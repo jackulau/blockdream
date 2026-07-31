@@ -25,7 +25,7 @@ import { analyzeAudio, type NoteEvent } from "@blockdream/audio";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
 import { generateJavaDatapack, generateVoxelDatapack, generateRgbScreenDatapack, rgbImageToScreenFrame, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId, planTickPlayback } from "@blockdream/emit-commands";
-import { framesToAnimated3d, framesToFlat3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
+import { framesToAnimated3d, framesToFlat3d, objToVolume, gltfToFrames, glbToFrames, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, DEFAULT_MODEL_MAP_COLOR_ID, EMPTY, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -159,12 +159,23 @@ function howToLoad3d(namespace: string, sx: number, sy: number, sz: number): str
 }
 
 /** Guard against a silent empty 3D build (degenerate input: a solid-colour / fully-transparent image
- *  yields zero voxels). Throws a clear error rather than writing a valid-but-empty datapack. */
-function assertNonEmpty3d(volumes: VoxelVolume[]): void {
-  if (volumes.length === 0 || volumes.every((v) => countSolid(v) === 0)) {
+ *  yields zero voxels). Throws a clear error rather than writing a valid-but-empty datapack.
+ *  `resolvesToBlock` tightens the check to voxels that resolve to a REAL placeable block: a volume
+ *  whose every voxel resolves to air (e.g. the model importers' old air-sentinel default of 0) is
+ *  just as empty in-world as one with no voxels at all, and used to ship an air-only pack. */
+function assertNonEmpty3d(volumes: VoxelVolume[], resolvesToBlock?: (mapColorId: number) => boolean): void {
+  const hasRealBlock = volumes.some((v) => {
+    for (let i = 0; i < v.data.length; i++) {
+      const c = v.data[i]!;
+      if (c !== EMPTY && (resolvesToBlock === undefined || resolvesToBlock(c))) return true;
+    }
+    return false;
+  });
+  if (!hasRealBlock) {
     throw new Error(
-      "no subject detected: the input produced an empty 3D build (try a clearer subject/background, " +
-        "a non-zero --depth, or check the image isn't a single flat colour)",
+      "no subject detected: the input produced an empty 3D build (zero voxels, or every voxel " +
+        "resolves to air; try a clearer subject/background, a non-zero --depth, or check the " +
+        "image isn't a single flat colour)",
     );
   }
 }
@@ -213,21 +224,25 @@ export function render(opts: RenderOptions): RenderResult {
     };
     const resolution = Math.max(2, opts.width); // width = cube grid resolution for models
     const lower = opts.input.toLowerCase();
+    // Explicit non-air fallback for colorless geometry (belt to the voxelizers' own default
+    // braces): mapColorId 0 is the AIR sentinel, and the old implicit 0 turned the shipped
+    // sample cube.obj into a datapack whose only command was a `fill ... air`.
+    const modelOpts = { resolution, solid: true, matchColor, mapColorId: DEFAULT_MODEL_MAP_COLOR_ID };
     let volumes: VoxelVolume[];
     if (lower.endsWith(".glb")) {
       const buf = readFileSync(opts.input);
       const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-      volumes = glbToFrames(ab, { resolution, solid: true, matchColor });
+      volumes = glbToFrames(ab, modelOpts);
     } else if (lower.endsWith(".gltf")) {
-      volumes = gltfToFrames(readFileSync(opts.input, "utf8"), { resolution, solid: true, matchColor });
+      volumes = gltfToFrames(readFileSync(opts.input, "utf8"), modelOpts);
     } else {
-      volumes = [objToVolume(readFileSync(opts.input, "utf8"), { resolution, solid: true, matchColor })];
+      volumes = [objToVolume(readFileSync(opts.input, "utf8"), modelOpts)];
     }
     // animate BEFORE the non-empty assert (same order as voxel3d/mcstructure3d): a degenerate
     // animation (e.g. animateFrames 0 → []) must hit the clear error here, not a deep "no frames"
     // in the Java emitter or a TypeError on volumes[0] in the Bedrock branch below.
     volumes = applyAnimate(volumes, opts); // --animate: procedural block-motion of the built model
-    assertNonEmpty3d(volumes);
+    assertNonEmpty3d(volumes, (id) => resolveSolidBlockId(solidIds, id) !== undefined);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     if (edition === "bedrock") {
       volumes.forEach((vol, fi) => {
@@ -444,7 +459,7 @@ export function render(opts: RenderOptions): RenderResult {
           }),
       opts,
     );
-    assertNonEmpty3d(volumes);
+    assertNonEmpty3d(volumes, (id) => resolveSolidBlockId(solidIds, id) !== undefined);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     // --music: if the video carries audio, transcribe it to a note-block music area + sequencer.
     const music = analyzeMusicForInput(opts);
@@ -519,7 +534,7 @@ export function render(opts: RenderOptions): RenderResult {
       framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric }),
       opts,
     );
-    assertNonEmpty3d(volumes);
+    assertNonEmpty3d(volumes, (id) => resolveSolidBlockId(solidIds, id) !== undefined);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     volumes.forEach((vol, fi) => {
       const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION, origin: opts.origin });
