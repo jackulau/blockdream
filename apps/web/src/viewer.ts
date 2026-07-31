@@ -56,7 +56,9 @@ export class Viewer {
     this.cfg.onStatus?.("connecting…", "idle");
     const ws = new WebSocket(this.cfg.url);
     this.ws = ws;
+    let opened = false; // did THIS socket ever reach open?
     ws.onopen = () => {
+      opened = true;
       this.cfg.onStatus?.("connected", "ok");
       this.running = true;
       const now = performance.now();
@@ -69,7 +71,10 @@ export class Viewer {
     ws.onmessage = (ev) => this.onMessage(JSON.parse(ev.data));
     ws.onclose = () => {
       this.running = false;
-      this.cfg.onStatus?.("disconnected", "idle");
+      // A socket that NEVER opened already showed the useful error pill ("connection failed ·
+      // is the server running?") from onerror - the close event that follows a failed connect
+      // must not overwrite it with a blank "disconnected". Only a formerly-live session says so.
+      if (opened) this.cfg.onStatus?.("disconnected", "idle");
     };
     ws.onerror = () => this.cfg.onStatus?.("connection failed · is the server running?", "err");
   }

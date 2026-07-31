@@ -32,9 +32,17 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
+// Memoized swatches: the generated icon is pure in (id, size), but a canvas.toDataURL PNG
+// encode per BOM row per animated frame is real main-thread work - cache the data URL so
+// each block is encoded once for the page's lifetime (the BOM re-renders every GIF frame).
+const SWATCH_CACHE = new Map<string, string>();
+
 /** A faithful generated icon: the block's average RGB plus a stable per-block noise
  *  pattern so e.g. stone vs planks read as different textured chips (offline, no assets). */
 export function swatchDataUrl(info: BlockInfo, size = 26): string {
+  const key = `${info.id}@${size}`;
+  const cached = SWATCH_CACHE.get(key);
+  if (cached) return cached;
   const c = document.createElement("canvas");
   c.width = c.height = size;
   const ctx = c.getContext("2d")!;
@@ -51,7 +59,9 @@ export function swatchDataUrl(info: BlockInfo, size = 26): string {
     img.data[o + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
-  return c.toDataURL();
+  const url = c.toDataURL();
+  SWATCH_CACHE.set(key, url);
+  return url;
 }
 
 // --- real local textures (extracted from the official jar by scripts/fetch-block-textures.py) ---

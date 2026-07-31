@@ -15,6 +15,109 @@ import type { MapPalette } from "@blockdream/palette";
 import { blockForBase, swatchDataUrl, localTextureUrl, hasLocalTextures, loadTextureManifest } from "./blocks";
 import { decodeGif, isGif } from "./gif";
 import { buildSchedule, frameAtElapsed, type FrameSchedule } from "./anim";
+import { classifyImportFile } from "./import-files";
+
+/** Count distinct byte values. Equivalent to `new Set(bytes).size` but a flat O(n) pass over a
+ *  256-flag table - this runs per animated-GIF frame for the stats line, and Set construction
+ *  over a whole frame's map-color bytes was the hot part. */
+export function distinctByteCount(bytes: Uint8Array): number {
+  const seen = new Uint8Array(256);
+  let n = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i]!;
+    if (!seen[b]) {
+      seen[b] = 1;
+      n++;
+    }
+  }
+  return n;
+}
+
+/** §02 drop-zone routing: null means "load it as block-art"; a string is the message to show
+ *  instead of silently ignoring the drop. Classification is extension-first (classifyImportFile),
+ *  so an OS drag whose File carries an empty MIME type still routes by its name. */
+export function blockArtDropMessage(f: { name?: string; type?: string }): string | null {
+  const kind = classifyImportFile(f);
+  if (kind === "image" || kind === "gif") return null;
+  const name = f.name || "that file";
+  if (kind === "video") return `${name} is a video · the 3D voxel builder (section 03) plays videos as block animations`;
+  if (kind === "glb" || kind === "gltf" || kind === "obj") return `${name} is a 3D model · import it in the 3D voxel builder (section 03)`;
+  return `couldn't import ${name} · drop an image (.png/.jpg/.webp/.gif)`;
+}
+
+/** Incremental bill-of-materials renderer. The markup per row is byte-identical to a full
+ *  rebuild (li > img.ic + div.nm + div.ct, same classes, same innerHTML), but across frames of
+ *  an animated GIF the keyed <li> nodes are kept: count text updates only when it changes, rows
+ *  are re-appended only when the sort order changes, and a full rebuild happens only when the
+ *  block SET (or the texture mode) changes - so per-frame BOM work stops being DOM churn. */
+export function createBomRenderer(bomEl: HTMLElement): (counts: Map<number, number>, total: number) => void {
+  interface RowNode {
+    li: HTMLLIElement;
+    ct: HTMLDivElement;
+    ctHtml: string;
+  }
+  const nodes = new Map<number, RowNode>();
+  let lastUseTex: boolean | null = null;
+  return (counts, total) => {
+    const rows = [...counts.entries()]
+      .map(([baseId, n]) => ({ info: blockForBase(baseId), n }))
+      .filter((r): r is { info: NonNullable<ReturnType<typeof blockForBase>>; n: number } => !!r.info)
+      .sort((a, b) => b.n - a.n);
+    const useTex = hasLocalTextures(); // always use real block textures when present (no toggle)
+    const sameSet =
+      useTex === lastUseTex && nodes.size === rows.length && rows.every((r) => nodes.has(r.info.baseId));
+    if (!sameSet) {
+      nodes.clear();
+      bomEl.innerHTML = "";
+      for (const { info, n } of rows) {
+        const li = document.createElement("li");
+        const ic = document.createElement("img");
+        ic.className = "ic";
+        ic.alt = info.name;
+        const swatch = swatchDataUrl(info);
+        const real = useTex ? localTextureUrl(info.id) : null;
+        if (real) {
+          ic.src = real;
+          ic.onerror = () => {
+            ic.onerror = null;
+            ic.src = swatch; // graceful fallback if a texture file is missing
+          };
+        } else {
+          ic.src = swatch; // no local texture (or toggle off) → generated swatch
+        }
+        const nm = document.createElement("div");
+        nm.className = "nm";
+        nm.innerHTML = `${info.name}<br><small>${info.id}</small>`;
+        const ct = document.createElement("div");
+        ct.className = "ct";
+        const ctHtml = `${n}<small>${((100 * n) / total).toFixed(1)}%</small>`;
+        ct.innerHTML = ctHtml;
+        li.append(ic, nm, ct);
+        bomEl.appendChild(li);
+        nodes.set(info.baseId, { li, ct, ctHtml });
+      }
+      lastUseTex = useTex;
+      return;
+    }
+    // same block set: re-append the kept nodes only if the count-sorted order actually changed
+    let orderChanged = false;
+    for (let i = 0; i < rows.length; i++) {
+      if (bomEl.children[i] !== nodes.get(rows[i]!.info.baseId)!.li) {
+        orderChanged = true;
+        break;
+      }
+    }
+    if (orderChanged) for (const r of rows) bomEl.appendChild(nodes.get(r.info.baseId)!.li);
+    for (const { info, n } of rows) {
+      const rec = nodes.get(info.baseId)!;
+      const ctHtml = `${n}<small>${((100 * n) / total).toFixed(1)}%</small>`;
+      if (ctHtml !== rec.ctHtml) {
+        rec.ct.innerHTML = ctHtml;
+        rec.ctHtml = ctHtml;
+      }
+    }
+  };
+}
 
 type Source = HTMLImageElement | HTMLCanvasElement;
 const srcW = (s: Source) => (s instanceof HTMLImageElement ? s.naturalWidth : s.width);
@@ -86,39 +189,8 @@ export function createBlockArt(
     ctx.drawImage(img, 0, 0, els.src.width, els.src.height);
   }
 
-  function renderBom(counts: Map<number, number>, total: number): void {
-    const rows = [...counts.entries()]
-      .map(([baseId, n]) => ({ info: blockForBase(baseId), n }))
-      .filter((r): r is { info: NonNullable<ReturnType<typeof blockForBase>>; n: number } => !!r.info)
-      .sort((a, b) => b.n - a.n);
-    const useTex = hasLocalTextures(); // always use real block textures when present (no toggle)
-    els.bom.innerHTML = "";
-    for (const { info, n } of rows) {
-      const li = document.createElement("li");
-      const ic = document.createElement("img");
-      ic.className = "ic";
-      ic.alt = info.name;
-      const swatch = swatchDataUrl(info);
-      const real = useTex ? localTextureUrl(info.id) : null;
-      if (real) {
-        ic.src = real;
-        ic.onerror = () => {
-          ic.onerror = null;
-          ic.src = swatch; // graceful fallback if a texture file is missing
-        };
-      } else {
-        ic.src = swatch; // no local texture (or toggle off) → generated swatch
-      }
-      const nm = document.createElement("div");
-      nm.className = "nm";
-      nm.innerHTML = `${info.name}<br><small>${info.id}</small>`;
-      const ct = document.createElement("div");
-      ct.className = "ct";
-      ct.innerHTML = `${n}<small>${((100 * n) / total).toFixed(1)}%</small>`;
-      li.append(ic, nm, ct);
-      els.bom.appendChild(li);
-    }
-  }
+  // keyed incremental BOM (markup byte-identical to a full rebuild; see createBomRenderer)
+  const renderBom = createBomRenderer(els.bom);
 
   function render(): void {
     const src = currentSource();
@@ -149,7 +221,7 @@ export function createBlockArt(
     ctx.putImageData(imgData, 0, 0);
     els.out.style.width = `${Math.min(512, q.width * 4)}px`;
 
-    const distinct = new Set(q.mapColorId).size;
+    const distinct = distinctByteCount(q.mapColorId);
     const anim = frames.length > 1 ? ` · frame ${curFrame + 1}/${frames.length}` : "";
     els.stats.textContent = `${q.width}×${q.height} · ${counts.size} blocks · ${distinct} colors · ${dt.toFixed(1)} ms${anim}`;
     renderBom(counts, q.width * q.height);
@@ -207,11 +279,18 @@ export function createBlockArt(
       }
     }
     const img = new Image();
+    const url = URL.createObjectURL(file);
     img.onload = () => {
       loadImage(img);
-      URL.revokeObjectURL(img.src);
+      URL.revokeObjectURL(url);
     };
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      // a corrupt/undecodable file used to be a TOTAL silent no-op (stale image + stats kept,
+      // object URL leaked) - say what happened and free the URL so a retry starts clean.
+      URL.revokeObjectURL(url);
+      els.stats.textContent = `couldn't decode ${file.name} · is it a valid image?`;
+    };
+    img.src = url;
   }
 
   els.out.addEventListener("mousemove", (e) => {
@@ -264,6 +343,10 @@ export function createBlockArt(
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => loadImage(img);
+    img.onerror = () => {
+      // 404 / undecodable sample: message instead of a silently empty section
+      els.stats.textContent = `couldn't load ${url}`;
+    };
     img.src = url;
   }
   return {
