@@ -63,6 +63,20 @@ how you ask - whether baked or cast live. `--image` paints a flat wall; `--build
 video animates either way: as a moving 2D wall (`--image`) or as a **real-content 3D animation** -
 every frame its own build (`--build`). Details: [docs/live-cast.md](./docs/live-cast.md).
 
+**Share your SCREEN (live).** The same transport, pointed at your desktop: `cast-screen.sh` serves
+a local capture page - share any screen, window, or browser tab exactly as you would on a video
+call, and it appears as a live block wall in the running world. No mod, no datapack, nothing
+uploaded (loopback port into your own server); a delta encoder means a mostly-still screen is
+nearly free to paint:
+
+```bash
+bash scripts/cast-screen.sh --rcon-pass <pass> --setup                          # then open http://127.0.0.1:8770, click "Share a screen"
+bash scripts/cast-screen.sh --rcon-pass <pass> --size 160x90 --fps 8 --facing east
+```
+
+`--origin` / `--facing` place the wall like every other cast; `--size WxH` is the block grid your
+screen is downscaled to (default `128x72`, 16:9). Full flow + how it works: [docs/screen-share.md](./docs/screen-share.md).
+
 **Recreate a WHOLE video - with its soundtrack (offline datapack).** The faithful full-video
 modes reproduce a clip frame-for-frame instead of lifting a subject into relief: `--wall` makes
 every pixel exactly one block, `--led` fronts the wall with an invisible always-lit
@@ -157,6 +171,7 @@ ml/               # Workstream B - world model (Python / PyTorch)
 - [Technical writeup & results](./docs/results.md) - architecture diagram, methods, graphics, measured numbers
 - [Architecture](./docs/architecture.md) - whole-system map, packages, data flow
 - [Live cast into a running world](./docs/live-cast.md) - stream the world model onto a block wall in-place (no mod, no datapack); the transport + honest frame rates
+- [Screen-share into Minecraft](./docs/screen-share.md) - share any screen/window/tab live as a block wall (`scripts/cast-screen.sh`) over the same RCON transport
 - [Play it in Minecraft without Fabric](./docs/play-without-fabric.md) - offline cast + live RCON bridge
 - [3D builds & animation](./docs/3d-and-animation.md) - image→3D, greedy meshing, animation system
 - [Importing animations](./docs/video-import.md) - glTF / .glb / .obj-sequence / GIF / video (.mp4/.webm) → blocks; `--animate explode|wave|buildup` for procedural block-motion; **video audio → note blocks** (`--music auto|on|off`, `--music-engine playsound|redstone`) + the builder's drag-to-arrange canvas mod
