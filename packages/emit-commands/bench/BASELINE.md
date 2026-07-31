@@ -6,17 +6,17 @@ Deterministic seeded inputs. `pnpm exec tsx packages/emit-commands/bench/emit-be
 
 | stage                              |   med (ms) |  M elem/s |
 | ---------------------------------- | ---------: | --------: |
-| rgbScreenDeltaLines                |    13.961 |      21.1 |
-| generateRgbScreenDatapack          |   355.775 |       0.8 |
-| generateRgbScreenDatapackReference |   383.707 |       0.8 |
-| greedyBoxes                        |   190.389 |       0.7 |
-| computeVoxelDeltas                 |    10.258 |      43.1 |
-| noteSequencer(playsound)           |     1.225 |       0.5 |
-| redstoneSequencer                  |     1.937 |       0.3 |
+| rgbScreenDeltaLines                |     6.169 |      47.8 |
+| generateRgbScreenDatapack          |    29.240 |      10.1 |
+| generateRgbScreenDatapackReference |    95.502 |       3.1 |
+| greedyBoxes                        |     5.989 |      21.0 |
+| computeVoxelDeltas                 |     0.787 |     561.9 |
+| noteSequencer(playsound)           |     0.313 |       1.9 |
+| redstoneSequencer                  |     0.356 |       1.7 |
 
 ## A/B: optimized vs retained byte-identical reference (same run - the rigorous comparison)
 
 | stage                  | ref (ms) | opt (ms) | speedup |
 | ---------------------- | -------: | -------: | ------: |
-| rgbscreen-delta-lines  |    10.727 |     8.956 |    1.20x |
-| greedy-boxes           |  2339.469 |   383.503 |    6.10x |
+| rgbscreen-delta-lines  |     8.745 |     5.280 |    1.66x |
+| greedy-boxes           |   629.633 |    18.060 |   34.86x |
