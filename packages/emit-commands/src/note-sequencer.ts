@@ -70,8 +70,11 @@ export interface NoteSequencer {
   setupScores: string[];
   /** Loop length in game ticks (`#mtcount`); 0 when there are no notes. */
   loopTicks: number;
-  /** Notes actually emitted (after the maxNotes cap). */
+  /** Notes actually emitted (after the loop trim and the maxNotes cap). */
   noteCount: number;
+  /** Distinct (instrument, note) pairs = physical keyboard cells along +X (0 when no
+   *  notes). The keyboard spans x in [musicOrigin.x, musicOrigin.x + keyboardNotes - 1]. */
+  keyboardNotes: number;
 }
 
 function fmt(n: number): string {
@@ -97,20 +100,22 @@ export function noteSequencer(notes: NoteEvent[], opts: NoteSequencerOptions = {
 
   // Physical keyboard: one tuned note block per distinct (instrument, note),
   // laid out ascending along +X, each on its instrument-selecting base block.
+  // The distinct set is computed even when the keyboard is not placed, so callers
+  // always learn the keyboard span (keyboardNotes cells along +X).
+  const seen = new Set<string>();
+  const distinct: Array<{ note: number; instrument: string }> = [];
+  for (const e of used) {
+    const key = `${e.instrument}:${e.note}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      distinct.push({ note: e.note, instrument: e.instrument });
+    }
+  }
+  distinct.sort((a, b) =>
+    a.instrument === b.instrument ? a.note - b.note : a.instrument < b.instrument ? -1 : 1,
+  );
   const keyboard: string[] = [];
   if (placeKeyboard && used.length) {
-    const seen = new Set<string>();
-    const distinct: Array<{ note: number; instrument: string }> = [];
-    for (const e of used) {
-      const key = `${e.instrument}:${e.note}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        distinct.push({ note: e.note, instrument: e.instrument });
-      }
-    }
-    distinct.sort((a, b) =>
-      a.instrument === b.instrument ? a.note - b.note : a.instrument < b.instrument ? -1 : 1,
-    );
     distinct.forEach((d, i) => {
       const x = origin.x + i;
       const base = INSTRUMENT_BASE[d.instrument] ?? INSTRUMENT_BASE["harp"]!;
@@ -140,5 +145,5 @@ export function noteSequencer(notes: NoteEvent[], opts: NoteSequencerOptions = {
     ? [`scoreboard players set #mt ma 0`, `scoreboard players set #mtcount ma ${loopTicks}`]
     : [];
 
-  return { keyboard, musicLines, setupScores, loopTicks, noteCount: used.length };
+  return { keyboard, musicLines, setupScores, loopTicks, noteCount: used.length, keyboardNotes: distinct.length };
 }

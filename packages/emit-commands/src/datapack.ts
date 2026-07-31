@@ -40,6 +40,11 @@ export interface GeneratedPack {
   totalSetblocks: number;
   /** total emitted commands after fill optimization (≤ totalSetblocks). */
   totalCommands?: number;
+  /** Music notes ACTUALLY emitted into the pack (after the loop trim and the note cap);
+   *  0 when the pack has no music. Report this, not the input timeline length. */
+  musicNoteCount?: number;
+  /** Music loop length in game ticks (the #mtcount the pack sets); 0 when no music. */
+  musicLoopTicks?: number;
 }
 
 const RESERVED = new Set(["minecraft"]);

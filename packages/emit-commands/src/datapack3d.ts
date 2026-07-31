@@ -221,7 +221,7 @@ export function generateVoxelDatapack(
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
           const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes });
-          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores };
+          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores, noteCount: r.noteCount, loopTicks: r.loopTicks };
         })()
       : (() => {
           const n = noteSequencer(music, {
@@ -231,7 +231,7 @@ export function generateVoxelDatapack(
             // Unequal loop lengths re-phase on every wrap and drift a little more each cycle.
             loopTicksOverride: volumes.length > 1 ? volumes.length * speed : undefined,
           });
-          return { physical: n.keyboard, musicLines: n.musicLines, setupScores: n.setupScores };
+          return { physical: n.keyboard, musicLines: n.musicLines, setupScores: n.setupScores, noteCount: n.noteCount, loopTicks: n.loopTicks };
         })();
 
   // Optional LED glow layer: an invisible light plane one block outside the chosen face.
@@ -311,5 +311,16 @@ export function generateVoxelDatapack(
   if (opts.supportedFormats) packMeta.supported_formats = opts.supportedFormats;
   files.set("pack.mcmeta", JSON.stringify({ pack: packMeta }, null, 2) + "\n");
 
-  return { files, namespace: ns, frameCount: volumes.length, width: sx, height: sy, totalSetblocks, totalCommands };
+  return {
+    files,
+    namespace: ns,
+    frameCount: volumes.length,
+    width: sx,
+    height: sy,
+    totalSetblocks,
+    totalCommands,
+    // honest music reporting: what the pack actually plays, not the input timeline length
+    musicNoteCount: seq ? seq.noteCount : 0,
+    musicLoopTicks: seq ? seq.loopTicks : 0,
+  };
 }

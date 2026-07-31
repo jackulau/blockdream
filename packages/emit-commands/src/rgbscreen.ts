@@ -330,7 +330,7 @@ export function generateRgbScreenDatapack(
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
           const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes });
-          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores };
+          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores, noteCount: r.noteCount, loopTicks: r.loopTicks };
         })()
       : (() => {
           const nn = noteSequencer(music, {
@@ -338,7 +338,7 @@ export function generateRgbScreenDatapack(
             maxNotes: opts.musicMaxNotes,
             loopTicksOverride: frames.length > 1 ? frames.length * speed : undefined,
           });
-          return { physical: nn.keyboard, musicLines: nn.musicLines, setupScores: nn.setupScores };
+          return { physical: nn.keyboard, musicLines: nn.musicLines, setupScores: nn.setupScores, noteCount: nn.noteCount, loopTicks: nn.loopTicks };
         })();
 
   files.set(
@@ -413,7 +413,18 @@ export function generateRgbScreenDatapack(
   if (opts.supportedFormats) packMeta.supported_formats = opts.supportedFormats;
   files.set("pack.mcmeta", JSON.stringify({ pack: packMeta }, null, 2) + "\n");
 
-  return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks, totalCommands };
+  return {
+    files,
+    namespace: ns,
+    frameCount: frames.length,
+    width: W,
+    height: H,
+    totalSetblocks,
+    totalCommands,
+    // honest music reporting: what the pack actually plays, not the input timeline length
+    musicNoteCount: seq ? seq.noteCount : 0,
+    musicLoopTicks: seq ? seq.loopTicks : 0,
+  };
 }
 
 /**
@@ -515,7 +526,7 @@ export function generateRgbScreenDatapackReference(
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
           const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes });
-          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores };
+          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores, noteCount: r.noteCount, loopTicks: r.loopTicks };
         })()
       : (() => {
           const nn = noteSequencer(music, {
@@ -523,7 +534,7 @@ export function generateRgbScreenDatapackReference(
             maxNotes: opts.musicMaxNotes,
             loopTicksOverride: frames.length > 1 ? frames.length * speed : undefined,
           });
-          return { physical: nn.keyboard, musicLines: nn.musicLines, setupScores: nn.setupScores };
+          return { physical: nn.keyboard, musicLines: nn.musicLines, setupScores: nn.setupScores, noteCount: nn.noteCount, loopTicks: nn.loopTicks };
         })();
 
   files.set(
@@ -598,5 +609,16 @@ export function generateRgbScreenDatapackReference(
   if (opts.supportedFormats) packMeta.supported_formats = opts.supportedFormats;
   files.set("pack.mcmeta", JSON.stringify({ pack: packMeta }, null, 2) + "\n");
 
-  return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks, totalCommands };
+  return {
+    files,
+    namespace: ns,
+    frameCount: frames.length,
+    width: W,
+    height: H,
+    totalSetblocks,
+    totalCommands,
+    // honest music reporting: what the pack actually plays, not the input timeline length
+    musicNoteCount: seq ? seq.noteCount : 0,
+    musicLoopTicks: seq ? seq.loopTicks : 0,
+  };
 }
