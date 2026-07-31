@@ -141,7 +141,7 @@ function assertNamespace(nsv: string): void {
 }
 
 /** World position of image pixel (ix, iy) - iy is an IMAGE row (0 = top). */
-function pixelPos(
+export function pixelPos(
   origin: Vec3,
   facing: ScreenFacing,
   width: number,
@@ -310,12 +310,16 @@ export function generateRgbScreenDatapack(
 
   files.set(`${fnDir}/play.mcfunction`, `$function ${ns}:frames/$(idx)\n`);
 
-  // forceload bounds: the one-block-thick screen plane
-  const last = pixelPos(origin, facing, W, H, W - 1, 0);
-  const flx0 = Math.min(origin.x, Math.floor(last.x));
-  const flx1 = Math.max(origin.x, Math.floor(last.x));
-  const flz0 = Math.min(origin.z, Math.floor(last.z));
-  const flz1 = Math.max(origin.z, Math.floor(last.z));
+  // forceload bounds: the one-block-thick screen plane. pixelPos MIRRORS the along-axis
+  // for north/east (x or z = origin + (width - along)), so pixel ix=0 can be the FAR
+  // corner: bound over BOTH corner pixels (min/max each axis). Bounding origin + ix=W-1
+  // alone degenerates the rect to a single chunk for north/east screens.
+  const corner0 = pixelPos(origin, facing, W, H, 0, 0);
+  const corner1 = pixelPos(origin, facing, W, H, W - 1, 0);
+  const flx0 = Math.min(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
+  const flx1 = Math.max(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
+  const flz0 = Math.min(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
+  const flz1 = Math.max(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
 
   // Optional note-block music, identical wiring to the voxel datapack (shared #play clock,
   // music loop locked to the animation loop so audio and video never re-phase).
@@ -491,12 +495,16 @@ export function generateRgbScreenDatapackReference(
 
   files.set(`${fnDir}/play.mcfunction`, `$function ${ns}:frames/$(idx)\n`);
 
-  // forceload bounds: the one-block-thick screen plane
-  const last = pixelPos(origin, facing, W, H, W - 1, 0);
-  const flx0 = Math.min(origin.x, Math.floor(last.x));
-  const flx1 = Math.max(origin.x, Math.floor(last.x));
-  const flz0 = Math.min(origin.z, Math.floor(last.z));
-  const flz1 = Math.max(origin.z, Math.floor(last.z));
+  // forceload bounds: the one-block-thick screen plane. pixelPos MIRRORS the along-axis
+  // for north/east (x or z = origin + (width - along)), so pixel ix=0 can be the FAR
+  // corner: bound over BOTH corner pixels (min/max each axis). Bounding origin + ix=W-1
+  // alone degenerates the rect to a single chunk for north/east screens.
+  const corner0 = pixelPos(origin, facing, W, H, 0, 0);
+  const corner1 = pixelPos(origin, facing, W, H, W - 1, 0);
+  const flx0 = Math.min(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
+  const flx1 = Math.max(origin.x, Math.floor(corner0.x), Math.floor(corner1.x));
+  const flz0 = Math.min(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
+  const flz1 = Math.max(origin.z, Math.floor(corner0.z), Math.floor(corner1.z));
 
   // Optional note-block music, identical wiring to the voxel datapack (shared #play clock,
   // music loop locked to the animation loop so audio and video never re-phase).
