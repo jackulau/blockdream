@@ -39,7 +39,7 @@ import { Viewer3D } from "./viewer3d";
 import { localTextureUrl, faceTextureUrl, loadTextureManifest, hasLocalTextures, swatchDataUrl } from "./blocks";
 import { resolveBlock, safeBlockInfo } from "./resolve-block";
 import { volumeBom } from "./bom3d";
-import { downloadDatapack, planTickPlayback } from "./datapack-export";
+import { downloadDatapack, planExportBudget, planTickPlayback } from "./datapack-export";
 import {
   quantizedToRaster,
   flatVolumeToRaster,
@@ -965,6 +965,9 @@ async function setup3dViewer(): Promise<void> {
     // source; at/below 20 fps every frame keeps its nearest whole-tick dwell.
     const plan = planTickPlayback(allFrames.length, durationsMs);
     const frames = plan.resampled ? plan.indices.map((i) => allFrames[i]!) : allFrames;
+    // Export-budget guard: one .mcfunction per frame; warn (do not block) past the tested budget.
+    const budget = planExportBudget(frames.length);
+    if (budget.warn) console.warn(`blockdream export: ${budget.message}`);
     // the viewer centers the build + the note-block row on their group positions; pass each object's
     // half-extent so the export lands them centered where they sit on screen (not corner-offset).
     const v0 = frames[0];
@@ -987,8 +990,9 @@ async function setup3dViewer(): Promise<void> {
     const paceNote = plan.resampled
       ? ` · in-game 20 fps (Minecraft's 1-frame-per-tick ceiling; ${allFrames.length} → ${frames.length} frames, same duration)`
       : ` · in-game ${plan.fps} fps`;
+    const budgetNote = budget.warn ? ` · WARNING: ${budget.message}` : "";
     $<HTMLDivElement>("v3-export").textContent =
-      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote} · /function blockdream_3d:setup`;
+      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote}${budgetNote} · /function blockdream_3d:setup`;
     downloadDatapack("blockdream-3d-datapack", pack.files);
   });
 

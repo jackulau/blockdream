@@ -2,7 +2,13 @@ import { describe, it, expect } from "vitest";
 import { unzipSync, strFromU8 } from "fflate";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { createVolume, setVoxel } from "@blockdream/voxel";
-import { zipDatapack, loadInstructions, planTickPlayback } from "../src/datapack-export";
+import {
+  zipDatapack,
+  loadInstructions,
+  planTickPlayback,
+  planExportBudget,
+  EXPORT_FRAME_BUDGET,
+} from "../src/datapack-export";
 import { resolveBlock } from "../src/resolve-block";
 import { planDatapackPlacement, initialArrangeState, arrangeReducer } from "../src/canvas-mod";
 import type { NoteEvent } from "@blockdream/audio";
@@ -183,5 +189,46 @@ describe("planTickPlayback (Minecraft's 20 fps / 1-frame-per-tick ceiling)", () 
     const p = planTickPlayback(4, [undefined, undefined, undefined, undefined]);
     expect(p.resampled).toBe(false); // fallback 100 ms/frame = 10 fps
     expect(p.speedTicks).toBe(2);
+  });
+});
+
+describe("planExportBudget (function-file export budget guard)", () => {
+  it("the budget never drops below the largest real-server-validated pack (2191 frames, goal 083)", () => {
+    expect(EXPORT_FRAME_BUDGET).toBeGreaterThanOrEqual(2191);
+  });
+
+  it("at or below the budget: warn=false, still reports the planned count", () => {
+    for (const n of [1, 24, 2191, EXPORT_FRAME_BUDGET]) {
+      const p = planExportBudget(n);
+      expect(p.warn, `${n} frames`).toBe(false);
+      expect(p.frameCount).toBe(n);
+      expect(p.budget).toBe(EXPORT_FRAME_BUDGET);
+      expect(p.message).toContain(String(n));
+    }
+  });
+
+  it("2191 frames exactly (validated live, goal 083) is within budget - never warned about", () => {
+    expect(planExportBudget(2191).warn).toBe(false);
+  });
+
+  it("above the budget: warn=true with the planned count and the budget in the message", () => {
+    const over = EXPORT_FRAME_BUDGET + 1;
+    const p = planExportBudget(over);
+    expect(p.warn).toBe(true);
+    expect(p.message).toContain(String(over));
+    expect(p.message).toContain(String(EXPORT_FRAME_BUDGET));
+  });
+
+  it("a worst-case web decode (20 fps x 660 s = 13200 frames) is flagged, not blocked", () => {
+    const p = planExportBudget(13200);
+    expect(p.warn).toBe(true);
+    expect(p.message).toContain("13200");
+    // guard reports; it must not throw or cap - the caller decides how to surface it
+    expect(p.frameCount).toBe(13200);
+  });
+
+  it("respects an explicit budget override (pure function, no hidden state)", () => {
+    expect(planExportBudget(10, 10).warn).toBe(false);
+    expect(planExportBudget(11, 10).warn).toBe(true);
   });
 });

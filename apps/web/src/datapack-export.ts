@@ -8,6 +8,34 @@ import { zipSync, strToU8 } from "fflate";
 // >20 fps clips identically to this exporter; re-exported here to keep existing imports.
 export { planTickPlayback, type TickPlan } from "@blockdream/emit-commands";
 
+/** Export-budget ceiling on per-frame .mcfunction files in one web-exported datapack.
+ *  2191 frames is the largest pack validated end-to-end on a REAL server (whole-video
+ *  Bad Apple e2e, goal 083) - never set this below 2191; that size is a shipped, proven
+ *  capability. 2600 adds modest headroom; beyond it a pack has never been proven to
+ *  /reload in-game, so the export warns (it does NOT hard-fail - the CLI covers the
+ *  same risk with an explicit --max-frames / maxFrames flag, the web warns instead). */
+export const EXPORT_FRAME_BUDGET = 2600;
+
+export interface ExportBudget {
+  frameCount: number; // planned per-frame function files (one .mcfunction per frame)
+  budget: number; // the documented ceiling this plan was checked against
+  warn: boolean; // true when frameCount exceeds the budget
+  message: string; // human-readable status for the UI (warning text when warn=true)
+}
+
+/** Pure export-budget guard: given the number of frames about to be emitted (one function
+ *  file each), report whether the pack exceeds the documented budget. Callers surface the
+ *  warning (console + status element) BEFORE zipping; the export itself still proceeds. */
+export function planExportBudget(frameCount: number, budget: number = EXPORT_FRAME_BUDGET): ExportBudget {
+  const warn = frameCount > budget;
+  const message = warn
+    ? `${frameCount} frame function files exceeds the tested budget of ${budget} ` +
+      `(largest real-server-validated pack: 2191 frames). The pack will still be built, ` +
+      `but /reload may be slow or fail; consider a shorter clip or a lower fps.`
+    : `${frameCount} frame function files (within the ${budget}-frame budget)`;
+  return { frameCount, budget, warn, message };
+}
+
 /** Step-by-step in-game load guide, derived from the pack's own namespace, bundled into the zip so
  *  the instructions travel with the download (the "how do I load this" answer ships with it). */
 export function loadInstructions(files: Map<string, string>): string {
