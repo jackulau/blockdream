@@ -29,9 +29,12 @@ import { runFfmpeg, ffmpegMissingMessage } from "@blockdream/video";
 import type { RgbImage } from "@blockdream/color-core";
 import {
   actionMessage,
+  boxSetupFootprint,
   buildBoxSetupCommands,
   buildSetupCommands,
   buildToLiveFrames,
+  describeSetupFootprint,
+  wallSetupFootprint,
   videoBuildToLiveFrames,
   castImageFrames,
   frameToWallCommands,
@@ -488,7 +491,10 @@ export async function main(argv: string[]): Promise<number> {
   // ----- optional in-world setup: clear the wall + viewing space (no datapack/reload) -----
   // (--build does its OWN 3D build-box setup below; this flat-wall clear is for the WM stream / --image)
   if (doSetup && !buildPath) {
-    const setupCmds = buildSetupCommands(origin, sizeW, sizeH, { clearance: setupClearance, facing: wallFacing });
+    const setupOpts = { clearance: setupClearance, facing: wallFacing };
+    // disclose the exact clear box BEFORE the first /fill executes (dry-run reports it without RCON)
+    for (const line of describeSetupFootprint("wall + viewing clearance", wallSetupFootprint(origin, sizeW, sizeH, setupOpts))) log(line);
+    const setupCmds = buildSetupCommands(origin, sizeW, sizeH, setupOpts);
     log(`setup: clearing wall slab + ${setupClearance}-block clearance (facing ${wallFacing}) in the running world (${setupCmds.length} /fill command(s), no datapack/reload)`);
     if (dryRun) {
       for (const c of setupCmds) log(`  setup> ${c}`);
@@ -542,6 +548,8 @@ export async function main(argv: string[]): Promise<number> {
     // --setup clears the build box; folding it into frame 0 means each loop re-clears, so a looping
     // animation wraps cleanly (no stale blocks from the previous pass).
     if (doSetup && frameCommands.length > 0) {
+      // disclose the exact clear box BEFORE any command is sent (dry-run reports it without RCON)
+      for (const line of describeSetupFootprint("build", boxSetupFootprint(origin, volume))) log(line);
       frameCommands[0] = [...buildBoxSetupCommands(origin, volume), ...frameCommands[0]!];
     }
     const kind = isVideo ? `video ×${frameCommands.length} frames` : buildAnimate ? `${buildAnimate} ×${frameCommands.length} frames` : "static";

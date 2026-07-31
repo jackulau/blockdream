@@ -29,6 +29,7 @@ const REQUIRED = {
   "docs/driving-world-model.md": ["## Datasets found", "## Architecture", "## Run it"],
   "docs/live-control.md": ["## Architecture", "## Operator setup"],
   "docs/live-cast.md": ["## The transport", "## Drop-in: one command into a running world", "## Honest frame rates", "## Going faster"],
+  "docs/screen-share.md": ["## What you need", "## Run it", "## How it works", "## Notes and limits"],
   "docs/play-without-fabric.md": ["## Offline cast (datapack)", "## Live bridge (RCON)", "## Security notes", "## Fabric alternative"],
   "docs/movement-types.md": ["## How conditioning works", "## Honest status"],
   "docs/load-into-minecraft.md": ["## Java Edition", "## Bedrock Edition"],

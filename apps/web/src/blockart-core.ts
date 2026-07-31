@@ -244,6 +244,7 @@ export function createBlockArt(
   els.file.addEventListener("change", () => {
     const file = els.file.files?.[0];
     if (file) void loadFile(file);
+    els.file.value = ""; // allow re-selecting the SAME file (e.g. retry after a failed import) to re-fire "change"
   });
   els.grid.addEventListener("input", () => {
     els.gridVal.textContent = `${els.grid.value} px`;

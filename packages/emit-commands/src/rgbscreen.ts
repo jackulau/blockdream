@@ -1,17 +1,17 @@
-// TRUE-RGB screen emitter — 16.7M colors in UNMODDED Minecraft. Vanilla has no RGB
+// TRUE-RGB screen emitter - 16.7M colors in UNMODDED Minecraft. Vanilla has no RGB
 // *block* (verified against every 2026 drop: 26.1 Tiny Takeover, 26.2 Chaos Cubed,
-// the 26.3 snapshots — all fixed-color palettes), but a `text_display` entity's
+// the 26.3 snapshots - all fixed-color palettes), but a `text_display` entity's
 // `background` is a full ARGB int. A grid of one-per-pixel text_displays therefore
 // IS an exact-color screen: no palette quantization, no dither, per-pixel updates by
 // `data merge entity <uuid> {background:<argb>}`. `brightness:{sky:15,block:15}`
-// makes every pixel full-bright — the screen is inherently an LED wall.
+// makes every pixel full-bright - the screen is inherently an LED wall.
 //
 // Same 100%-vanilla playback machinery as the block datapacks (tick-driven scoreboard
 // counter + `$function` macro dispatch), so this composes with the note-block music
 // sequencers unchanged. Pure string-building; no node/DOM imports.
 //
 // Frame encoding: setup summons every pixel with frame 0's color baked in, so
-// frames/0 is the WRAP delta (last frame → frame 0), not a keyframe — the loop
+// frames/0 is the WRAP delta (last frame → frame 0), not a keyframe - the loop
 // re-enters frame 0 with exactly the pixels that differ from the final frame.
 
 import type { RgbImage } from "@blockdream/color-core";
@@ -63,7 +63,7 @@ export interface RgbScreenOptions {
   packFormat?: number;
   /** supported_formats range for pack.mcmeta (see datapack.ts). */
   supportedFormats?: { min_inclusive: number; max_inclusive: number };
-  /** Java NBT DataVersion of the TARGET version — selects the text-component NBT
+  /** Java NBT DataVersion of the TARGET version - selects the text-component NBT
    *  syntax (1.21.5 / DataVersion 4325 moved entity text from JSON-in-string to SNBT). */
   dataVersion?: number;
   description?: string;
@@ -84,7 +84,7 @@ export interface RgbScreenOptions {
    * shows gaps or overlap (font/pack dependent), tune with --px-scale.
    */
   pxScale?: { x: number; y: number };
-  /** Optional note-block music (see datapack3d.ts — identical wiring). */
+  /** Optional note-block music (see datapack3d.ts - identical wiring). */
   music?: NoteEvent[];
   musicOrigin?: Vec3;
   musicEngine?: "playsound" | "redstone";
@@ -100,7 +100,7 @@ export const DEFAULT_PX_SCALE = { x: 6.667, y: 4.0 } as const;
  * Deterministic, collision-free UUID for pixel `index` of screen `ns`.
  * splitmix32 stream seeded by index ⊕ hash(ns): the first output word alone is a
  * bijection of the seed, so two distinct pixel indexes can never share a UUID.
- * Deterministic on purpose — frame functions address entities by literal UUID
+ * Deterministic on purpose - frame functions address entities by literal UUID
  * (O(1) lookup, no selector scan), so the ids must be reproducible at emit time.
  */
 export function pixelUuid(ns: string, index: number): readonly [number, number, number, number] {
@@ -140,7 +140,7 @@ function assertNamespace(nsv: string): void {
   }
 }
 
-/** World position of image pixel (ix, iy) — iy is an IMAGE row (0 = top). */
+/** World position of image pixel (ix, iy) - iy is an IMAGE row (0 = top). */
 function pixelPos(
   origin: Vec3,
   facing: ScreenFacing,
@@ -167,8 +167,229 @@ function fmtF(n: number): string {
   return `${Math.round(n * 1000) / 1000}f`;
 }
 
-/** Generate a vanilla Java datapack that plays exact-RGB frames on a text_display screen. */
+/**
+ * HOT LOOP: one frame's delta lines from precomputed per-pixel command prefixes.
+ * `mergePrefix[i]` is `data merge entity <uuid> {background:` for pixel i, so each
+ * changed pixel costs one prefix + int + "}" concat instead of rebuilding the whole
+ * template (~2x faster line building; on a 2,191-frame clip this loop emits millions
+ * of lines). Byte-identical to referenceRgbScreenDeltaLines (locked by
+ * rgbscreen-perf.test.ts).
+ */
+export function rgbScreenDeltaLines(cur: Int32Array, prev: Int32Array, mergePrefix: string[]): string[] {
+  const lines: string[] = [];
+  for (let i = 0; i < mergePrefix.length; i++) {
+    if (cur[i] !== prev[i]) lines.push(mergePrefix[i]! + cur[i] + "}");
+  }
+  return lines;
+}
+
+/**
+ * Reference delta-line builder, kept verbatim from before the prefix optimization:
+ * rebuilds the full command template per changed pixel per frame. Exported only for
+ * the same-run opt-vs-ref A/B in rgbscreen-perf.test.ts. Do not optimize.
+ */
+export function referenceRgbScreenDeltaLines(cur: Int32Array, prev: Int32Array, uuids: string[]): string[] {
+  const lines: string[] = [];
+  for (let i = 0; i < uuids.length; i++) {
+    if (cur[i] !== prev[i]) lines.push(`data merge entity ${uuids[i]} {background:${cur[i]}}`);
+  }
+  return lines;
+}
+
+/**
+ * Generate a vanilla Java datapack that plays exact-RGB frames on a text_display screen.
+ *
+ * Hot path: on a real clip (e.g. 2,191 frames) the delta loop emits millions of
+ * `data merge entity <uuid> {background:<argb>}` lines. Rebuilding that template per
+ * changed pixel per frame re-concatenates the constant prefix millions of times, so the
+ * per-pixel prefix is precomputed ONCE (`mergePrefix`) and each delta line is built by
+ * rgbScreenDeltaLines as a single prefix + int + "}" concat. Same for the summon loop:
+ * every part of the summon string except position, UUID, and frame-0 color is
+ * loop-invariant and hoisted. Output is byte-for-byte identical to
+ * generateRgbScreenDatapackReference (locked by rgbscreen-perf.test.ts).
+ */
 export function generateRgbScreenDatapack(
+  frames: RgbScreenFrame[],
+  opts: RgbScreenOptions = {},
+): GeneratedPack {
+  if (frames.length === 0) throw new Error("no frames");
+  const { width: W, height: H } = frames[0]!;
+  if (W <= 0 || H <= 0) throw new Error(`empty screen ${W}x${H}`);
+  for (const [f, fr] of frames.entries()) {
+    if (fr.width !== W || fr.height !== H) {
+      throw new Error(`frame ${f} is ${fr.width}x${fr.height}, expected ${W}x${H}`);
+    }
+  }
+  const ns = opts.namespace ?? "blockdream_rgb";
+  assertNamespace(ns);
+  const packFormat = opts.packFormat ?? 48;
+  const origin = opts.origin ?? { x: 0, y: 64, z: 0 };
+  const facing = opts.facing ?? "south";
+  const speed = Math.max(1, Math.floor(opts.speedTicks ?? 2));
+  const limit = Math.max(1, Math.floor(opts.maxCommandsPerFunction ?? DEFAULT_MAX_COMMANDS));
+  const scale = opts.pxScale ?? DEFAULT_PX_SCALE;
+  const yaw = FACING_YAW[facing];
+  // 1.21.5+ reads SNBT components; older versions want the JSON-in-a-string form.
+  const textNbt = (opts.dataVersion ?? 0) >= SNBT_TEXT_DATA_VERSION ? `" "` : `'{"text":" "}'`;
+
+  const n = W * H;
+  // Precomputed per-pixel command prefixes: `data merge entity <uuid> {background:` is
+  // invariant across ALL frames for a given pixel, so build it once, not per delta line.
+  const mergePrefix: string[] = new Array(n);
+  const uuidNbt: string[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const u = pixelUuid(ns, i);
+    mergePrefix[i] = `data merge entity ${uuidString(u)} {background:`;
+    uuidNbt[i] = `[I;${u[0]},${u[1]},${u[2]},${u[3]}]`;
+  }
+
+  const files = new Map<string, string>();
+  const fnDir = `data/${ns}/function`;
+
+  // screen: one summon per pixel, frame 0's color baked in (chunked under the limit)
+  const f0 = frames[0]!.argb;
+  const summons: string[] = new Array(n);
+  const transform = `transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[${fmtF(scale.x)},${fmtF(scale.y)},1f]}`;
+  // hoisted loop invariants: the constant head, the ns/text mid-section, and the whole
+  // tail (fmtF(yaw) + transform were previously re-evaluated/re-concatenated per pixel)
+  const summonHead = "summon minecraft:text_display ";
+  const summonMid = `,Tags:["${ns}"],text:${textNbt},background:`;
+  const summonTail = `,see_through:0b,brightness:{sky:15,block:15},billboard:"fixed",Rotation:[${fmtF(yaw)},0f],${transform}}`;
+  for (let iy = 0; iy < H; iy++) {
+    for (let ix = 0; ix < W; ix++) {
+      const i = iy * W + ix;
+      const p = pixelPos(origin, facing, W, H, ix, iy);
+      summons[i] =
+        summonHead + p.x + " " + p.y + " " + p.z + " {UUID:" + uuidNbt[i] + summonMid + f0[i] + summonTail;
+    }
+  }
+  writeSplitFunction(files, `${fnDir}/screen`, summons, limit, (k) => `function ${ns}:screen/part${k}`, `# summon the ${W}x${H} pixel grid (frame 0 baked in)`);
+
+  // per-frame deltas; frames/0 is the WRAP delta (last → 0)
+  let totalSetblocks = 0;
+  let totalCommands = 0;
+  for (let f = 0; f < frames.length; f++) {
+    const cur = frames[f]!.argb;
+    const prev = frames[(f - 1 + frames.length) % frames.length]!.argb;
+    const lines: string[] = frames.length > 1 ? rgbScreenDeltaLines(cur, prev, mergePrefix) : [];
+    totalSetblocks += lines.length;
+    totalCommands += lines.length;
+    const header = `# frame ${f}${f === 0 ? " (wrap Δ from last)" : ""} (Δ ${lines.length})`;
+    writeSplitFunction(files, `${fnDir}/frames/${f}`, lines, limit, (k) => `function ${ns}:frames/${f}/part${k}`, header);
+  }
+
+  files.set(`${fnDir}/play.mcfunction`, `$function ${ns}:frames/$(idx)\n`);
+
+  // forceload bounds: the one-block-thick screen plane
+  const last = pixelPos(origin, facing, W, H, W - 1, 0);
+  const flx0 = Math.min(origin.x, Math.floor(last.x));
+  const flx1 = Math.max(origin.x, Math.floor(last.x));
+  const flz0 = Math.min(origin.z, Math.floor(last.z));
+  const flz1 = Math.max(origin.z, Math.floor(last.z));
+
+  // Optional note-block music, identical wiring to the voxel datapack (shared #play clock,
+  // music loop locked to the animation loop so audio and video never re-phase).
+  const music = opts.music && opts.music.length ? opts.music : undefined;
+  const musicOrigin = opts.musicOrigin ?? { x: flx1 + 2, y: origin.y, z: flz1 };
+  const seq = !music
+    ? undefined
+    : (opts.musicEngine ?? "playsound") === "redstone"
+      ? (() => {
+          const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes });
+          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores };
+        })()
+      : (() => {
+          const nn = noteSequencer(music, {
+            musicOrigin,
+            maxNotes: opts.musicMaxNotes,
+            loopTicksOverride: frames.length > 1 ? frames.length * speed : undefined,
+          });
+          return { physical: nn.keyboard, musicLines: nn.musicLines, setupScores: nn.setupScores };
+        })();
+
+  files.set(
+    `${fnDir}/setup.mcfunction`,
+    [
+      `# one-time setup: load via /function ${ns}:setup`,
+      `scoreboard objectives add ma dummy`,
+      `scoreboard players set #play ma ${opts.autoplay ? 1 : 0}`,
+      `scoreboard players set #t ma 0`,
+      `scoreboard players set #f ma 0`,
+      `scoreboard players set #speed ma ${speed}`,
+      `scoreboard players set #count ma ${frames.length}`,
+      ...(seq ? seq.setupScores : []),
+      `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
+      `kill @e[type=minecraft:text_display,tag=${ns}]`, // idempotent re-setup
+      `function ${ns}:screen`,
+      ...(seq ? seq.physical : []),
+      "",
+    ].join("\n"),
+  );
+  if (seq) files.set(`${fnDir}/music.mcfunction`, seq.musicLines.join("\n"));
+
+  files.set(
+    `${fnDir}/start.mcfunction`,
+    [`forceload add ${flx0} ${flz0} ${flx1} ${flz1}`, `scoreboard players set #play ma 1`, ""].join("\n"),
+  );
+  files.set(
+    `${fnDir}/stop.mcfunction`,
+    [`scoreboard players set #play ma 0`, `forceload remove ${flx0} ${flz0} ${flx1} ${flz1}`, ""].join("\n"),
+  );
+  files.set(
+    `${fnDir}/teardown.mcfunction`,
+    [
+      `# remove the screen entirely (entities persist in the world save)`,
+      `# forceload first: kill only reaches LOADED entities, and after :stop the`,
+      `# screen chunks may have unloaded (teardown from far away would leak pixels)`,
+      `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
+      `scoreboard players set #play ma 0`,
+      `kill @e[type=minecraft:text_display,tag=${ns}]`,
+      `forceload remove ${flx0} ${flz0} ${flx1} ${flz1}`,
+      "",
+    ].join("\n"),
+  );
+  files.set(
+    `${fnDir}/driver.mcfunction`,
+    [
+      `# advance + dispatch, runs every tick from #minecraft:tick`,
+      `execute unless score #play ma matches 1 run return 0`,
+      `scoreboard players add #t ma 1`,
+      `execute if score #t ma < #speed ma run return 0`,
+      `scoreboard players set #t ma 0`,
+      `scoreboard players add #f ma 1`,
+      `execute if score #f ma >= #count ma run scoreboard players set #f ma 0`,
+      `execute store result storage ${ns}:anim idx int 1 run scoreboard players get #f ma`,
+      `function ${ns}:play with storage ${ns}:anim`,
+      "",
+    ].join("\n"),
+  );
+  files.set(
+    `data/minecraft/tags/function/tick.json`,
+    JSON.stringify({ values: seq ? [`${ns}:driver`, `${ns}:music`] : [`${ns}:driver`] }, null, 2) + "\n",
+  );
+
+  const packMeta: {
+    pack_format: number;
+    description: string;
+    supported_formats?: { min_inclusive: number; max_inclusive: number };
+  } = {
+    pack_format: packFormat,
+    description: opts.description ?? `blockdream TRUE-RGB screen (${W}x${H}, ${frames.length} frames)`,
+  };
+  if (opts.supportedFormats) packMeta.supported_formats = opts.supportedFormats;
+  files.set("pack.mcmeta", JSON.stringify({ pack: packMeta }, null, 2) + "\n");
+
+  return { files, namespace: ns, frameCount: frames.length, width: W, height: H, totalSetblocks, totalCommands };
+}
+
+/**
+ * Deliberately-simple REFERENCE implementation, kept verbatim (algorithm and
+ * emitted bytes) from before the string-building optimization (per-pixel template
+ * literals rebuilt per frame). Exported only so tests can assert the optimized path
+ * is byte-for-byte identical and faster (same pattern as greedyBoxesSparse vs
+ * greedyBoxes). Do not optimize.
+ */
+export function generateRgbScreenDatapackReference(
   frames: RgbScreenFrame[],
   opts: RgbScreenOptions = {},
 ): GeneratedPack {
@@ -247,7 +468,7 @@ export function generateRgbScreenDatapack(
   const flz0 = Math.min(origin.z, Math.floor(last.z));
   const flz1 = Math.max(origin.z, Math.floor(last.z));
 
-  // Optional note-block music — identical wiring to the voxel datapack (shared #play clock,
+  // Optional note-block music, identical wiring to the voxel datapack (shared #play clock,
   // music loop locked to the animation loop so audio and video never re-phase).
   const music = opts.music && opts.music.length ? opts.music : undefined;
   const musicOrigin = opts.musicOrigin ?? { x: flx1 + 2, y: origin.y, z: flz1 };

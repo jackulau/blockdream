@@ -21,13 +21,14 @@ import {
   generateSequence,
   generateSequenceOverFrames,
   spinSequence,
-  TRANSFORM_ANIMS,
   EMPTY,
   type SequenceAnimName,
   type VoxelVolume,
 } from "@blockdream/voxel";
+import { animSourceFor, isTransformAnim, spinExportVolume } from "./anim-source";
+import { classifyImportFile } from "./import-files";
 import { rgbFramesToFlat3d, rgbFramesToAnimated3d } from "./video3d";
-import { isVideoFile, decodeVideo } from "./video";
+import { decodeVideo } from "./video";
 import { ClipAudio, type ClipAudioMode } from "./clip-audio";
 import { analyzeFileAudio } from "./audio";
 import { NotePreview } from "./note-preview";
@@ -39,7 +40,7 @@ import { Viewer3D } from "./viewer3d";
 import { localTextureUrl, faceTextureUrl, loadTextureManifest, hasLocalTextures, swatchDataUrl } from "./blocks";
 import { resolveBlock, safeBlockInfo } from "./resolve-block";
 import { volumeBom } from "./bom3d";
-import { downloadDatapack, planTickPlayback } from "./datapack-export";
+import { downloadDatapack, planExportBudget, planTickPlayback } from "./datapack-export";
 import {
   quantizedToRaster,
   flatVolumeToRaster,
@@ -497,7 +498,10 @@ async function setup3dViewer(): Promise<void> {
   // that reverts cleanly to the single solid. Distinguishes a generated sequence from an IMPORTED
   // multi-frame animation (GIF/video/glb/obj-seq), which must NOT be discarded when a transform is picked.
   let seqFromBase = false;
-  const isTransformAnim = (s: string) => (TRANSFORM_ANIMS as readonly string[]).includes(s);
+  // The plain frames of an active MODEL import (glb/glTF/obj-seq/single obj). Kept so a block-motion
+  // anim (wave/explode/buildup) generates OVER the import instead of falling back to the stale
+  // baseVolume (which still points at the previously built solid) and silently discarding it.
+  let importedFrames: VoxelVolume[] | null = null;
 
   // Build a genuine 3D SOLID from the current source. imageToSolid isolates the subject from the
   // background, inflates thickness by silhouette shape (a rounded dome, not a brightness emboss),
@@ -509,7 +513,8 @@ async function setup3dViewer(): Promise<void> {
     const q = lastSource;
     if (!q) return;
     flatFramesRgb = null; // a single solid is not a flat import, nor a base-derived sequence,
-    flatVolFrames = null; // nor an imported clip
+    flatVolFrames = null; // nor an imported clip or model
+    importedFrames = null;
     seqFromBase = false;
     const maxDepth = Math.max(4, Number(depth.value));
     const depthOf =
@@ -672,34 +677,36 @@ async function setup3dViewer(): Promise<void> {
   });
 
   // animation selector: live transform anims (spin/bob/rock/tumble/pulse/orbit/none) apply instantly;
-  // block-motion anims (explode/wave/buildup) regenerate a frame sequence from the built solid.
+  // block-motion anims (explode/wave/buildup) regenerate a frame sequence from the RIGHT source.
+  // WHICH content each choice must use is the pure decision in anim-source.ts (unit-tested there):
+  // a flat GIF/video clip rides/effects the clip, a model import effects the IMPORT (not the stale
+  // built solid), a still build effects baseVolume, and transforms apply to whatever is shown.
   animSel.addEventListener("change", () => {
     const sel = animSel.value;
-    // A flat GIF/video import is a multi-frame animation whose frames ARE the content. Apply the chosen
-    // animation WITHOUT discarding the import: a transform anim rides live on top of the playing frames
-    // (camera swings to 3/4 so a rotation reads in depth; "still" restores head-on), while a sequence
-    // anim needs a single solid, so solidify the imported subject's current frame and sequence THAT.
-    if (flatVolFrames) {
-      if (isTransformAnim(sel)) {
+    const src = animSourceFor(sel, { flatVolFrames, importedFrames, baseVolume, seqFromBase, current3d });
+    switch (src.kind) {
+      case "clip-transform": {
         // a block-motion effect (wave/explode/buildup) may have replaced the plain clip; restore it so
         // the transform rides on the ACTUAL animation frames, not a frozen effected sequence.
-        if (flatVolFrames && current3d !== flatVolFrames) {
-          current3d = flatVolFrames;
+        if (src.restore) {
+          current3d = src.frames;
           current3dDurations = flatDurationsMs; // restoring the clip restores its real timing
-          if (flatVolFrames[0]) renderBom3d(flatVolFrames[0]);
-          viewer.setFrames(flatVolFrames, { faceOn: sel === "none" });
-          scrub.max = String(flatVolFrames.length - 1);
+          if (src.frames[0]) renderBom3d(src.frames[0]);
+          viewer.setFrames(src.frames, { faceOn: sel === "none" });
+          scrub.max = String(src.frames.length - 1);
           $<HTMLButtonElement>("v3-download").disabled = false;
           playBtn.textContent = viewer.isPlaying ? "pause" : "play";
         }
         viewer.reframe(sel === "none"); // none → head-on; any motion → 3/4 so it reads in depth
         viewer.setAnim(sel);
         hud.textContent = `${flatLabel} · ${sel === "none" ? "head-on" : sel} · drag to orbit`;
-      } else if (flatVolFrames && flatVolFrames.length) {
+        break;
+      }
+      case "clip-sequence": {
         // block-motion effect (wave/explode/buildup) applied OVER the playing clip: the animation keeps
         // advancing (frame f uses clip[f % N]) while the effect displaces it, instead of the old
         // behaviour that froze one frame, solidified it, and animated only that (losing the animation).
-        const combined = generateSequenceOverFrames(sel as SequenceAnimName, flatVolFrames);
+        const combined = generateSequenceOverFrames(sel as SequenceAnimName, src.frames);
         current3d = combined;
         current3dDurations = null; // the effect resamples to its own frame count → uniform playback
         if (combined[0]) renderBom3d(combined[0]);
@@ -709,16 +716,29 @@ async function setup3dViewer(): Promise<void> {
         viewer.play();
         playBtn.textContent = "pause";
         hud.textContent = `${flatLabel} · ${sel} · playing · drag to orbit`;
+        break;
       }
-      return;
-    }
-    if (isTransformAnim(sel)) {
-      if (seqFromBase) rebuildVolume(); // revert a GENERATED sequence to its solid (imports are left intact)
-      viewer.setAnim(sel);
-      if (lastSource) hud.textContent = `${sel} · drag to orbit`;
-    } else if (baseVolume) {
-      showFrames(generateSequence(sel as SequenceAnimName, baseVolume, 24), sel);
-      seqFromBase = true;
+      case "shown-transform": {
+        if (src.revertToBase) rebuildVolume(); // revert a GENERATED sequence to its solid (imports are left intact)
+        viewer.setAnim(sel);
+        if (lastSource) hud.textContent = `${sel} · drag to orbit`;
+        break;
+      }
+      case "import-sequence": {
+        // the effect rides OVER the imported model's plain frames (frame f displaces import[f % N]),
+        // NOT the stale baseVolume - which still points at the previously built solid and would
+        // silently discard the import. showFrames leaves importedFrames set, so re-picking another
+        // effect starts again from the PLAIN import (no effect-on-effect compounding).
+        showFrames(generateSequenceOverFrames(sel as SequenceAnimName, src.frames), sel);
+        break;
+      }
+      case "base-sequence": {
+        showFrames(generateSequence(sel as SequenceAnimName, src.volume, 24), sel);
+        seqFromBase = true;
+        break;
+      }
+      case "none":
+        break;
     }
   });
 
@@ -740,6 +760,13 @@ async function setup3dViewer(): Promise<void> {
     hud.textContent = `${label} · ${frames.length} frame${frames.length > 1 ? "s" : ""} · drag to orbit`;
   }
 
+  // A MODEL import (glb/glTF/obj-seq/single obj): show it and remember its plain frames so the
+  // animation selector can generate a block-motion effect over the IMPORT (see anim-source.ts).
+  function showImported(frames: VoxelVolume[], label: string): void {
+    showFrames(frames, label);
+    importedFrames = frames;
+  }
+
   // import a real animation → block animation: a Blender glTF/.glb (node-TRS animation sampled to
   // frames), an .obj-per-frame sequence (select multiple), a single .obj model, an animated .gif,
   // a VIDEO file (.mp4/.webm/.mov - decoded natively in the browser, no ffmpeg), or a still image
@@ -750,6 +777,7 @@ async function setup3dViewer(): Promise<void> {
     viewer.pause(); // stop the render loop overwriting the status line
     flatFramesRgb = null; // a fresh import invalidates the prior flat import (re-set below on success)
     flatVolFrames = null;
+    importedFrames = null; // …and the prior model import (re-set below when this one is a model)
     current3dMusic = []; // a fresh import drops any prior video's note-block music
     notePreview.setEvents([]);
     clipAudio.dispose(); // …and its original soundtrack (re-loaded below when the new file has one)
@@ -758,21 +786,24 @@ async function setup3dViewer(): Promise<void> {
     playBtn.textContent = "play";
     hud.textContent = `importing ${files.length > 1 ? `${files.length} files` : files[0]!.name}…`;
     try {
-      const objs = files.filter((f) => /\.obj$/i.test(f.name));
-      const glb = files.find((f) => /\.glb$/i.test(f.name));
-      const gltf = files.find((f) => /\.gltf$/i.test(f.name));
-      const gif = files.find((f) => /\.gif$/i.test(f.name) || f.type === "image/gif");
-      const video = files.find((f) => isVideoFile(f));
-      const image = files.find((f) => f.type.startsWith("image/")); // any still image (gif handled above)
+      // ONE pure classifier (import-files.ts, unit-tested) decides what each file is - the picker,
+      // the canvas drag & drop, and the URL box all reach this dispatch, so every entry point
+      // accepts exactly the same set.
+      const objs = files.filter((f) => classifyImportFile(f) === "obj");
+      const glb = files.find((f) => classifyImportFile(f) === "glb");
+      const gltf = files.find((f) => classifyImportFile(f) === "gltf");
+      const gif = files.find((f) => classifyImportFile(f) === "gif");
+      const video = files.find((f) => classifyImportFile(f) === "video");
+      const image = files.find((f) => classifyImportFile(f) === "image"); // any still image (gif handled above)
       if (glb) {
-        showFrames(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glb ${glb.name}`);
+        showImported(glbToFrames(await glb.arrayBuffer(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glb ${glb.name}`);
       } else if (gltf) {
-        showFrames(gltfToFrames(await gltf.text(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glTF ${gltf.name}`);
+        showImported(gltfToFrames(await gltf.text(), { frames: 24, resolution: 40, mapColorId: grayId, matchColor: match3d }), `glTF ${gltf.name}`);
       } else if (objs.length > 1) {
         const texts = await Promise.all(objs.sort((a, b) => a.name.localeCompare(b.name)).map((f) => f.text()));
-        showFrames(objSequenceToFrames(texts, { resolution: 40, mapColorId: grayId, matchColor: match3d }), `obj-seq ×${texts.length}`);
+        showImported(objSequenceToFrames(texts, { resolution: 40, mapColorId: grayId, matchColor: match3d }), `obj-seq ×${texts.length}`);
       } else if (objs.length === 1) {
-        showFrames([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true, matchColor: match3d })], `model ${objs[0]!.name}`);
+        showImported([objToVolume(await objs[0]!.text(), { resolution: 40, mapColorId: grayId, solid: true, matchColor: match3d })], `model ${objs[0]!.name}`);
       } else if (gif) {
         // animated GIF → FLAT, faithful per-frame block animation. A 2D motion graphic has no "subject"
         // to lift off a "background"; the OLD dome-inflation path turned it into a boiling blob. Here the
@@ -914,7 +945,27 @@ async function setup3dViewer(): Promise<void> {
   }
 
   $<HTMLInputElement>("v3-import").addEventListener("change", (ev) => {
-    void importFiles(Array.from((ev.target as HTMLInputElement).files ?? []));
+    const input = ev.target as HTMLInputElement;
+    void importFiles(Array.from(input.files ?? []));
+    input.value = ""; // allow re-selecting the SAME file (e.g. retry after a failed import) to re-fire "change"
+  });
+
+  // drag & drop any importable asset (model / GIF / video / image) onto the 3D canvas area - the
+  // same affordance §02 trains, funneled through the SAME importFiles pipeline as the picker + URL.
+  const v3Drop = $<HTMLDivElement>("v3-drop");
+  for (const e of ["dragenter", "dragover"]) {
+    v3Drop.addEventListener(e, (ev) => {
+      ev.preventDefault();
+      v3Drop.classList.add("drag");
+    });
+  }
+  for (const e of ["dragleave", "drop"]) {
+    v3Drop.addEventListener(e, () => v3Drop.classList.remove("drag"));
+  }
+  v3Drop.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    const files = Array.from((ev as DragEvent).dataTransfer?.files ?? []);
+    if (files.length) void importFiles(files); // multiple files supported (an .obj-per-frame sequence)
   });
 
   // paste a link (the Dribbble GIF, a video, any CORS-friendly image) → fetched → same block pipeline
@@ -950,7 +1001,13 @@ async function setup3dViewer(): Promise<void> {
   // the single still. Returns the timing to replay at (null ⇒ uniform, for a baked spin / sequence).
   function exportFrames(): { frames: VoxelVolume[]; durationsMs: Array<number | undefined> | null } {
     if (current3d.length > 1) return { frames: current3d, durationsMs: current3dDurations };
-    if (baseVolume && animSel.value === "spin") return { frames: spinSequence(baseVolume, 24), durationsMs: null };
+    if (animSel.value === "spin") {
+      // bake the turntable of the volume the user is actually looking at: an active import beats
+      // the stale baseVolume (same source preference as anim-source.ts - after a model import,
+      // baseVolume still points at the PREVIOUSLY built solid; spinning it exported stale content).
+      const v = spinExportVolume({ flatVolFrames, importedFrames, baseVolume });
+      if (v) return { frames: spinSequence(v, 24), durationsMs: null };
+    }
     return { frames: current3d, durationsMs: current3dDurations };
   }
 
@@ -965,6 +1022,9 @@ async function setup3dViewer(): Promise<void> {
     // source; at/below 20 fps every frame keeps its nearest whole-tick dwell.
     const plan = planTickPlayback(allFrames.length, durationsMs);
     const frames = plan.resampled ? plan.indices.map((i) => allFrames[i]!) : allFrames;
+    // Export-budget guard: one .mcfunction per frame; warn (do not block) past the tested budget.
+    const budget = planExportBudget(frames.length);
+    if (budget.warn) console.warn(`blockdream export: ${budget.message}`);
     // the viewer centers the build + the note-block row on their group positions; pass each object's
     // half-extent so the export lands them centered where they sit on screen (not corner-offset).
     const v0 = frames[0];
@@ -987,8 +1047,9 @@ async function setup3dViewer(): Promise<void> {
     const paceNote = plan.resampled
       ? ` · in-game 20 fps (Minecraft's 1-frame-per-tick ceiling; ${allFrames.length} → ${frames.length} frames, same duration)`
       : ` · in-game ${plan.fps} fps`;
+    const budgetNote = budget.warn ? ` · WARNING: ${budget.message}` : "";
     $<HTMLDivElement>("v3-export").textContent =
-      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote} · /function blockdream_3d:setup`;
+      `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote}${budgetNote} · /function blockdream_3d:setup`;
     downloadDatapack("blockdream-3d-datapack", pack.files);
   });
 

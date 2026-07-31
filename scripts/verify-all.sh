@@ -180,6 +180,8 @@ node --check tools/mineflayer-collector/redstone-music-e2e.mjs
 ok "node --check redstone-music-e2e.mjs"
 node --check tools/mineflayer-collector/fullvideo-e2e.mjs
 ok "node --check fullvideo-e2e.mjs"
+node --check tools/mineflayer-collector/screenshare-e2e.mjs
+ok "node --check screenshare-e2e.mjs"
 if [ "${BLOCKDREAM_E2E:-}" = "1" ]; then
   node tools/mineflayer-collector/bridge-e2e.mjs >/dev/null
   ok "bridge-e2e live run (vanilla server + bot + sidecar)"
@@ -193,8 +195,10 @@ if [ "${BLOCKDREAM_E2E:-}" = "1" ]; then
   ok "redstone-music-e2e live run (voxel3d --music-engine redstone → vanilla server builds the note-block instrument + the delay-line conducts the pulse end-to-end)"
   node tools/mineflayer-collector/fullvideo-e2e.mjs >/dev/null
   ok "fullvideo-e2e live run (whole-video wall --wall --led + music-locked loop AND TRUE-RGB text_display screen, cell/entity-exact on a vanilla server)"
+  node tools/mineflayer-collector/screenshare-e2e.mjs >/dev/null
+  ok "screenshare-e2e live run (screen-share bridge: emulated capture page streams wire-format frames over WS, wall painted cell-exact on a vanilla server)"
 else
-  skipped_allowed "bridge-e2e + datapack-e2e + scale-datapack-e2e + music-datapack-e2e + redstone-music-e2e + fullvideo-e2e live runs - set BLOCKDREAM_E2E=1 (needs network for the Mojang server jar + Java 21 + ffmpeg; ~2min)"
+  skipped_allowed "bridge-e2e + datapack-e2e + scale-datapack-e2e + music-datapack-e2e + redstone-music-e2e + fullvideo-e2e + screenshare-e2e live runs - set BLOCKDREAM_E2E=1 (needs network for the Mojang server jar + Java 21 + ffmpeg; ~2min)"
 fi
 
 printf '\nverify-all: %d passed, %d skipped - ' "$pass" "$skip"
