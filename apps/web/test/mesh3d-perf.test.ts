@@ -142,6 +142,24 @@ describe("mesh3d optimized mesher vs retained reference", () => {
     });
   }
 
+  it("keyOf contract: called exactly once per quad, in quad order, by both the optimized and reference groupers", () => {
+    const v = previewSlab(64, 36, 2);
+    const expected = greedyQuads(v).map((q) => `${q.id}:${q.dir}`);
+    expect(expected.length).toBeGreaterThan(100); // non-trivial workload guard
+
+    for (const [label, fn] of [
+      ["optimized", meshByMaterial],
+      ["reference", meshByMaterialReference],
+    ] as const) {
+      const calls: string[] = [];
+      fn(v, (id, dir) => {
+        calls.push(`${id}:${dir}`);
+        return singleKey(id);
+      });
+      expect(calls, `${label}: keyOf must see every quad exactly once, in quad order`).toEqual(expected);
+    }
+  });
+
   it("empty volume sanity: both mesher paths emit zero quads and zero groups", () => {
     const v = createVolume(8, 8, 8);
     expect(v.data.every((b) => b === EMPTY)).toBe(true);
