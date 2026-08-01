@@ -335,7 +335,7 @@ export function runAB(cfg: BenchConfig = {}): ABStage[] {
     out.push({ name: "spinSequence", optMs, refMs, speedup: refMs / optMs });
   }
 
-  // 5. spinSequence inner Y copy (goal 089 D19) — hoisted running indices (opt) vs the verbatim
+  // 5. spinSequence inner Y copy (goal 089 D19): hoisted running indices (opt) vs the verbatim
   //    getVoxel/setVoxel column copy (spinSequenceReference). Byte-identical (spin-perf.test.ts);
   //    isolates exactly what D19 changed (the per-voxel inBounds + voxelIndex overhead).
   {
