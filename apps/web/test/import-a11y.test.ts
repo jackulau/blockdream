@@ -29,7 +29,17 @@ describe("(a) audio-analysis failure carries a visible reason", () => {
   it("the showcase writes it to the HUD in the audio catch (not just log.warn)", () => {
     expect(showcase).toContain("audioAnalysisFailedText(video.name, (err as Error).message)");
     // the catch still logs for debugging, but no longer ONLY logs
-    expect(showcase).toMatch(/log\.warn\("audio analysis failed", err\);[\s\S]{0,400}audioAnalysisFailedText/);
+    expect(showcase).toMatch(/log\.warn\("audio analysis failed", err\);[\s\S]{0,500}audioAnalysisFailedText/);
+  });
+
+  it("the reason survives playback: onFrame's per-frame HUD line carries it", () => {
+    // a one-shot hud.textContent write in the catch is erased by onFrame on the next frame
+    // advance (~50-100ms into playback) - the failed clip is PLAYING when the catch runs, so
+    // the reason must ride the per-frame line, not race it.
+    expect(showcase).toMatch(/audioFailNote = audioAnalysisFailedText/);
+    expect(showcase).toMatch(/drag to orbit\$\{audioFailNote \? ` · \$\{audioFailNote\}` : ""\}/);
+    // and a fresh import clears it, so a prior clip's failure never haunts the next one
+    expect(showcase).toMatch(/current3dMusic = \[\];[^\n]*\n\s*audioFailNote = null;/);
   });
 });
 

@@ -440,6 +440,11 @@ async function setup3dViewer(): Promise<void> {
     }
   }
 
+  // audio-analysis failure reason. onFrame rewrites the HUD on every frame advance, so a one-shot
+  // write in the catch survives <100ms once playback starts - the reason has to ride the per-frame
+  // line to stay readable for as long as the failed clip is the one playing.
+  let audioFailNote: string | null = null;
+
   const viewer = new Viewer3D({
     canvas,
     // hover picking: same tooltip contract as the 2D block-art canvas (name, id, rgb swatch)
@@ -471,7 +476,7 @@ async function setup3dViewer(): Promise<void> {
     colorFor: (id) => hexByMap[id & 255]!,
     onFrame: (i, n) => {
       scrub.value = String(i);
-      hud.textContent = `frame ${i + 1}/${n} · drag to orbit`;
+      hud.textContent = `frame ${i + 1}/${n} · drag to orbit${audioFailNote ? ` · ${audioFailNote}` : ""}`;
       // audio, per the audio-mode select. "original": the clip's own soundtrack follows the frame
       // clock (only when the shown frames carry the clip's real timing - an effect sequence has its
       // own uniform clock, so the soundtrack pauses rather than desync). "note blocks": the synth
@@ -864,6 +869,7 @@ async function setup3dViewer(): Promise<void> {
     flatVolFrames = null;
     importedFrames = null; // …and the prior model import (re-set below when this one is a model)
     current3dMusic = []; // a fresh import drops any prior video's note-block music
+    audioFailNote = null; // …and the prior clip's audio-failure reason off the HUD line
     notePreview.setEvents([]);
     clipAudio.dispose(); // …and its original soundtrack (re-loaded below when the new file has one)
     viewer.setMusicArea([]);
@@ -994,8 +1000,11 @@ async function setup3dViewer(): Promise<void> {
           log.warn("audio analysis failed", err);
           // the toggle stays disabled (nothing to toggle) - but the REASON must be visible:
           // "Note blocks" greyed forever beside an audio-mode select still offering silent
-          // "note blocks" was a dead end. The visual import above already succeeded.
-          hud.textContent = audioAnalysisFailedText(video.name, (err as Error).message);
+          // "note blocks" was a dead end. The visual import above already succeeded, so
+          // playback is live and onFrame owns the HUD - the note rides that line (see
+          // audioFailNote) instead of being a one-shot write the next frame erases.
+          audioFailNote = audioAnalysisFailedText(video.name, (err as Error).message);
+          hud.textContent = audioFailNote;
         }
       } else if (image) {
         // still image → a single subject-isolated 3D solid the viewer spins live (its own animation).
