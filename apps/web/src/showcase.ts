@@ -43,6 +43,8 @@ import {
   IMPORT_CANCELLED_TEXT,
   gifCapNote,
   viewer3dUnavailableText,
+  VIEWER3D_CONTEXT_LOST_TEXT,
+  VIEWER3D_CONTEXT_RESTORED_TEXT,
   AUDIO_BLOCKED_TEXT,
   settingsChangeNote,
   blockArtExportText,
@@ -482,6 +484,24 @@ async function setup3dViewer(): Promise<void> {
         const w = previewTickWindow(previewPlan, i);
         notePreview.windowShown(w.t0, w.t1);
       }
+    },
+    // GPU reset mid-session: the renderer used to keep rAF-ing into the dead context - a frozen
+    // black canvas with every control still live. Now the section pauses, disables, and explains
+    // (same disable-and-explain surface as the construction-failure catch below).
+    onContextLost: () => {
+      playBtn.textContent = "play";
+      clipAudio.pause();
+      hud.textContent = VIEWER3D_CONTEXT_LOST_TEXT;
+      for (const id of SECTION3_CONTROL_IDS) $<HTMLButtonElement>(id).disabled = true;
+    },
+    onContextRestored: () => {
+      for (const id of SECTION3_CONTROL_IDS) $<HTMLButtonElement>(id).disabled = false;
+      // re-enabling everything must not over-promise: exports need frames, the note-block
+      // toggle needs a transcription, and an in-flight import keeps its triggers locked.
+      if (!current3d.length) for (const id of ["v3-download", "v3-gif", "v3-png"]) $<HTMLButtonElement>(id).disabled = true;
+      musicToggle.disabled = current3dMusic.length === 0;
+      setImportBusy(importing);
+      hud.textContent = VIEWER3D_CONTEXT_RESTORED_TEXT;
     },
   });
 

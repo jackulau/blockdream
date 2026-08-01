@@ -49,6 +49,15 @@ export function viewer3dUnavailableText(msg: string): string {
   return `3D viewer unavailable: ${msg} (WebGL required)`;
 }
 
+/** HUD line while the WebGL context is LOST after a successful start (GPU reset / driver
+ *  crash / low-memory device). Rendering + playback are stopped and the section's controls
+ *  disabled - the old behavior was a frozen black canvas with live controls. */
+export const VIEWER3D_CONTEXT_LOST_TEXT =
+  "3D viewer paused: the browser lost the WebGL context (GPU reset) · waiting for it to be restored…";
+
+/** HUD line once the browser restores the context and the frame is re-meshed. */
+export const VIEWER3D_CONTEXT_RESTORED_TEXT = "3D viewer restored · press play to resume";
+
 /** HUD line when the browser's autoplay policy blocks clip audio / the note-block synth. */
 export const AUDIO_BLOCKED_TEXT = "audio blocked by the browser - click play again to enable sound";
 
