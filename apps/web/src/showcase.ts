@@ -69,6 +69,7 @@ import {
   type GifFrame,
 } from "./pixel-export";
 import { decodeGif } from "./gif";
+import { buildHexTable, rgbFromFlatVol as rgbFromFlatVolTable } from "./render-tables";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const MC_URL = "ws://127.0.0.1:8765";
@@ -279,11 +280,10 @@ const CLIP_VOXEL_BUDGET = 360e6;
 const STILL_SOLID_GRID = 96;
 // single-color OKLab match for 3D model imports (vertex colors / material colors → blocks)
 const match3d = (r: number, g: number, b: number) => nearestSrgbHue(r, g, b, pal3d, 0.8).color.mapColorId;
-const hexByMap = new Map<number, number>();
-for (const e of pal3d.entries) {
-  const c = e.color;
-  hexByMap.set(c.mapColorId, (c.r << 16) | (c.g << 8) | c.b);
-}
+// Dense 256-slot hex table (module init) replacing the old per-pixel Map lookup. Serves BOTH
+// call sites: the viewer's colorFor and rgbFromFlatVol's whole-clip double loop - the hot
+// loop itself lives in render-tables.ts (byte-locked + perf-gated in render-tables-perf).
+const hexByMap = buildHexTable(pal3d.entries);
 
 // a neutral mid-gray solid block id for monochrome .obj imports (low channel spread, mid brightness)
 let grayId = 0;
@@ -464,7 +464,7 @@ async function setup3dViewer(): Promise<void> {
       const face = dir === 2 ? "top" : dir === 3 ? "bottom" : "side";
       return faceTextureUrl(info.id, face);
     },
-    colorFor: (id) => hexByMap.get(id) ?? 0x808080,
+    colorFor: (id) => hexByMap[id & 255]!,
     onFrame: (i, n) => {
       scrub.value = String(i);
       hud.textContent = `frame ${i + 1}/${n} · drag to orbit`;
@@ -618,22 +618,8 @@ async function setup3dViewer(): Promise<void> {
   // Reconstruct an RGB image from a flat wall frame's FRONT layer (palette colour per block).
   // Whole-video clips are too long to keep their raw decoded RGB in memory; the wall itself is the
   // compact record, and its palette colours are exactly what any re-quantize would land on anyway.
-  function rgbFromFlatVol(v: VoxelVolume): RgbImage {
-    const { sx, sy } = v;
-    const data = new Uint8Array(sx * sy * 3);
-    for (let iy = 0; iy < sy; iy++) {
-      const wy = sy - 1 - iy; // world Y is flipped vs image rows (imageToFlat keeps builds upright)
-      for (let ix = 0; ix < sx; ix++) {
-        const id = v.data[ix + sx * wy]!;
-        const hex = id === EMPTY ? 0 : hexByMap.get(id) ?? 0x808080;
-        const j = (iy * sx + ix) * 3;
-        data[j] = (hex >> 16) & 255;
-        data[j + 1] = (hex >> 8) & 255;
-        data[j + 2] = hex & 255;
-      }
-    }
-    return { width: sx, height: sy, data };
-  }
+  // The per-pixel hot loop lives in render-tables.ts, fed by the module-init dense hex table.
+  const rgbFromFlatVol = (v: VoxelVolume): RgbImage => rgbFromFlatVolTable(v, hexByMap);
 
   // The image "build 3D from image" should solidify: the SUBJECT the user imported (the currently
   // displayed frame of an active GIF/video) when one is loaded, else the §02 block-art source. This is
