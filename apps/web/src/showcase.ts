@@ -36,7 +36,7 @@ import { ClipAudio, type ClipAudioMode } from "./clip-audio";
 import { analyzeFileAudio } from "./audio";
 import { NotePreview } from "./note-preview";
 import type { NoteEvent } from "@blockdream/audio";
-import { initialArrangeState, arrangeReducer, planDatapackPlacement } from "./canvas-mod";
+import { initialArrangeState, arrangeReducer, planDatapackPlacement, musicKeyboardHalf } from "./canvas-mod";
 import {
   SECTION3_CONTROL_IDS,
   viewer3dUnavailableText,
@@ -1082,10 +1082,11 @@ async function setup3dViewer(): Promise<void> {
       // the viewer centers the build + the note-block row on their group positions; pass each object's
       // half-extent so the export lands them centered where they sit on screen (not corner-offset).
       const v0 = frames[0];
-      const distinctNotes = new Set(current3dMusic.map((n) => n.note)).size;
+      // center the dragged music row on the keyboard the pack will ACTUALLY place (distinct
+      // (instrument, note) pairs after the loop trim), not a note-only Set-size guess.
       const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 }, {
         buildHalf: v0 ? { x: v0.sx / 2, z: v0.sz / 2 } : undefined,
-        musicHalf: { x: (distinctNotes - 1) / 2, z: 0 },
+        musicHalf: musicKeyboardHalf(current3dMusic, frames.length, plan.speedTicks),
       });
       const pack = generateVoxelDatapack(frames, resolveBlock, {
         namespace: "blockdream_3d",

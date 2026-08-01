@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import { planGifExport, gifFrameDelays, packingHudText, reportPngDownload, GIF_EXPORT_PIXEL_BUDGET } from "../src/export-plan";
 import { planExportBudget, planTickPlayback, EXPORT_FRAME_BUDGET } from "../src/datapack-export";
 import { clampFrameDurations, MIN_FRAME_MS } from "../src/anim";
+import { musicKeyboardHalf } from "../src/canvas-mod";
+import { noteSequencer } from "@blockdream/emit-commands";
+import type { NoteEvent } from "@blockdream/audio";
 
 // Export honesty (goal 087 D8): the download buttons must not claim success over a failed
 // encode, and heavy exports must be budgeted + announced BEFORE the synchronous work starts.
@@ -124,5 +127,34 @@ describe("clampFrameDurations (goal 088 D9e: one shared duration sanitizer)", ()
 
   it("passes null through (no timing stays no timing)", () => {
     expect(clampFrameDurations(null)).toBeNull();
+  });
+});
+
+describe("musicKeyboardHalf (goal 088 D3: center on the keyboard the pack ACTUALLY places)", () => {
+  const ev = (tick: number, note: number, instrument = "harp"): NoteEvent => ({
+    tick, note, instrument, velocity: 1,
+  });
+
+  it("counts distinct (instrument, note) PAIRS - the same note on two instruments is two cells", () => {
+    const notes = [ev(0, 5, "harp"), ev(1, 5, "bass"), ev(2, 5, "harp")];
+    // the old note-only Set guess said width 1 (half 0); the real keyboard is 2 cells wide
+    expect(musicKeyboardHalf(notes, 1, 2)).toEqual({ x: 0.5, z: 0 });
+  });
+
+  it("respects the animation loop trim - notes past frameCount x speedTicks do not widen the row", () => {
+    const notes = [ev(0, 1), ev(100, 2)]; // loop = 2 frames x 2 ticks = 4; tick 100 is trimmed
+    expect(musicKeyboardHalf(notes, 2, 2)).toEqual({ x: 0, z: 0 });
+    // a single still (frameCount 1) has no loop override, so both notes count
+    expect(musicKeyboardHalf(notes, 1, 2)).toEqual({ x: 0.5, z: 0 });
+  });
+
+  it("matches the sequencer's own keyboardNotes for the same loop context", () => {
+    const notes = [ev(0, 3), ev(1, 7), ev(2, 3, "bass"), ev(3, 12)];
+    const seq = noteSequencer(notes, { placeKeyboard: false, loopTicksOverride: 8 });
+    expect(musicKeyboardHalf(notes, 4, 2)).toEqual({ x: (seq.keyboardNotes - 1) / 2, z: 0 });
+  });
+
+  it("no notes -> zero extent (and no sequencer call blows up on empty input)", () => {
+    expect(musicKeyboardHalf([], 10, 2)).toEqual({ x: 0, z: 0 });
   });
 });

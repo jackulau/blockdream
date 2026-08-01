@@ -5,8 +5,28 @@
 // a WebGL context (the viewer itself can't run in node/jsdom).
 
 import type { NoteEvent } from "@blockdream/audio";
+import { noteSequencer } from "@blockdream/emit-commands";
 
 export type SceneObjectId = "build" | "music";
+
+/** Half-extent (x) of the physical note-block keyboard the datapack will ACTUALLY place,
+ *  asked of the sequencer itself (keyboardNotes = distinct (instrument, note) pairs AFTER
+ *  the loop trim and note cap). The old `new Set(notes.map((n) => n.note)).size` guess
+ *  ignored instruments and the loop trim, so a dragged music row centered on a phantom
+ *  width and landed off its on-screen spot. Mirrors generateVoxelDatapack's own call:
+ *  loop = frameCount × speedTicks when animated, sequencer default cap otherwise. */
+export function musicKeyboardHalf(
+  notes: ReadonlyArray<NoteEvent>,
+  frameCount: number,
+  speedTicks: number,
+): GroundVec {
+  if (!notes.length) return { x: 0, z: 0 };
+  const seq = noteSequencer(notes.slice(), {
+    placeKeyboard: false, // span only - nothing is placed here
+    loopTicksOverride: frameCount > 1 ? frameCount * speedTicks : undefined,
+  });
+  return { x: Math.max(0, (seq.keyboardNotes - 1) / 2), z: 0 };
+}
 
 /** A point on the ground plane (world XZ). Y is fixed per object, so arranging is a 2D problem. */
 export interface GroundVec {

@@ -40,10 +40,11 @@ describe("world-model key → action mapping", () => {
 // world-model.ts touches the DOM at import time, so these are source-text checks
 // (same source-only style as checks.test.ts).
 describe("all 9 movement types are selectable", () => {
-  it("standalone tester DEMO_SKILL maps every movement type", () => {
+  it("standalone tester MOVEMENT_TYPES lists every movement type (legacy DEMO_SKILL map is gone)", () => {
     const src = readFileSync(new URL("../src/world-model.ts", import.meta.url), "utf8");
-    const map = src.match(/const DEMO_SKILL[^;]*;/)?.[0] ?? "";
-    for (const m of MOVEMENT_TYPES) expect(map).toContain(`${m}: "${m}"`);
+    const list = src.match(/const MOVEMENT_TYPES[^;]*;/)?.[0] ?? "";
+    for (const m of MOVEMENT_TYPES) expect(list).toContain(`"${m}"`);
+    expect(src).not.toContain("DEMO_SKILL"); // selector values ARE the movement types now
   });
 
   it("showcase movement dropdown lists every movement type", () => {
