@@ -36,7 +36,8 @@ Options:
                        (default: bayer for video, floyd-steinberg for stills)
   --palette <p>      map | block   (preview ONLY: compare against the 244-color map palette
                        or the full solid-block build gamut; default: map)
-  --temporal <n>     temporal-coherence threshold for video (e.g. 0.002)
+  --temporal <n>     temporal-coherence threshold for video (e.g. 0.002; needs 2+ frames
+                       and --dither bayer|none - error diffusion is excluded)
   --gamut <lambda>   hue-rigidity for out-of-gamut colours (e.g. 0.8; keeps source hue)
   --speed <ticks>    ticks/frame for datapack/behaviorpack playback (default: matches --fps
                        so playback runs real-time - e.g. --fps 20 → 1 tick/frame; no --fps → 2)
@@ -367,6 +368,16 @@ export function runCli(argv: string[]): number {
   // map-item targets have no plane at all.
   if (values.facing && target !== "voxel3d" && target !== "mcstructure3d" && target !== "model3d" && target !== "rgbscreen") {
     process.stderr.write(`note: --facing applies only to --target voxel3d|mcstructure3d|model3d|rgbscreen (the 2D wall targets have a fixed +Z plane; ignored for ${target})\n`);
+  }
+  // rgbscreen is TRUE-RGB by design (exact source colors on text_display pixels): there is no
+  // palette, so nothing to dither, temporally stabilize, or gamut-map.
+  if ((values.dither !== undefined || values.temporal !== undefined || values.gamut !== undefined) && target === "rgbscreen") {
+    process.stderr.write(`note: --dither/--temporal/--gamut do not apply to --target rgbscreen (TRUE-RGB: exact source colors, no palette quantization; ignored)\n`);
+  }
+  // Temporal hysteresis rides on the deterministic per-position methods; error diffusion has its
+  // own dynamics and is excluded (quantizeVideo skips it), so this combination silently no-oped.
+  if (values.temporal !== undefined && dither === "floyd-steinberg" && target !== "rgbscreen") {
+    process.stderr.write(`note: --temporal has no effect with --dither floyd-steinberg (error diffusion is excluded from temporal hysteresis; use --dither bayer or none)\n`);
   }
 
   const maxNotes = values["max-notes"] !== undefined ? Number(values["max-notes"]) : undefined;

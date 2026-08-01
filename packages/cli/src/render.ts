@@ -402,6 +402,13 @@ export function render(opts: RenderOptions): RenderResult {
     return { target: opts.target, frameCount: screenFrames.length, width: opts.width, height: opts.height, filesWritten, notes };
   }
 
+  // --temporal is hysteresis against the PREVIOUS frame; a single still has none, so quantizeAll
+  // takes the exact-match path and the threshold cannot apply. Say so instead of silently
+  // dropping it. (rgbscreen and model3d returned above: they never quantize a frame sequence.)
+  if (opts.temporalThreshold !== undefined && frames.length <= 1) {
+    notes.push(`--temporal only applies to multi-frame input - ignored for a single still.`);
+  }
+
   if (opts.target === "map") {
     const mapPal =
       edition === "bedrock"
