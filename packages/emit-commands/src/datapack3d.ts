@@ -240,7 +240,7 @@ export function generateVoxelDatapack(
   // `bounds` is the physical music area's XZ footprint: setblock into an unloaded chunk
   // fails and redstone only ticks in loaded chunks, so the forceload rect must cover it
   // (the repro: a 199-cell delay line built past the build-box forceload silently died).
-  const seq = !music
+  const seqBuilt = !music
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
@@ -275,6 +275,11 @@ export function generateVoxelDatapack(
               : undefined,
           };
         })();
+  // Zero SURVIVING notes (the loop trim / note cap emptied the melody) = NO music
+  // machinery at all: no music.mcfunction, no tick.json registration, no #mt/#mtcount
+  // scores. Otherwise the pack ticked #mt forever against a never-created #mtcount
+  // while playing nothing. Byte-identical to a music-less build, per the contract above.
+  const seq = seqBuilt && seqBuilt.noteCount > 0 ? seqBuilt : undefined;
 
   // Optional LED glow layer: an invisible light plane one block outside the chosen face.
   const ledBox = opts.ledPlane

@@ -326,7 +326,7 @@ export function generateRgbScreenDatapack(
   const music = opts.music && opts.music.length ? opts.music : undefined;
   const musicOrigin = opts.musicOrigin ?? { x: scrX1 + 2, y: origin.y, z: scrZ1 };
   const loopTicksOverride = frames.length > 1 ? frames.length * speed : undefined;
-  const seq = !music
+  const seqBuilt = !music
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
@@ -357,6 +357,10 @@ export function generateRgbScreenDatapack(
               : undefined,
           };
         })();
+  // Zero SURVIVING notes (loop trim / note cap emptied the melody) = NO music machinery:
+  // no music.mcfunction, no tick.json registration, no #mt/#mtcount scores (else #mt
+  // ticked forever against a never-created #mtcount for a pack that plays nothing).
+  const seq = seqBuilt && seqBuilt.noteCount > 0 ? seqBuilt : undefined;
 
   // forceload rect: the screen plane PLUS the physical music area (setblock into an
   // unloaded chunk fails, and a redstone delay line only ticks in loaded chunks)
@@ -546,7 +550,7 @@ export function generateRgbScreenDatapackReference(
   const music = opts.music && opts.music.length ? opts.music : undefined;
   const musicOrigin = opts.musicOrigin ?? { x: scrX1 + 2, y: origin.y, z: scrZ1 };
   const loopTicksOverride = frames.length > 1 ? frames.length * speed : undefined;
-  const seq = !music
+  const seqBuilt = !music
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
@@ -577,6 +581,10 @@ export function generateRgbScreenDatapackReference(
               : undefined,
           };
         })();
+  // Zero SURVIVING notes (loop trim / note cap emptied the melody) = NO music machinery:
+  // no music.mcfunction, no tick.json registration, no #mt/#mtcount scores (else #mt
+  // ticked forever against a never-created #mtcount for a pack that plays nothing).
+  const seq = seqBuilt && seqBuilt.noteCount > 0 ? seqBuilt : undefined;
 
   // forceload rect: the screen plane PLUS the physical music area (setblock into an
   // unloaded chunk fails, and a redstone delay line only ticks in loaded chunks)
