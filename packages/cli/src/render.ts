@@ -573,7 +573,7 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   if (opts.target === "bedrock-script") {
-    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: speedTicksAuto });
+    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: speedTicksAuto, origin: opts.origin });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const mcpack = join(opts.out, "blockdream-script.mcpack");
@@ -588,6 +588,7 @@ export function render(opts: RenderOptions): RenderResult {
       speedTicks: speedTicksAuto,
       packFormat: mc.packFormat,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
+      origin: opts.origin,
     });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
@@ -599,7 +600,7 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   // behaviorpack
-  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: speedTicksAuto });
+  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: speedTicksAuto, origin: opts.origin });
   writePack(pack, opts.out);
   filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
   const mcpack = join(opts.out, "blockdream.mcpack");

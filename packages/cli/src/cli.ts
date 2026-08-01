@@ -58,8 +58,12 @@ Options:
                        (voxel3d/mcstructure3d/model3d; animates a STILL image or a 3D model.
                         For a clip it animates the first frame.)
   --animate-frames <n>  frame count for --animate (default: 24)
-  --origin <x,y,z>   where the 3D build spawns in-world (voxel3d/model3d datapack; default 0,64,0)
-  --facing <dir>     which way the 3D build faces: north | south | east | west (default: south/+Z)
+  --origin <x,y,z>   where the build spawns in-world (default 0,64,0). Applies to every
+                       block/structure target, 2D walls included; map|mwframes emit map
+                       ITEMS with no world position
+  --facing <dir>     which way the build faces: north | south | east | west (default: south/+Z;
+                       voxel3d/mcstructure3d/model3d/rgbscreen - the flat 2D walls are +Z-facing
+                       by construction)
   --music <mode>     voxel3d/rgbscreen: video audio → note-block music. auto | on | off (default:
                        auto = include note blocks iff the input video has an audio track)
   --instrument <i>   note-block instrument for the music (default: harp). One of:
@@ -352,6 +356,17 @@ export function runCli(argv: string[]): number {
   }
   if ((values["rgb-levels"] !== undefined || values["px-scale"] !== undefined) && target !== "rgbscreen") {
     process.stderr.write(`note: --rgb-levels/--px-scale apply only to --target rgbscreen (ignored for ${target})\n`);
+  }
+  // --origin repositions every block/structure build; only the map-ITEM targets have no world
+  // position at all (a filled-map .dat / Fabric frame pool is placed by the player, not the pack).
+  if (values.origin && (target === "map" || target === "mwframes")) {
+    process.stderr.write(`note: --origin does not apply to --target map|mwframes (map items have no world position; ignored for ${target})\n`);
+  }
+  // --facing rotates the 3D builds and orients the rgbscreen plane; the flat 2D block walls
+  // (datapack/behaviorpack/bedrock-script/mcstructure) are +Z-facing by construction, and the
+  // map-item targets have no plane at all.
+  if (values.facing && target !== "voxel3d" && target !== "mcstructure3d" && target !== "model3d" && target !== "rgbscreen") {
+    process.stderr.write(`note: --facing applies only to --target voxel3d|mcstructure3d|model3d|rgbscreen (the 2D wall targets have a fixed +Z plane; ignored for ${target})\n`);
   }
 
   const maxNotes = values["max-notes"] !== undefined ? Number(values["max-notes"]) : undefined;
