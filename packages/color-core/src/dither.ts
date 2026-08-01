@@ -14,6 +14,18 @@ export type DitherMethod = "none" | "floyd-steinberg" | "bayer";
 // any value here is byte-identical.
 const MEMO_WARMUP = 1 << 12; // 4096 pixels
 
+// Module-local copy of the sRGB->linear decode table, built ONCE from the imported function (so
+// every double is identical by construction). The bayer/nearest/hysteresis hot loops read 8-bit
+// channels straight out of a Uint8Array, so a plain `SRGB_LIN[c]` load replaces a per-pixel
+// imported-function call: vite-node compiles imported-binding reads to getter calls (goal-087
+// lesson), and even in plain node this drops a call per channel. Only valid for integer 0..255
+// inputs - exactly what a Uint8Array yields.
+const SRGB_LIN = (() => {
+  const t = new Float64Array(256);
+  for (let c = 0; c < 256; c++) t[c] = srgbChannelToLinear(c);
+  return t;
+})();
+
 export interface QuantizeOptions {
   method?: DitherMethod;
   /** Bayer ordered-dither amplitude in linear light (default 0.06). */
@@ -111,10 +123,14 @@ export function quantizeNearest(
   // (gamutMap is frame-constant), so repeated colors reuse the result and skip the O(palette)
   // OKLab search. Byte-identical. The LUT path is already O(1)/pixel, so it skips the memo.
   const useLut = gamutMap === undefined && !!lut;
-  // exact brute-force match — a pure function of (r,g,b) since gamutMap is frame-constant
+  // one tiny per-frame array (~244 doubles) for the gamut path, never per-pixel
+  const sortedHue = gamutMap !== undefined ? buildSortedHue(pal) : null;
+  // exact brute-force match - a pure function of (r,g,b) since gamutMap is frame-constant.
+  // Dispatched through the allocation-free scratch matchers (bit-identical to the allocating
+  // nearestByLab/nearestByLabHue; locked against quantizeNearestReference by dither-perf.test.ts).
   const match = (r: number, g: number, b: number): number => {
-    const lab = linearRgbToOklab(srgbChannelToLinear(r), srgbChannelToLinear(g), srgbChannelToLinear(b));
-    return gamutMap === undefined ? nearestByLab(lab, pal).index : nearestByLabHue(lab, pal, gamutMap).index;
+    linearToLabScratch(SRGB_LIN[r]!, SRGB_LIN[g]!, SRGB_LIN[b]!);
+    return gamutMap === undefined ? nearestIdxByLab(labL, labA, labB, pal) : nearestIdxByLabHue(labL, labA, labB, pal, gamutMap, sortedHue!);
   };
   // Memo: repeated colors reuse the result and skip the O(palette) OKLab search (byte-identical).
   // Adaptive — if a warmup window shows few repeats, drop the memo so a high-entropy frame pays
@@ -147,6 +163,66 @@ export function quantizeNearest(
         memo!.set(key, index);
       }
       if (++tried === MEMO_WARMUP && hits * 4 < MEMO_WARMUP) memoOn = false; // <25% repeats → drop it
+    } else {
+      index = match(r, g, b);
+    }
+    writePixel(frame, p, index, pal.entries[index]!.color.mapColorId);
+  }
+  return frame;
+}
+
+/**
+ * Reference nearest-quantizer, kept verbatim from before the scratch-matcher dispatch: the
+ * memo-miss/memo-off match allocates a fresh {L,a,b} and {index,color,dist2} per pixel via
+ * nearestByLab/nearestByLabHue. Exported only for the same-run opt-vs-ref A/B in
+ * dither-perf.test.ts. Do not optimize.
+ */
+export function quantizeNearestReference(
+  img: RgbImage,
+  pal: PreparedPalette,
+  lut?: RgbLut,
+  gamutMap?: number,
+  prevImage?: RgbImage,
+  prevQuantized?: QuantizedFrame,
+): QuantizedFrame {
+  const frame = emptyFrame(img);
+  const px = img.width * img.height;
+  const temporal = temporalUsable(img, prevImage, prevQuantized);
+  const pImg = temporal ? prevImage!.data : null;
+  const pIdx = temporal ? prevQuantized!.paletteIndex : null;
+  const useLut = gamutMap === undefined && !!lut;
+  const match = (r: number, g: number, b: number): number => {
+    const lab = linearRgbToOklab(srgbChannelToLinear(r), srgbChannelToLinear(g), srgbChannelToLinear(b));
+    return gamutMap === undefined ? nearestByLab(lab, pal).index : nearestByLabHue(lab, pal, gamutMap).index;
+  };
+  const memo = useLut ? null : new Map<number, number>();
+  let memoOn = memo !== null;
+  let tried = 0;
+  let hits = 0;
+  for (let p = 0; p < px; p++) {
+    const i = p * 3;
+    const r = img.data[i]!;
+    const g = img.data[i + 1]!;
+    const b = img.data[i + 2]!;
+    if (pImg && r === pImg[i]! && g === pImg[i + 1]! && b === pImg[i + 2]!) {
+      const idx = pIdx![p]!;
+      writePixel(frame, p, idx, pal.entries[idx]!.color.mapColorId);
+      continue;
+    }
+    let index: number;
+    if (useLut) {
+      index = lutNearest(lut!, r, g, b);
+    } else if (memoOn) {
+      const key = (r << 16) | (g << 8) | b;
+      const hit = memo!.get(key);
+      if (hit !== undefined) {
+        index = hit;
+        hits++;
+      } else {
+        index = match(r, g, b);
+        memo!.set(key, index);
+      }
+      if (++tried === MEMO_WARMUP && hits * 4 < MEMO_WARMUP) memoOn = false;
     } else {
       index = match(r, g, b);
     }
@@ -478,20 +554,30 @@ export function quantizeFloydSteinbergReference(img: RgbImage, pal: PreparedPale
   return frame;
 }
 
-// 8×8 Bayer ordered-dither matrix, normalized to (-0.5 .. +0.5).
+// 8×8 Bayer ordered-dither matrix base (0..63). Feeds both the flat hot-path table and the 2D
+// table the verbatim reference twins index.
+const BAYER8_BASE = [
+  [0, 32, 8, 40, 2, 34, 10, 42],
+  [48, 16, 56, 24, 50, 18, 58, 26],
+  [12, 44, 4, 36, 14, 46, 6, 38],
+  [60, 28, 52, 20, 62, 30, 54, 22],
+  [3, 35, 11, 43, 1, 33, 9, 41],
+  [51, 19, 59, 27, 49, 17, 57, 25],
+  [15, 47, 7, 39, 13, 45, 5, 37],
+  [63, 31, 55, 23, 61, 29, 53, 21],
+];
+
+// Flat hot-path table, normalized to (-0.5 .. +0.5) and indexed ((y & 7) << 3) | (x & 7): one
+// typed-array load per pixel instead of two array-of-arrays derefs. IDENTICAL doubles to the 2D
+// reference table below (same base integers, same `v / 64 - 0.5`).
 const BAYER8 = (() => {
-  const base = [
-    [0, 32, 8, 40, 2, 34, 10, 42],
-    [48, 16, 56, 24, 50, 18, 58, 26],
-    [12, 44, 4, 36, 14, 46, 6, 38],
-    [60, 28, 52, 20, 62, 30, 54, 22],
-    [3, 35, 11, 43, 1, 33, 9, 41],
-    [51, 19, 59, 27, 49, 17, 57, 25],
-    [15, 47, 7, 39, 13, 45, 5, 37],
-    [63, 31, 55, 23, 61, 29, 53, 21],
-  ];
-  return base.map((row) => row.map((v) => v / 64 - 0.5));
+  const out = new Float64Array(64);
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) out[(y << 3) | x] = BAYER8_BASE[y]![x]! / 64 - 0.5;
+  return out;
 })();
+
+// 2D table for the verbatim reference twins (the pre-optimization hot loops indexed [y&7][x&7]).
+const BAYER8_REF = BAYER8_BASE.map((row) => row.map((v) => v / 64 - 0.5));
 
 /**
  * Ordered (Bayer) dithering - fully deterministic per pixel position, which
@@ -524,6 +610,12 @@ export function quantizeBayer(
   let memoOn = memo !== null;
   let tried = 0;
   let hits = 0;
+  // one tiny per-frame array (~244 doubles) for the gamut path, never per-pixel
+  const sortedHue = gamutMap !== undefined ? buildSortedHue(pal) : null;
+  // Same dispatch order as matchLinear (gamutMap overrides the LUT, LUT beats brute force), but
+  // inlined in the loop and through the allocation-free scratch matchers: no per-pixel
+  // {L,a,b}/{index,color,dist2}, no per-pixel closure call, and the sRGB decode is a module-local
+  // table load. Bit-identical (locked against quantizeBayerReference by dither-perf.test.ts).
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const p = y * width + x;
@@ -544,13 +636,93 @@ export function quantizeBayer(
           index = hit;
           hits++;
         } else {
-          const t = BAYER8[y & 7]![x & 7]! * amplitude;
-          index = matchLinear(srgbChannelToLinear(r) + t, srgbChannelToLinear(g) + t, srgbChannelToLinear(b) + t, pal, lut, gamutMap);
+          const t = BAYER8[((y & 7) << 3) | (x & 7)]! * amplitude;
+          const lr = SRGB_LIN[r]! + t;
+          const lg = SRGB_LIN[g]! + t;
+          const lb = SRGB_LIN[b]! + t;
+          if (gamutMap !== undefined) {
+            linearToLabScratch(lr, lg, lb);
+            index = nearestIdxByLabHue(labL, labA, labB, pal, gamutMap, sortedHue!);
+          } else if (lut) {
+            index = lutNearest(lut, linearToSrgbChannel(lr), linearToSrgbChannel(lg), linearToSrgbChannel(lb));
+          } else {
+            linearToLabScratch(lr, lg, lb);
+            index = nearestIdxByLab(labL, labA, labB, pal);
+          }
           memo!.set(key, index);
         }
         if (++tried === MEMO_WARMUP && hits * 4 < MEMO_WARMUP) memoOn = false; // <25% repeats → drop it
       } else {
-        const t = BAYER8[y & 7]![x & 7]! * amplitude;
+        const t = BAYER8[((y & 7) << 3) | (x & 7)]! * amplitude;
+        const lr = SRGB_LIN[r]! + t;
+        const lg = SRGB_LIN[g]! + t;
+        const lb = SRGB_LIN[b]! + t;
+        if (gamutMap !== undefined) {
+          linearToLabScratch(lr, lg, lb);
+          index = nearestIdxByLabHue(labL, labA, labB, pal, gamutMap, sortedHue!);
+        } else if (lut) {
+          index = lutNearest(lut, linearToSrgbChannel(lr), linearToSrgbChannel(lg), linearToSrgbChannel(lb));
+        } else {
+          linearToLabScratch(lr, lg, lb);
+          index = nearestIdxByLab(labL, labA, labB, pal);
+        }
+      }
+      writePixel(frame, p, index, pal.entries[index]!.color.mapColorId);
+    }
+  }
+  return frame;
+}
+
+/**
+ * Reference Bayer quantizer, kept verbatim from before the scratch-matcher/flat-table
+ * optimization: 2D BAYER8 indexing + allocating matchLinear per memo-miss/memo-off pixel.
+ * Exported only for the same-run opt-vs-ref A/B in dither-perf.test.ts. Do not optimize.
+ */
+export function quantizeBayerReference(
+  img: RgbImage,
+  pal: PreparedPalette,
+  amplitude = 0.06,
+  lut?: RgbLut,
+  gamutMap?: number,
+  prevImage?: RgbImage,
+  prevQuantized?: QuantizedFrame,
+): QuantizedFrame {
+  const { width, height } = img;
+  const frame = emptyFrame(img);
+  const temporal = temporalUsable(img, prevImage, prevQuantized);
+  const pImg = temporal ? prevImage!.data : null;
+  const pIdx = temporal ? prevQuantized!.paletteIndex : null;
+  const memo = lut ? null : new Map<number, number>();
+  let memoOn = memo !== null;
+  let tried = 0;
+  let hits = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x;
+      const i = p * 3;
+      const r = img.data[i]!;
+      const g = img.data[i + 1]!;
+      const b = img.data[i + 2]!;
+      if (pImg && r === pImg[i]! && g === pImg[i + 1]! && b === pImg[i + 2]!) {
+        const idx = pIdx![p]!;
+        writePixel(frame, p, idx, pal.entries[idx]!.color.mapColorId);
+        continue;
+      }
+      let index: number;
+      if (memoOn) {
+        const key = ((r << 16) | (g << 8) | b) * 64 + ((y & 7) << 3) + (x & 7);
+        const hit = memo!.get(key);
+        if (hit !== undefined) {
+          index = hit;
+          hits++;
+        } else {
+          const t = BAYER8_REF[y & 7]![x & 7]! * amplitude;
+          index = matchLinear(srgbChannelToLinear(r) + t, srgbChannelToLinear(g) + t, srgbChannelToLinear(b) + t, pal, lut, gamutMap);
+          memo!.set(key, index);
+        }
+        if (++tried === MEMO_WARMUP && hits * 4 < MEMO_WARMUP) memoOn = false;
+      } else {
+        const t = BAYER8_REF[y & 7]![x & 7]! * amplitude;
         index = matchLinear(
           srgbChannelToLinear(r) + t,
           srgbChannelToLinear(g) + t,
@@ -584,6 +756,105 @@ export function quantizeFrame(
       // error, so a temporal skip would corrupt it. Always full-quantize (prev intentionally ignored).
       return quantizeFloydSteinberg(img, pal, opts.lut, opts.gamutMap);
   }
+}
+
+/**
+ * One frame of temporal-hysteresis quantization (the hot loop behind quantizeVideo; lives here so
+ * it shares the module-local scratch matchers and flat BAYER8 - vite-node compiles hot-loop reads
+ * of imported bindings to getter calls). The CANDIDATE is exactly what the non-temporal
+ * quantizer picks for the method ("bayer" applies the position's Bayer offset; `gamutMap`
+ * overrides the LUT; any other method matches plain nearest). The hysteresis keep/switch
+ * decision is applied on top: a pixel keeps `prev`'s index while that color stays within
+ * `bestDist2 + threshold` of the (dithered) target in OKLab.
+ *
+ * Allocation-free per pixel: scratch-scalar Lab, index-only matchers, and per-CALL typed arrays
+ * of the palette's L/a/b/mapColorId indexed by palette index (frame-constant). Identical
+ * arithmetic order to the allocating form - element-identical to quantizeVideoReference (locked
+ * by dither-perf.test.ts).
+ */
+export function quantizeFrameHysteresis(
+  img: RgbImage,
+  pal: PreparedPalette,
+  opts: QuantizeOptions,
+  threshold: number,
+  prev?: QuantizedFrame,
+): QuantizedFrame {
+  const { width, height } = img;
+  const frame = emptyFrame(img);
+  const gamutMap = opts.gamutMap;
+  const lut = opts.lut;
+  const isBayer = opts.method === "bayer";
+  const amplitude = opts.bayerAmplitude ?? 0.06;
+  const sortedHue = gamutMap !== undefined ? buildSortedHue(pal) : null;
+  // frame-constant palette views: Lab + mapColorId by ORIGINAL index, so the hysteresis
+  // distances and result writes are typed-array loads instead of entry-object chains
+  const n = pal.entries.length;
+  const palL = new Float64Array(n);
+  const palA = new Float64Array(n);
+  const palB = new Float64Array(n);
+  const palMap = new Uint8Array(n);
+  for (let k = 0; k < n; k++) {
+    const e = pal.entries[k]!;
+    palL[k] = e.lab.L;
+    palA[k] = e.lab.a;
+    palB[k] = e.lab.b;
+    palMap[k] = e.color.mapColorId;
+  }
+  const data = img.data;
+  const prevIdxArr = prev ? prev.paletteIndex : null;
+  const outIdx = frame.paletteIndex;
+  const outMap = frame.mapColorId;
+  let p = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++, p++) {
+      const i = p * 3;
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      // candidate + target Lab (for bayer, the DITHERED color) in the scratch scalars
+      let idx: number;
+      if (isBayer) {
+        const t = BAYER8[((y & 7) << 3) | (x & 7)]! * amplitude;
+        const lr = SRGB_LIN[r]! + t;
+        const lg = SRGB_LIN[g]! + t;
+        const lb = SRGB_LIN[b]! + t;
+        linearToLabScratch(lr, lg, lb);
+        idx =
+          gamutMap !== undefined
+            ? nearestIdxByLabHue(labL, labA, labB, pal, gamutMap, sortedHue!)
+            : lut
+              ? lutNearest(lut, linearToSrgbChannel(lr), linearToSrgbChannel(lg), linearToSrgbChannel(lb))
+              : nearestIdxByLab(labL, labA, labB, pal);
+      } else {
+        linearToLabScratch(SRGB_LIN[r]!, SRGB_LIN[g]!, SRGB_LIN[b]!);
+        idx =
+          gamutMap !== undefined
+            ? nearestIdxByLabHue(labL, labA, labB, pal, gamutMap, sortedHue!)
+            : lut
+              ? lutNearest(lut, r, g, b)
+              : nearestIdxByLab(labL, labA, labB, pal);
+      }
+      let chosenIdx = idx;
+      if (prevIdxArr) {
+        const prevIdx = prevIdxArr[p]!;
+        if (prevIdx !== chosenIdx) {
+          // same operand order as labDist2(target, entry): target minus entry, L then a then b
+          const bL = labL - palL[idx]!;
+          const bA = labA - palA[idx]!;
+          const bB = labB - palB[idx]!;
+          const bestDist2 = bL * bL + bA * bA + bB * bB;
+          const kL = labL - palL[prevIdx]!;
+          const kA = labA - palA[prevIdx]!;
+          const kB = labB - palB[prevIdx]!;
+          const keepDist = kL * kL + kA * kA + kB * kB;
+          if (keepDist <= bestDist2 + threshold) chosenIdx = prevIdx;
+        }
+      }
+      outIdx[p] = chosenIdx;
+      outMap[p] = palMap[chosenIdx]!;
+    }
+  }
+  return frame;
 }
 
 export { linearToSrgbChannel };

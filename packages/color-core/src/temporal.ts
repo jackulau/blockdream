@@ -1,6 +1,6 @@
 import { linearRgbToOklab, srgbChannelToLinear, linearToSrgbChannel, type Lab } from "./oklab";
 import { nearestByLab, nearestByLabHue, lutNearest, type PreparedPalette } from "./match";
-import { quantizeFrame, type QuantizeOptions } from "./dither";
+import { quantizeFrame, quantizeFrameHysteresis, type QuantizeOptions } from "./dither";
 import type { RgbImage, QuantizedFrame } from "./image";
 
 function labDist2(a: Lab, b: Lab): number {
@@ -11,12 +11,10 @@ function labDist2(a: Lab, b: Lab): number {
 }
 
 /**
- * 8x8 Bayer threshold table, flattened and indexed ((y & 7) << 3) | (x & 7). It MUST hold the
- * exact doubles dither.ts's BAYER8 holds (same base integers, same `v / 64 - 0.5`
- * normalization): the hysteresis loop below reproduces quantizeBayer's candidate match
- * bit-for-bit, and the identity-to-still tests in temporal.test.ts lock the two tables
- * together. Module-local on purpose: vite-node compiles hot-loop reads of imported bindings
- * to getter calls (see the goal-087 lesson in dither.ts).
+ * 8x8 Bayer threshold table for the REFERENCE twin below, flattened and indexed
+ * ((y & 7) << 3) | (x & 7). It MUST hold the exact doubles dither.ts's BAYER8 holds (same base
+ * integers, same `v / 64 - 0.5` normalization); the identity-to-still tests in temporal.test.ts
+ * lock the two tables together.
  */
 const BAYER8 = (() => {
   const base = [
@@ -59,9 +57,39 @@ export interface VideoQuantizeOptions extends QuantizeOptions {
  * otherwise), then applies the keep/switch decision on top. With no previous
  * frame (or a threshold that never retains) the output is element-identical to
  * per-frame `quantizeFrame`. Any method other than "bayer"/"floyd-steinberg"
- * quantizes hysteresis candidates as plain nearest ("none").
+ * quantizes hysteresis candidates as plain nearest ("none"). The per-frame hot
+ * loop is quantizeFrameHysteresis in dither.ts (allocation-free; element-
+ * identical to quantizeVideoReference, locked by dither-perf.test.ts).
  */
 export function quantizeVideo(
+  frames: RgbImage[],
+  pal: PreparedPalette,
+  opts: VideoQuantizeOptions = {},
+): QuantizedFrame[] {
+  const threshold = opts.temporalThreshold ?? 0;
+  const useHysteresis = threshold > 0 && opts.method !== "floyd-steinberg";
+  const out: QuantizedFrame[] = [];
+  let prev: QuantizedFrame | undefined;
+
+  for (const img of frames) {
+    if (!useHysteresis) {
+      out.push(quantizeFrame(img, pal, opts));
+      continue;
+    }
+    const frame = quantizeFrameHysteresis(img, pal, opts, threshold, prev);
+    out.push(frame);
+    prev = frame;
+  }
+  return out;
+}
+
+/**
+ * Reference video quantizer, kept verbatim from before the hysteresis hot loop moved to
+ * dither.ts's allocation-free quantizeFrameHysteresis: per-pixel {L,a,b}/{index,color,dist2}
+ * allocations via the public matchers, entry-object chains for the hysteresis distances.
+ * Exported only for the same-run opt-vs-ref A/B in dither-perf.test.ts. Do not optimize.
+ */
+export function quantizeVideoReference(
   frames: RgbImage[],
   pal: PreparedPalette,
   opts: VideoQuantizeOptions = {},
@@ -96,10 +124,6 @@ export function quantizeVideo(
         const r = img.data[i]!;
         const g = img.data[i + 1]!;
         const b = img.data[i + 2]!;
-        // Candidate match: EXACTLY what the non-temporal quantizer picks for this method.
-        // `target` is the color the quantizer is matching (for bayer, the DITHERED color), so
-        // the hysteresis distances below are measured against the same ideal the candidate was
-        // chosen for.
         let target: Lab;
         let idx: number;
         if (isBayer) {
