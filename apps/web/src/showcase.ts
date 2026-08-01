@@ -7,7 +7,8 @@ import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt, wireBlockArtDrop } from "./blockart-core";
-import { planGifExport, packingHudText, reportPngDownload } from "./export-plan";
+import { planGifExport, gifFrameDelays, packingHudText, reportPngDownload } from "./export-plan";
+import { clampFrameDurations } from "./anim";
 import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage, type DitherMethod } from "@blockdream/color-core";
 import { quantizeForDatapack } from "./blockart-export";
 import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
@@ -1068,7 +1069,7 @@ async function setup3dViewer(): Promise<void> {
     // HONEST in-game pacing: Minecraft plays one animation step per game tick - 20 fps is the
     // ceiling. A clip decoded above that is resampled EVENLY so the in-game duration matches the
     // source; at/below 20 fps every frame keeps its nearest whole-tick dwell.
-    const plan = planTickPlayback(allFrames.length, durationsMs);
+    const plan = planTickPlayback(allFrames.length, clampFrameDurations(durationsMs));
     const frames = plan.resampled ? plan.indices.map((i) => allFrames[i]!) : allFrames;
     // Export-budget guard: one .mcfunction per frame; warn (do not block) past the tested budget.
     // The warning + "packing…" go to the HUD BEFORE the synchronous generate+zip (which can take
@@ -1104,7 +1105,7 @@ async function setup3dViewer(): Promise<void> {
       $<HTMLDivElement>("v3-export").textContent =
         `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote}${budgetNote} · /function blockdream_3d:setup`;
       hud.textContent = `datapack packed · ${pack.frameCount} frames`;
-      downloadDatapack("blockdream-3d-datapack", pack.files);
+      downloadDatapack("blockdream-3d-datapack", pack.files, placement.origin);
     }, 30);
   });
 
@@ -1132,9 +1133,12 @@ async function setup3dViewer(): Promise<void> {
       const W = Math.max(...frames.map((f) => f.sx));
       const H = Math.max(...frames.map((f) => f.sy));
       const scale = fitScale(W, H, 384);
+      // delays come from the SAME tick plan the datapack uses, so GIF pacing == in-game pacing
+      // (a spin with no timing used to export at 70 ms/frame while the pack played 100 ms).
+      const delays = gifFrameDelays(frames.length, durationsMs);
       const gif: GifFrame[] = frames.map((f, i) => ({
         raster: upscaleNearest(padRaster(flatVolumeToRaster(f), W, H), scale),
-        delayMs: durationsMs?.[i] ?? 70,
+        delayMs: delays[i]!,
       }));
       try {
         downloadGif("blockdream-animation.gif", gif);

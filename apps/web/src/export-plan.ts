@@ -4,6 +4,8 @@
 // wires them to elements.
 
 import { fitScale } from "./pixel-export";
+import { planTickPlayback } from "@blockdream/emit-commands";
+import { clampFrameDurations } from "./anim";
 
 /** Ceiling on TOTAL output pixels across all frames of one browser GIF export. Each frame is
  *  padded + integer-upscaled to an RGBA raster (4 bytes/pixel) BEFORE the synchronous encode,
@@ -32,6 +34,14 @@ export function planGifExport(
   budget = GIF_EXPORT_PIXEL_BUDGET,
 ): GifExportPlan {
   const frames = dims.length;
+  if (frames === 0) {
+    // Zero frames used to slip through as ok:true ("encoding 0 GIF frames at 1x1") because
+    // Math.max(1, ...[]) = 1; an empty export is a refusal, not a degenerate success.
+    return {
+      frames: 0, outWidth: 0, outHeight: 0, totalPixels: 0, maxFrames: 0, ok: false,
+      message: "GIF export refused: no frames to encode - import an image, GIF, or video first.",
+    };
+  }
   const W = Math.max(1, ...dims.map((d) => d.sx));
   const H = Math.max(1, ...dims.map((d) => d.sy));
   const scale = fitScale(W, H, target);
@@ -47,6 +57,26 @@ export function planGifExport(
       `frame rasters and would freeze or kill the tab. At this size the budget is ${maxFrames} frames · ` +
       `lower the fps, use a shorter clip, or export the datapack instead (it streams frame files).`;
   return { frames, outWidth, outHeight, totalPixels, maxFrames, ok, message };
+}
+
+/** Per-frame GIF delays that match the tick plan the datapack export uses, so the exported
+ *  GIF and the in-game animation pace identically. No timing → the plan's uniform dwell
+ *  (speedTicks × 50 ms; the legacy 2-tick default = 100 ms - the GIF used to hardcode 70 ms
+ *  while the pack played 100). Real timing → each frame keeps its clamped source delay
+ *  (MIN_FRAME_MS floor via clampFrameDurations), and a missing entry falls back to the
+ *  plan's own 100 ms default, again matching the pack. */
+export function gifFrameDelays(
+  frameCount: number,
+  durationsMs: Array<number | undefined | null> | null,
+): number[] {
+  const clamped = clampFrameDurations(durationsMs);
+  const plan = planTickPlayback(frameCount, clamped);
+  const uniform = plan.speedTicks * 50;
+  if (!clamped || !clamped.length) return new Array<number>(frameCount).fill(uniform);
+  return Array.from({ length: frameCount }, (_, i) => {
+    const d = clamped[i];
+    return typeof d === "number" ? d : 100;
+  });
 }
 
 /** Pre-generation HUD line for the datapack export: the budget warning (when any) must be

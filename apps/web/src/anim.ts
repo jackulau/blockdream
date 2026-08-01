@@ -15,6 +15,18 @@ export interface FrameSchedule {
 /** Guard against pathological 0-delay GIF frames pinning playback to a single tick. */
 export const MIN_FRAME_MS = 10;
 
+/** Shared duration sanitizer for every consumer of decoded per-frame timing (viewer clock,
+ *  tick-plan input, GIF delays): a real duration keeps its value with the MIN_FRAME_MS floor,
+ *  anything missing or <= 0 becomes undefined so the consumer's own fallback applies. Without
+ *  this, a 0-delay GIF frame fed planTickPlayback dragged the average down and mis-planned
+ *  the whole clip while the viewer (buildSchedule) had already clamped it. */
+export function clampFrameDurations(
+  durationsMs: Array<number | undefined | null> | null,
+): Array<number | undefined> | null {
+  if (!durationsMs) return null;
+  return durationsMs.map((d) => (typeof d === "number" && d > 0 ? Math.max(MIN_FRAME_MS, d) : undefined));
+}
+
 /** Build a playback schedule from per-frame durations (ms). Missing/<=0 → fallbackMs. */
 export function buildSchedule(durationsMs: Array<number | undefined | null>, fallbackMs = 100): FrameSchedule {
   const cumulative: number[] = [];
