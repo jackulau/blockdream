@@ -1,12 +1,27 @@
-// Perf regression net for the optimized GIF export hot path (typed-array LZW dictionary +
-// open-addressing colour hash). The optimized encodeGif must stay BYTE-IDENTICAL to the retained
-// reference (encodeGifReference, the original Map-based algorithm kept verbatim in the module),
-// and it must actually be faster - both A/B'd in the SAME process, back-to-back, so machine noise
-// hits both sides equally (same discipline as packages/voxel/test/bench-smoke.test.ts).
+// Perf regression net for the optimized pixel-export hot paths: the GIF encoder (typed-array LZW
+// dictionary + open-addressing colour hash) and the per-frame raster helpers (flat Uint8Array
+// palette tables in quantizedToRaster / flatVolumeToRaster, row-replicating copyWithin in
+// upscaleNearest). Every optimized function must stay BYTE-IDENTICAL to its retained reference
+// (the original algorithm kept verbatim in the module), and be faster - A/B'd in the SAME
+// process, back-to-back, so machine noise hits both sides equally (same discipline as
+// packages/voxel/test/bench-smoke.test.ts).
 
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
-import { encodeGif, encodeGifReference, type GifFrame, type Raster } from "../src/pixel-export";
+import type { QuantizedFrame } from "@blockdream/color-core";
+import { createVolume, EMPTY } from "@blockdream/voxel";
+import {
+  encodeGif,
+  encodeGifReference,
+  quantizedToRaster,
+  quantizedToRasterReference,
+  flatVolumeToRaster,
+  flatVolumeToRasterReference,
+  upscaleNearest,
+  upscaleNearestReference,
+  type GifFrame,
+  type Raster,
+} from "../src/pixel-export";
 
 function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
@@ -123,5 +138,163 @@ describe("pixel-export optimized GIF encoder vs retained reference", () => {
 
     // matching frames still encode fine (the guard is purely additive)
     expect(() => encodeGif([good, good])).not.toThrow();
+  });
+});
+
+// ---- raster helpers: flat palette tables + copyWithin row replication --------------------------
+
+/** Deterministic LCG so every fixture is irregular but reproducible. */
+function lcg(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s;
+  };
+}
+
+/**
+ * Export-shaped quantized frame: ~35% air (mapColorId 0, the common MISS that made the reference
+ * allocate a fallback tuple per pixel), the rest spread over the whole 0..255 id space so both
+ * mapped and unmapped ids are exercised.
+ */
+function randomQuantized(width: number, height: number, seed: number): QuantizedFrame {
+  const rand = lcg(seed);
+  const mapColorId = new Uint8Array(width * height);
+  for (let p = 0; p < mapColorId.length; p++) {
+    const roll = rand() % 100;
+    mapColorId[p] = roll < 35 ? 0 : rand() % 256;
+  }
+  return { width, height, mapColorId, paletteIndex: new Int32Array(width * height) };
+}
+
+/** Random flat-ish volume: ~30% all-air columns, voxels at varying depths, ids over 0..254. */
+function randomFlatVolume(sx: number, sy: number, sz: number, seed: number) {
+  const v = createVolume(sx, sy, sz);
+  const rand = lcg(seed);
+  for (let i = 0; i < v.data.length; i++) {
+    const roll = rand() % 100;
+    if (roll < 45) continue; // stays EMPTY
+    v.data[i] = rand() % 255; // 0..254, never the EMPTY sentinel
+  }
+  expect(v.data.some((c) => c === EMPTY)).toBe(true);
+  return v;
+}
+
+/** Random RGBA raster with ~10% transparent pixels (alpha must replicate exactly too). */
+function randomRaster(width: number, height: number, seed: number): Raster {
+  const rand = lcg(seed);
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let o = 0; o < data.length; o += 4) {
+    data[o] = rand() % 256;
+    data[o + 1] = rand() % 256;
+    data[o + 2] = rand() % 256;
+    data[o + 3] = rand() % 100 < 10 ? rand() % 128 : 255;
+  }
+  return { width, height, data };
+}
+
+function expectRasterIdentical(opt: Raster, ref: Raster, label: string): void {
+  expect(opt.width, `${label}: width`).toBe(ref.width);
+  expect(opt.height, `${label}: height`).toBe(ref.height);
+  expect(opt.data.length, `${label}: byte length`).toBe(ref.data.length);
+  expect(
+    Buffer.compare(
+      Buffer.from(opt.data.buffer, opt.data.byteOffset, opt.data.byteLength),
+      Buffer.from(ref.data.buffer, ref.data.byteOffset, ref.data.byteLength),
+    ),
+    `${label}: bytes`,
+  ).toBe(0);
+}
+
+/** Min-of-rounds interleaved A/B (a spike only ever makes a round slower, never faster). */
+function abMinOfRounds(runRef: () => unknown, runOpt: () => unknown, rounds: number): { refMs: number; optMs: number } {
+  runRef();
+  runOpt(); // JIT warmup for both sides
+  let refMs = Infinity;
+  let optMs = Infinity;
+  for (let round = 0; round < rounds; round++) {
+    let t = performance.now();
+    runRef();
+    refMs = Math.min(refMs, performance.now() - t);
+    t = performance.now();
+    runOpt();
+    optMs = Math.min(optMs, performance.now() - t);
+  }
+  return { refMs, optMs };
+}
+
+describe("pixel-export raster helpers vs retained references", () => {
+  it("quantizedToRaster is byte-identical to the reference (air-heavy, full id spread, odd sizes)", () => {
+    for (const [w, h, seed] of [
+      [128, 128, 0xa11ce],
+      [61, 37, 0xbee],
+      [1, 1, 0xc0de],
+      [256, 144, 0xd00d],
+    ] as const) {
+      const q = randomQuantized(w, h, seed);
+      expectRasterIdentical(quantizedToRaster(q), quantizedToRasterReference(q), `quantized ${w}x${h}`);
+    }
+  });
+
+  it("flatVolumeToRaster is byte-identical to the reference (air columns, depth occlusion, id spread)", () => {
+    for (const [sx, sy, sz, seed] of [
+      [128, 96, 1, 0x1234],
+      [64, 64, 4, 0x5678],
+      [3, 5, 2, 0x9abc],
+    ] as const) {
+      const v = randomFlatVolume(sx, sy, sz, seed);
+      expectRasterIdentical(flatVolumeToRaster(v), flatVolumeToRasterReference(v), `volume ${sx}x${sy}x${sz}`);
+    }
+  });
+
+  it("upscaleNearest is byte-identical to the reference (scales 2,3,4,7, non-integer, s=1 same-object)", () => {
+    for (const [w, h, scale, seed] of [
+      [128, 96, 4, 0x111],
+      [61, 37, 3, 0x222],
+      [16, 16, 7, 0x333],
+      [50, 20, 2.9, 0x444], // floors to 2
+    ] as const) {
+      const src = randomRaster(w, h, seed);
+      expectRasterIdentical(upscaleNearest(src, scale), upscaleNearestReference(src, scale), `upscale ${w}x${h} x${scale}`);
+    }
+    const src = randomRaster(4, 4, 0x555);
+    expect(upscaleNearest(src, 1), "s=1 returns the source object").toBe(src);
+    expect(upscaleNearestReference(src, 1)).toBe(src);
+  });
+
+  it("optimized quantizedToRaster is faster than the reference (same-run interleaved A/B)", { timeout: 60000, retry: 2 }, () => {
+    // the whole-video export path calls this once per clip frame; batch 24 frames per round so a
+    // round is long enough to time reliably
+    const frames: QuantizedFrame[] = [];
+    for (let f = 0; f < 24; f++) frames.push(randomQuantized(256, 144, 0xf00 + f));
+    const { refMs, optMs } = abMinOfRounds(
+      () => frames.forEach((q) => quantizedToRasterReference(q)),
+      () => frames.forEach((q) => quantizedToRaster(q)),
+      9,
+    );
+    const speedup = refMs / optMs;
+    console.log(
+      `quantizedToRaster A/B (min of 9 rounds, 24x 256x144 frames): reference ${refMs.toFixed(2)} ms, ` +
+        `optimized ${optMs.toFixed(2)} ms, speedup ${speedup.toFixed(2)}x`,
+    );
+    // generous margin well below the locally measured speedup, guarding regression without CI flake
+    expect(speedup, `optimized must beat the reference (measured ${speedup.toFixed(2)}x)`).toBeGreaterThan(1.1);
+  });
+
+  it("optimized upscaleNearest is faster than the reference (same-run interleaved A/B)", { timeout: 60000, retry: 2 }, () => {
+    // fitScale targets 384-512px: a 128x96 block grid ships at x4 = 512x384
+    const sources: Raster[] = [];
+    for (let f = 0; f < 12; f++) sources.push(randomRaster(128, 96, 0xabc + f));
+    const { refMs, optMs } = abMinOfRounds(
+      () => sources.forEach((r) => upscaleNearestReference(r, 4)),
+      () => sources.forEach((r) => upscaleNearest(r, 4)),
+      9,
+    );
+    const speedup = refMs / optMs;
+    console.log(
+      `upscaleNearest A/B (min of 9 rounds, 12x 128x96 -> x4): reference ${refMs.toFixed(2)} ms, ` +
+        `optimized ${optMs.toFixed(2)} ms, speedup ${speedup.toFixed(2)}x`,
+    );
+    expect(speedup, `optimized must beat the reference (measured ${speedup.toFixed(2)}x)`).toBeGreaterThan(1.2);
   });
 });
