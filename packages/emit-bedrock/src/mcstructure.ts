@@ -88,6 +88,92 @@ export function buildMcStructure(
   };
   intern(fill); // ensure fill exists (commonly index 0)
 
+  // Cache the palette index per raw mapColorId - the same goal-075 fix its 3D twin
+  // buildVoxelMcStructure got: a repeated pixel skips both the blockFor resolve and the
+  // per-cell `JSON.stringify(states)` intern key (the hot spot - a wall reuses a few
+  // dozen distinct blocks across every pixel). `blockFor` is a pure id->block lookup,
+  // so the first pixel using each id still interns in the unchanged x->y->z scan order:
+  // every distinct block key lands at the same palette index as per-cell interning.
+  // Byte-identical (locked against buildMcStructureReference in mcstructure-perf.test.ts).
+  const idToPaletteIdx = new Map<number, number>();
+  // Layer 0 = blocks, layer 1 = -1 (no second layer). Bedrock order: x outer, then y, then z.
+  const layer0 = new Int32Array(W * H * D);
+  const layer1 = new Int32Array(W * H * D);
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      for (let z = 0; z < D; z++) {
+        const idx = (x * H + y) * D + z;
+        const py = H - 1 - y; // image row 0 at top of the wall
+        const mapColorId = frame.mapColorId[py * W + x]!;
+        let pi = idToPaletteIdx.get(mapColorId);
+        if (pi === undefined) {
+          pi = intern(blockFor(mapColorId) ?? fill);
+          idToPaletteIdx.set(mapColorId, pi);
+        }
+        layer0[idx] = pi;
+        layer1[idx] = -1;
+      }
+    }
+  }
+
+  const root = Compound({
+    format_version: Int(1),
+    size: List(TAG.Int, [Int(W), Int(H), Int(D)]),
+    structure: Compound({
+      block_indices: List(TAG.List, [IntList(layer0), IntList(layer1)]),
+      entities: List(TAG.Compound, []),
+      palette: Compound({
+        default: Compound({
+          block_palette: List(TAG.Compound, blockPalette),
+          block_position_data: Compound({}),
+        }),
+      }),
+    }),
+    structure_world_origin: originList(opts.origin),
+  });
+
+  return writeNbt("", root, "little");
+}
+
+/**
+ * Deliberately-simple REFERENCE implementation of {@link buildMcStructure}, kept
+ * verbatim (algorithm and emitted bytes) from before the mapColorId->palette-index
+ * memo: interns via the `${name}|${JSON.stringify(states)}` string key PER CELL.
+ * Exported only so mcstructure-perf.test.ts can assert the optimized path is
+ * byte-for-byte identical and faster. Do not optimize.
+ */
+export function buildMcStructureReference(
+  frame: QuantizedFrame,
+  blockFor: (mapColorId: number) => BlockRef | undefined,
+  opts: McStructureOptions = {},
+): Buffer {
+  const W = frame.width;
+  const H = frame.height;
+  const D = 1;
+  const fill = opts.fill ?? { name: "minecraft:air" };
+
+  // Intern distinct blocks into the structure palette.
+  const paletteIndex = new Map<string, number>();
+  const blockPalette: NbtValue[] = [];
+  const blockVersion = opts.blockVersion ?? DEFAULT_BLOCK_VERSION;
+  const intern = (b: BlockRef): number => {
+    const key = `${b.name}|${JSON.stringify(b.states ?? {})}`;
+    let idx = paletteIndex.get(key);
+    if (idx === undefined) {
+      idx = blockPalette.length;
+      paletteIndex.set(key, idx);
+      blockPalette.push(
+        Compound({
+          name: Str(b.name),
+          states: statesCompound(b.states),
+          version: Int(blockVersion),
+        }),
+      );
+    }
+    return idx;
+  };
+  intern(fill); // ensure fill exists (commonly index 0)
+
   // Layer 0 = blocks, layer 1 = -1 (no second layer). Bedrock order: x outer, then y, then z.
   const layer0 = new Int32Array(W * H * D);
   const layer1 = new Int32Array(W * H * D);
