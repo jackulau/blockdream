@@ -63,6 +63,45 @@ export function fillLines(
   return lines;
 }
 
+/** Vanilla's hard `/forceload` cap: one add/remove may touch at most this many chunks, else the
+ *  command is rejected at runtime ("Too many chunks..."). Forceload is the FIRST setup command, so
+ *  an over-cap rect used to fail silently and every later setblock fired into unloaded chunks. */
+export const MAX_FORCELOAD_CHUNKS = 256;
+
+/**
+ * Emit one-or-more `forceload <action>` lines covering every chunk the block rect
+ * [x0..x1]×[z0..z1] touches, each command within MAX_FORCELOAD_CHUNKS chunks. A rect inside the
+ * cap stays a single command with the caller's exact block coords (byte-identical to the old
+ * single-line emit); an oversized rect (e.g. a long redstone music spine beside a deep build) is
+ * tiled at chunk granularity - x strips of at most 256 chunks, z rows of floor(256/stripWidth) -
+ * with each tile's corners clamped back into the block rect. The tiles overlap nowhere and their
+ * chunk union equals the rect's chunk set exactly, so add/remove pairs stay symmetric.
+ */
+export function forceloadLines(
+  x0: number, z0: number, x1: number, z1: number,
+  action: "add" | "remove" = "add",
+): string[] {
+  const bx0 = Math.min(x0, x1), bx1 = Math.max(x0, x1);
+  const bz0 = Math.min(z0, z1), bz1 = Math.max(z0, z1);
+  const cx0 = Math.floor(bx0 / 16), cx1 = Math.floor(bx1 / 16);
+  const cz0 = Math.floor(bz0 / 16), cz1 = Math.floor(bz1 / 16);
+  if ((cx1 - cx0 + 1) * (cz1 - cz0 + 1) <= MAX_FORCELOAD_CHUNKS) {
+    return [`forceload ${action} ${x0} ${z0} ${x1} ${z1}`];
+  }
+  const lines: string[] = [];
+  for (let ca = cx0; ca <= cx1; ca += MAX_FORCELOAD_CHUNKS) {
+    const cb = Math.min(cx1, ca + MAX_FORCELOAD_CHUNKS - 1);
+    const rows = Math.max(1, Math.floor(MAX_FORCELOAD_CHUNKS / (cb - ca + 1)));
+    for (let cc = cz0; cc <= cz1; cc += rows) {
+      const cd = Math.min(cz1, cc + rows - 1);
+      lines.push(
+        `forceload ${action} ${Math.max(bx0, ca * 16)} ${Math.max(bz0, cc * 16)} ${Math.min(bx1, cb * 16 + 15)} ${Math.min(bz1, cd * 16 + 15)}`,
+      );
+    }
+  }
+  return lines;
+}
+
 const key3 = (x: number, y: number, z: number) => `${x}|${y}|${z}`;
 
 /**

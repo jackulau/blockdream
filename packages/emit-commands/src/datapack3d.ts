@@ -10,7 +10,7 @@
 import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
 import type { NoteEvent } from "@blockdream/audio";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
-import { fillLines, greedyBoxes } from "./fill";
+import { fillLines, forceloadLines, greedyBoxes } from "./fill";
 import { noteSequencer, type Vec3 } from "./note-sequencer";
 import { redstoneSequencer } from "./redstone-sequencer";
 import type { DatapackOptions, GeneratedPack } from "./datapack";
@@ -308,7 +308,8 @@ export function generateVoxelDatapack(
       `scoreboard players set #speed ma ${speed}`,
       `scoreboard players set #count ma ${volumes.length}`,
       ...(seq ? seq.setupScores : []),
-      `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
+      // split at the 256-chunk /forceload cap (a long redstone spine can exceed it)
+      ...forceloadLines(flx0, flz0, flx1, flz1, "add"),
       // build-box clear lives at the top of frames/0 (called below) so loop wraps re-clear
       // LED glow layer: invisible full-bright light plane fronting the wall ("keep" never clobbers)
       ...(ledBox ? fillLines(ledBox.x0, y0, ledBox.z0, ledBox.x1, y1, ledBox.z1, "minecraft:light[level=15]", "keep") : []),
@@ -323,11 +324,11 @@ export function generateVoxelDatapack(
   // (server-friendly: a paused animation keeps nothing loaded), start gets them back.
   files.set(
     `${fnDir}/start.mcfunction`,
-    [`forceload add ${flx0} ${flz0} ${flx1} ${flz1}`, `scoreboard players set #play ma 1`, ""].join("\n"),
+    [...forceloadLines(flx0, flz0, flx1, flz1, "add"), `scoreboard players set #play ma 1`, ""].join("\n"),
   );
   files.set(
     `${fnDir}/stop.mcfunction`,
-    [`scoreboard players set #play ma 0`, `forceload remove ${flx0} ${flz0} ${flx1} ${flz1}`, ""].join("\n"),
+    [`scoreboard players set #play ma 0`, ...forceloadLines(flx0, flz0, flx1, flz1, "remove"), ""].join("\n"),
   );
   files.set(
     `${fnDir}/driver.mcfunction`,
