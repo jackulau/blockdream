@@ -5,7 +5,6 @@
 
 import { fitScale } from "./pixel-export";
 import { planTickPlayback } from "@blockdream/emit-commands";
-import { clampFrameDurations } from "./anim";
 
 /** Ceiling on TOTAL output pixels across all frames of one browser GIF export. Each frame is
  *  padded + integer-upscaled to an RGBA raster (4 bytes/pixel) BEFORE the synchronous encode,
@@ -59,24 +58,41 @@ export function planGifExport(
   return { frames, outWidth, outHeight, totalPixels, maxFrames, ok, message };
 }
 
-/** Per-frame GIF delays that match the tick plan the datapack export uses, so the exported
- *  GIF and the in-game animation pace identically. No timing → the plan's uniform dwell
- *  (speedTicks × 50 ms; the legacy 2-tick default = 100 ms - the GIF used to hardcode 70 ms
- *  while the pack played 100). Real timing → each frame keeps its clamped source delay
- *  (MIN_FRAME_MS floor via clampFrameDurations), and a missing entry falls back to the
- *  plan's own 100 ms default, again matching the pack. */
-export function gifFrameDelays(
+/** Duration sanitizer for the TICK-PLAN input specifically: junk (missing / non-number /
+ *  <= 0) becomes undefined so planTickPlayback's own 100 ms fallback applies, but a real
+ *  duration is passed through UNFLOORED. The viewer clock's MIN_FRAME_MS floor is a display
+ *  guard; applying it before planning inflated every >100 fps source's planned total (a
+ *  120 fps 1 s clip became a 1.20 s pack while the CLI, which plans on raw durations,
+ *  correctly emitted 1.00 s). */
+export function tickPlanDurations(
+  durationsMs: ReadonlyArray<number | undefined | null> | null,
+): Array<number | undefined> | null {
+  if (!durationsMs) return null;
+  return durationsMs.map((d) => (typeof d === "number" && d > 0 ? d : undefined));
+}
+
+/** How the exported GIF paces: the SAME frames the datapack plays (the tick plan's list -
+ *  resampled above Minecraft's 20 fps ceiling), each held for its uniform tick dwell
+ *  (speedTicks × 50 ms). The GIF and the in-game animation therefore run the same
+ *  wall-clock timeline by construction - the old export kept the UNRESAMPLED frames with
+ *  per-frame source delays, so a [40,40,40] clip played 120 ms in the GIF but 100 ms
+ *  in game, and a [25,25] clip 50 ms vs 100 ms. */
+export interface GifExportPacing {
+  /** source-frame indices to emit (identity when the pack keeps every frame) */
+  indices: number[];
+  /** uniform per-frame delay (ms) = the pack's tick dwell (speedTicks × 50) */
+  delayMs: number;
+  /** indices.length × delayMs - equals the pack's in-game loop duration */
+  totalMs: number;
+}
+
+export function gifExportPacing(
   frameCount: number,
-  durationsMs: Array<number | undefined | null> | null,
-): number[] {
-  const clamped = clampFrameDurations(durationsMs);
-  const plan = planTickPlayback(frameCount, clamped);
-  const uniform = plan.speedTicks * 50;
-  if (!clamped || !clamped.length) return new Array<number>(frameCount).fill(uniform);
-  return Array.from({ length: frameCount }, (_, i) => {
-    const d = clamped[i];
-    return typeof d === "number" ? d : 100;
-  });
+  durationsMs: ReadonlyArray<number | undefined | null> | null,
+): GifExportPacing {
+  const plan = planTickPlayback(frameCount, tickPlanDurations(durationsMs));
+  const delayMs = plan.speedTicks * 50;
+  return { indices: plan.indices, delayMs, totalMs: plan.indices.length * delayMs };
 }
 
 /** Pre-generation HUD line for the datapack export: the budget warning (when any) must be

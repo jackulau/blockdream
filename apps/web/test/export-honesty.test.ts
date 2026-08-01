@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planGifExport, gifFrameDelays, packingHudText, reportPngDownload, GIF_EXPORT_PIXEL_BUDGET } from "../src/export-plan";
+import { planGifExport, gifExportPacing, packingHudText, reportPngDownload, GIF_EXPORT_PIXEL_BUDGET } from "../src/export-plan";
 import { planExportBudget, planTickPlayback, EXPORT_FRAME_BUDGET } from "../src/datapack-export";
 import { clampFrameDurations, MIN_FRAME_MS } from "../src/anim";
 import { musicKeyboardHalf } from "../src/canvas-mod";
@@ -101,20 +101,31 @@ describe("planGifExport with zero frames (goal 088 D9d)", () => {
   });
 });
 
-describe("gifFrameDelays (goal 088 D9b: GIF pacing == in-game tick-plan pacing)", () => {
-  it("no timing uses the tick plan's uniform dwell (2 ticks = 100 ms), not the old 70 ms", () => {
+describe("gifExportPacing (goal 089 D8: GIF frames + delays == the pack's tick plan)", () => {
+  it("no timing uses the tick plan's uniform dwell (2 ticks = 100 ms) over every frame", () => {
     const plan = planTickPlayback(3, null);
     expect(plan.speedTicks).toBe(2);
-    expect(gifFrameDelays(3, null)).toEqual([100, 100, 100]);
-    expect(gifFrameDelays(3, null)[0]).toBe(plan.speedTicks * 50);
+    const pacing = gifExportPacing(3, null);
+    expect(pacing.indices).toEqual([0, 1, 2]);
+    expect(pacing.delayMs).toBe(plan.speedTicks * 50);
+    expect(pacing.totalMs).toBe(300);
   });
 
-  it("real per-frame timing survives, with the 100 ms tick-plan fallback filling gaps", () => {
-    expect(gifFrameDelays(3, [40, 0, undefined])).toEqual([40, 100, 100]);
+  it("junk entries fall back to the plan's 100 ms default, matching the pack", () => {
+    // [40, 0, undefined] plans as [40, 100, 100] → avg 80 ms → 2-tick dwell, every frame kept
+    const pacing = gifExportPacing(3, [40, 0, undefined]);
+    expect(pacing.indices).toEqual([0, 1, 2]);
+    expect(pacing.delayMs).toBe(100);
+    expect(pacing.totalMs).toBe(300);
   });
 
-  it("sub-floor delays are clamped by the SAME MIN_FRAME_MS the viewer clock uses", () => {
-    expect(gifFrameDelays(2, [2, 60])).toEqual([MIN_FRAME_MS, 60]);
+  it(">20 fps sources emit the pack's RESAMPLED frame list at the 50 ms tick dwell", () => {
+    const pacing = gifExportPacing(3, [40, 40, 40]);
+    const plan = planTickPlayback(3, [40, 40, 40]);
+    expect(plan.resampled).toBe(true);
+    expect(pacing.indices).toEqual(plan.indices); // the GIF shows exactly the pack's frames
+    expect(pacing.delayMs).toBe(50);
+    expect(pacing.totalMs).toBe(plan.indices.length * plan.speedTicks * 50);
   });
 });
 

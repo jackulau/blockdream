@@ -7,8 +7,7 @@ import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt, wireBlockArtDrop } from "./blockart-core";
-import { planGifExport, gifFrameDelays, packingHudText, reportPngDownload } from "./export-plan";
-import { clampFrameDurations } from "./anim";
+import { planGifExport, gifExportPacing, tickPlanDurations, packingHudText, reportPngDownload } from "./export-plan";
 import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage, type DitherMethod } from "@blockdream/color-core";
 import { quantizeForDatapack } from "./blockart-export";
 import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
@@ -34,7 +33,7 @@ import { rgbFramesToFlat3d, rgbFramesToAnimated3d } from "./video3d";
 import { decodeVideo } from "./video";
 import { ClipAudio, type ClipAudioMode } from "./clip-audio";
 import { analyzeFileAudio } from "./audio";
-import { NotePreview } from "./note-preview";
+import { NotePreview, previewTickWindow } from "./note-preview";
 import type { NoteEvent } from "@blockdream/audio";
 import { initialArrangeState, arrangeReducer, planDatapackPlacement, musicKeyboardHalf } from "./canvas-mod";
 import {
@@ -51,7 +50,7 @@ import { Viewer3D } from "./viewer3d";
 import { localTextureUrl, faceTextureUrl, loadTextureManifest, hasLocalTextures, swatchDataUrl } from "./blocks";
 import { resolveBlock, safeBlockInfo } from "./resolve-block";
 import { volumeBom } from "./bom3d";
-import { downloadDatapack, planExportBudget, planTickPlayback } from "./datapack-export";
+import { downloadDatapack, planExportBudget, planTickPlayback, type TickPlan } from "./datapack-export";
 import {
   quantizedToRaster,
   flatVolumeToRaster,
@@ -468,8 +467,16 @@ async function setup3dViewer(): Promise<void> {
       // preview of the in-game datapack sound, frame-windowed. Scrubbing while paused stays silent.
       clipAudio.frameShown(i, viewer.isPlaying && !!current3dDurations);
       if (viewer.isPlaying && current3dDurations && audioModeSel.value === "noteblocks") {
-        const tpf = Math.max(1, Math.round((current3dDurations[i] ?? 100) / 50));
-        notePreview.frameShown(i, tpf);
+        // Preview pacing == pack pacing: the SAME tick plan the datapack export uses decides
+        // each frame's tick window (uniform speedTicks dwell + the loop trim at kept-frames ×
+        // speedTicks). The old per-frame round(rawDuration/50) let a 30 fps import preview the
+        // whole melody while the pack's locked music loop dropped everything past its trim.
+        if (previewPlan === null || previewPlanFor !== current3dDurations) {
+          previewPlan = planTickPlayback(current3d.length, tickPlanDurations(current3dDurations));
+          previewPlanFor = current3dDurations;
+        }
+        const w = previewTickWindow(previewPlan, i);
+        notePreview.windowShown(w.t0, w.t1);
       }
     },
   });
@@ -480,6 +487,10 @@ async function setup3dViewer(): Promise<void> {
   // GIF export replays at the source's speed. null ⇒ uniform (a baked spin / block-motion sequence).
   let current3dDurations: Array<number | undefined> | null = null;
   let flatDurationsMs: Array<number | undefined> | null = null; // the active flat clip's timing (for restore)
+  // memoized tick plan for the note-block preview (recomputed when the shown timing changes) -
+  // the preview windows come from the SAME plan the datapack export builds, never a per-frame guess
+  let previewPlan: TickPlan | null = null;
+  let previewPlanFor: unknown = null;
   let current3dMusic: NoteEvent[] = []; // note-block music transcribed from an imported video's audio
   let baseVolume: VoxelVolume | null = null; // the single built solid (source for block-motion anims)
 
@@ -1068,8 +1079,10 @@ async function setup3dViewer(): Promise<void> {
     if (!allFrames.length) return;
     // HONEST in-game pacing: Minecraft plays one animation step per game tick - 20 fps is the
     // ceiling. A clip decoded above that is resampled EVENLY so the in-game duration matches the
-    // source; at/below 20 fps every frame keeps its nearest whole-tick dwell.
-    const plan = planTickPlayback(allFrames.length, clampFrameDurations(durationsMs));
+    // source; at/below 20 fps every frame keeps its nearest whole-tick dwell. The plan input is
+    // sanitized but NOT per-frame floored (tickPlanDurations): the viewer's MIN_FRAME_MS display
+    // floor inflated every >100 fps source (120 fps 1 s → a 1.20 s pack; the CLI emits 1.00 s).
+    const plan = planTickPlayback(allFrames.length, tickPlanDurations(durationsMs));
     const frames = plan.resampled ? plan.indices.map((i) => allFrames[i]!) : allFrames;
     // Export-budget guard: one .mcfunction per frame; warn (do not block) past the tested budget.
     // The warning + "packing…" go to the HUD BEFORE the synchronous generate+zip (which can take
@@ -1114,8 +1127,15 @@ async function setup3dViewer(): Promise<void> {
   // rendered crisp (integer-upscaled), at the source's real per-frame timing. A video / imported GIF
   // exports its frames; a single spun solid bakes the turntable so the GIF genuinely rotates.
   $<HTMLButtonElement>("v3-gif").addEventListener("click", () => {
-    const { frames, durationsMs } = exportFrames();
-    if (!frames.length) return;
+    const { frames: allFrames, durationsMs } = exportFrames();
+    if (!allFrames.length) return;
+    // GIF pacing == pack pacing: emit the SAME frames the datapack plays (the tick plan's
+    // list - resampled above Minecraft's 20 fps ceiling) with each frame held its uniform
+    // tick dwell, so GIF and in-game animation run the same wall-clock timeline. The old
+    // export kept the unresampled frames at per-frame source delays: [40,40,40] played
+    // 120 ms as a GIF but 100 ms in game. Pack bytes are unchanged by this.
+    const pacing = gifExportPacing(allFrames.length, durationsMs);
+    const frames = pacing.indices.map((i) => allFrames[i]!);
     // Memory-budget guard BEFORE any per-frame raster is allocated: a long high-fps clip
     // (up to 13200 frames) padded + upscaled to RGBA is gigabytes - that synchronous path
     // froze or killed the tab with no warning. Hard cap with the honest math in the HUD.
@@ -1134,12 +1154,10 @@ async function setup3dViewer(): Promise<void> {
       const W = Math.max(...frames.map((f) => f.sx));
       const H = Math.max(...frames.map((f) => f.sy));
       const scale = fitScale(W, H, 384);
-      // delays come from the SAME tick plan the datapack uses, so GIF pacing == in-game pacing
-      // (a spin with no timing used to export at 70 ms/frame while the pack played 100 ms).
-      const delays = gifFrameDelays(frames.length, durationsMs);
-      const gif: GifFrame[] = frames.map((f, i) => ({
+      // uniform delay = the pack's tick dwell (speedTicks × 50 ms) over the pack's frame list
+      const gif: GifFrame[] = frames.map((f) => ({
         raster: upscaleNearest(padRaster(flatVolumeToRaster(f), W, H), scale),
-        delayMs: delays[i]!,
+        delayMs: pacing.delayMs,
       }));
       try {
         downloadGif("blockdream-animation.gif", gif);
