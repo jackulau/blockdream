@@ -302,6 +302,148 @@ export function gltfToFrames(gltf: GltfJson | string, opts: GltfImportOptions = 
     return fromTRS(t, q, s);
   };
 
+  // Topology (tris + triColors) is FRAME-INVARIANT: the node traversal below is deterministic and
+  // per-primitive vertex counts are constant, so every frame appends the same triangle indices
+  // (identical `base` offsets) and the same per-tri colors - only the transformed vertex positions
+  // vary with ts. Build the topology ONCE on the first frame and share the arrays across frames
+  // (rasterizeSequence/trisToVolume only read them). Rebuilding it per frame was ~frameCount x the
+  // allocations for zero information; output volumes are identical (locked against the verbatim
+  // {@link gltfToFramesReference} twin in test/gltf-frames.test.ts).
+  //
+  // Per-tri colors are appended with a counted loop, NOT `push(...spread)`: the spread form passes
+  // one ARGUMENT per triangle and throws RangeError past the engine argument limit (~65k-125k), a
+  // real import ceiling for a single large primitive.
+  const frames: Mesh[] = [];
+  let sharedTris: Tri[] | null = null;
+  let sharedTriColors: Array<V3 | null> | null = null;
+  let sharedHasColor = false;
+  for (let f = 0; f < frameCount; f++) {
+    const ts = animated ? tMin + ((tMax - tMin) * f) / Math.max(1, frameCount - 1) : 0;
+    const verts: V3[] = [];
+    const buildTopology = sharedTris === null;
+    const tris: Tri[] = buildTopology ? [] : sharedTris!;
+    const triColors: Array<V3 | null> = buildTopology ? [] : sharedTriColors!;
+    const visit = (nodeIdx: number, parent: Mat4): void => {
+      const node = g.nodes![nodeIdx]!;
+      const world = mul(parent, localMatrix(nodeIdx, ts));
+      if (node.mesh !== undefined) {
+        for (const prim of meshGeo[node.mesh]!) {
+          const base = verts.length;
+          for (const v of prim.verts) verts.push(transform(world, v));
+          if (buildTopology) {
+            for (const t of prim.tris) tris.push([t[0] + base, t[1] + base, t[2] + base]);
+            const pc = prim.triColors;
+            if (pc) for (const c of pc) triColors.push(c);
+            else for (let i = 0; i < prim.tris.length; i++) triColors.push(null);
+          }
+        }
+      }
+      for (const c of node.children ?? []) visit(c, world);
+    };
+    for (const r of roots) visit(r, identity());
+    if (buildTopology) {
+      sharedTris = tris;
+      sharedTriColors = triColors;
+      sharedHasColor = triColors.some((c) => c !== null);
+    }
+    frames.push({ verts, tris, triColors: sharedHasColor ? triColors : undefined });
+  }
+  return rasterizeSequence(frames, opts);
+}
+
+/**
+ * VERBATIM pre-optimization gltfToFrames - the reference twin for the goal-089 D21 topology hoist
+ * above (and the pre-fix spread-push, which throws RangeError for primitives past the engine
+ * argument limit - a bug the optimized path fixes, so past that size the twins intentionally
+ * DIVERGE: reference throws, optimized succeeds). Kept exported (house convention, see
+ * trisToVolumeReference in obj.ts) so test/gltf-frames.test.ts can prove per-frame output volumes
+ * are identical. Not for production use.
+ */
+export function gltfToFramesReference(gltf: GltfJson | string, opts: GltfImportOptions = {}): VoxelVolume[] {
+  const g: GltfJson = typeof gltf === "string" ? JSON.parse(gltf) : gltf;
+  if (!g.meshes?.length || !g.nodes?.length) throw new Error("glTF has no meshes/nodes");
+  const bufs = resolveBuffers(g, opts.buffers);
+
+  // per-node animation tracks
+  type Track = { times: Float64Array; values: Float64Array; comps: number };
+  const anim: Record<number, { translation?: Track; rotation?: Track; scale?: Track }> = {};
+  let tMin = Infinity;
+  let tMax = -Infinity;
+  for (const a of g.animations ?? []) {
+    for (const ch of a.channels) {
+      const node = ch.target.node;
+      if (node === undefined || !["translation", "rotation", "scale"].includes(ch.target.path)) continue;
+      const samp = a.samplers[ch.sampler]!;
+      const tin = readAccessor(g, bufs, samp.input);
+      const tout = readAccessor(g, bufs, samp.output);
+      (anim[node] ??= {})[ch.target.path as "translation" | "rotation" | "scale"] = { times: tin.data, values: tout.data, comps: tout.comps };
+      tMin = Math.min(tMin, tin.data[0]!);
+      tMax = Math.max(tMax, tin.data[tin.count - 1]!);
+    }
+  }
+  const animated = tMax > tMin;
+  const frameCount = animated ? Math.max(1, Math.floor(opts.frames ?? 24)) : 1;
+
+  const roots = g.scenes?.[g.scene ?? 0]?.nodes ?? g.nodes.map((_, i) => i);
+
+  const meshGeo = g.meshes.map((m) =>
+    m.primitives.map((p) => {
+      const pos = readAccessor(g, bufs, p.attributes.POSITION!);
+      const verts: V3[] = [];
+      for (let i = 0; i < pos.count; i++) verts.push([pos.data[i * 3]!, pos.data[i * 3 + 1]!, pos.data[i * 3 + 2]!]);
+      let tris: Tri[] = [];
+      if (p.indices !== undefined) {
+        const idx = readAccessor(g, bufs, p.indices);
+        for (let i = 0; i + 2 < idx.count; i += 3) tris.push([idx.data[i]!, idx.data[i + 1]!, idx.data[i + 2]!]);
+      } else {
+        for (let i = 0; i + 2 < verts.length; i += 3) tris.push([i, i + 1, i + 2]);
+      }
+
+      const factor = p.material !== undefined
+        ? g.materials?.[p.material]?.pbrMetallicRoughness?.baseColorFactor ?? null
+        : null;
+      let vertColors: V3[] | null = null;
+      const colorAcc = p.attributes.COLOR_0;
+      if (colorAcc !== undefined) {
+        const acc = g.accessors![colorAcc]!;
+        const col = readAccessor(g, bufs, colorAcc);
+        const denom = acc.componentType === 5121 ? 255 : acc.componentType === 5123 ? 65535 : 1;
+        vertColors = [];
+        for (let i = 0; i < col.count; i++) {
+          vertColors.push([
+            col.data[i * col.comps]! / denom,
+            col.data[i * col.comps + 1]! / denom,
+            col.data[i * col.comps + 2]! / denom,
+          ]);
+        }
+      }
+      let triColors: Array<V3 | null> | undefined;
+      if (vertColors || factor) {
+        const f: V3 = factor ? [factor[0] ?? 1, factor[1] ?? 1, factor[2] ?? 1] : [1, 1, 1];
+        triColors = tris.map(([ia, ib, ic]): V3 => {
+          const at = (i: number): V3 => vertColors?.[i] ?? [1, 1, 1];
+          const a = at(ia), b = at(ib), c = at(ic);
+          return [
+            ((a[0]! + b[0]! + c[0]!) / 3) * f[0]! * 255,
+            ((a[1]! + b[1]! + c[1]!) / 3) * f[1]! * 255,
+            ((a[2]! + b[2]! + c[2]!) / 3) * f[2]! * 255,
+          ];
+        });
+      }
+      return { verts, tris, triColors };
+    }),
+  );
+
+  const localMatrix = (nodeIdx: number, ts: number): Mat4 => {
+    const node = g.nodes![nodeIdx]!;
+    if (node.matrix) return node.matrix.slice();
+    const tr = anim[nodeIdx];
+    const t = tr?.translation ? sampleTrack(tr.translation.times, tr.translation.values, 3, ts, false) : node.translation ?? [0, 0, 0];
+    const q = tr?.rotation ? sampleTrack(tr.rotation.times, tr.rotation.values, 4, ts, true) : node.rotation ?? [0, 0, 0, 1];
+    const s = tr?.scale ? sampleTrack(tr.scale.times, tr.scale.values, 3, ts, false) : node.scale ?? [1, 1, 1];
+    return fromTRS(t, q, s);
+  };
+
   const frames: Mesh[] = [];
   for (let f = 0; f < frameCount; f++) {
     const ts = animated ? tMin + ((tMax - tMin) * f) / Math.max(1, frameCount - 1) : 0;
