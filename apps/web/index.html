@@ -75,6 +75,11 @@
       button.ui:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
       button.ui:disabled { opacity: 0.4; cursor: not-allowed; }
       #ba-drop.drag, #v3-drop.drag { outline: 2px dashed var(--accent); outline-offset: 6px; border-radius: var(--radius-lg); }
+      /* keyboard-reachable hidden file input: visually hidden but still focusable (display:none
+         removes a control from the tab order entirely); the wrapping label stays the visible
+         click target and shows the focus ring via :focus-within. */
+      .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+      label.ui:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius); }
       /* pre-wrap (not pre): long one-line HUD errors wrap instead of forcing the whole document
          to scroll sideways on mobile; the \n two-line stats lines still break as written */
       .hud { font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.5; color: var(--accent-2); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: var(--space-2); min-height: 3em; }
@@ -277,7 +282,7 @@
             <button id="v3-gif" class="ui" disabled>Download GIF</button>
             <button id="v3-png" class="ui" disabled>Download PNG</button>
           </div>
-          <div class="row" id="v3-arrange-row">
+          <div class="row">
             <label style="font-size:.78rem;color:var(--dim);cursor:pointer" title="Drag the build or the note-block music area on the ground; orbit is suspended mid-drag">
               <input id="v3-arrange" type="checkbox" /> Arrange (drag on canvas)
             </label>
@@ -293,7 +298,7 @@
           </div>
           <div class="row">
             <label class="ui" style="cursor:pointer">import .gltf / .glb / .obj / .gif / video → blocks
-              <input id="v3-import" type="file" multiple accept=".gltf,.glb,.obj,.gif,.mp4,.webm,.mov,.m4v,image/gif,video/*,model/gltf+json,model/gltf-binary" style="display:none" />
+              <input id="v3-import" type="file" multiple accept=".gltf,.glb,.obj,.gif,.mp4,.webm,.mov,.m4v,image/gif,video/*,model/gltf+json,model/gltf-binary" class="visually-hidden" />
             </label>
             <button id="v3-cancel" class="ui" hidden>cancel import</button>
             <label style="font-size:.78rem;color:var(--dim)" title="Video decode + playback rate. Minecraft itself plays at most 20 fps (1 frame per game tick) - the datapack export samples down to 20 when you pick more.">fps

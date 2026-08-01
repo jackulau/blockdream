@@ -42,6 +42,7 @@ import {
   importBusyText,
   IMPORT_CANCELLED_TEXT,
   gifCapNote,
+  audioAnalysisFailedText,
   viewer3dUnavailableText,
   VIEWER3D_CONTEXT_LOST_TEXT,
   VIEWER3D_CONTEXT_RESTORED_TEXT,
@@ -1001,6 +1002,10 @@ async function setup3dViewer(): Promise<void> {
           }
         } catch (err) {
           log.warn("audio analysis failed", err);
+          // the toggle stays disabled (nothing to toggle) - but the REASON must be visible:
+          // "Note blocks" greyed forever beside an audio-mode select still offering silent
+          // "note blocks" was a dead end. The visual import above already succeeded.
+          hud.textContent = audioAnalysisFailedText(video.name, (err as Error).message);
         }
       } else if (image) {
         // still image → a single subject-isolated 3D solid the viewer spins live (its own animation).

@@ -61,6 +61,18 @@ export const VIEWER3D_CONTEXT_RESTORED_TEXT = "3D viewer restored · press play 
 /** HUD line when the browser's autoplay policy blocks clip audio / the note-block synth. */
 export const AUDIO_BLOCKED_TEXT = "audio blocked by the browser - click play again to enable sound";
 
+/** HUD line when the imported clip's audio can't be decoded/transcribed. The note-block
+ *  toggle is disabled on every import and only re-enabled when a transcription lands, so a
+ *  decode failure used to leave "Note blocks" greyed FOREVER with no reason - while the
+ *  audio-mode select still offered "note blocks" (pure silence). Say why, and what the
+ *  silence means. The visual import is unaffected and has already succeeded. */
+export function audioAnalysisFailedText(name: string, msg: string): string {
+  return (
+    `${name}: couldn't transcribe the clip's audio (${msg}) · ` +
+    `note blocks unavailable for this clip - the "note blocks" audio mode will stay silent`
+  );
+}
+
 /** The fps/resolution selects are read once at import time. Changing them mid-clip used to be
  *  a silent no-op; now the HUD says when the change takes effect. Null when nothing is loaded
  *  (the next import simply uses the new value - nothing to explain). */
