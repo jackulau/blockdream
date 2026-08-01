@@ -38,6 +38,10 @@ import type { NoteEvent } from "@blockdream/audio";
 import { initialArrangeState, arrangeReducer, planDatapackPlacement, musicKeyboardHalf } from "./canvas-mod";
 import {
   SECTION3_CONTROL_IDS,
+  IMPORT_TRIGGER_IDS,
+  importBusyText,
+  IMPORT_CANCELLED_TEXT,
+  gifCapNote,
   viewer3dUnavailableText,
   AUDIO_BLOCKED_TEXT,
   settingsChangeNote,
@@ -815,6 +819,20 @@ async function setup3dViewer(): Promise<void> {
     importedFrames = frames;
   }
 
+  // Re-entrancy guard + cancel for the import pipeline. All three entry points (picker, drop,
+  // URL) are fire-and-forget; two interleaved imports would race the state reset above the try
+  // against the other's post-decode writes and corrupt the flatVolFrames/flatDurationsMs
+  // pairing. While one runs: the triggers are disabled, a second request is refused with a
+  // clear HUD line, and the visible cancel button aborts the decode cleanly (no state write).
+  let importing = false;
+  let importAbort: AbortController | null = null;
+  const cancelBtn = $<HTMLButtonElement>("v3-cancel");
+  function setImportBusy(busy: boolean): void {
+    for (const id of IMPORT_TRIGGER_IDS) $<HTMLButtonElement>(id).disabled = busy;
+    cancelBtn.hidden = !busy;
+  }
+  cancelBtn.addEventListener("click", () => importAbort?.abort());
+
   // import a real animation → block animation: a Blender glTF/.glb (node-TRS animation sampled to
   // frames), an .obj-per-frame sequence (select multiple), a single .obj model, an animated .gif,
   // a VIDEO file (.mp4/.webm/.mov - decoded natively in the browser, no ffmpeg), or a still image
@@ -822,6 +840,14 @@ async function setup3dViewer(): Promise<void> {
   // all three funnel through importFiles so every source gets the identical pipeline.
   async function importFiles(files: File[]): Promise<void> {
     if (!files.length) return;
+    if (importing) {
+      hud.textContent = importBusyText(files[0]!.name || "that file");
+      return;
+    }
+    importing = true;
+    importAbort = new AbortController();
+    const signal = importAbort.signal;
+    setImportBusy(true);
     viewer.pause(); // stop the render loop overwriting the status line
     flatFramesRgb = null; // a fresh import invalidates the prior flat import (re-set below on success)
     flatVolFrames = null;
@@ -857,7 +883,7 @@ async function setup3dViewer(): Promise<void> {
         // to lift off a "background"; the OLD dome-inflation path turned it into a boiling blob. Here the
         // front face of each thin slab IS the source frame, block-for-block - the frames ARE the motion,
         // played at the GIF's real per-frame timing. Transparent pixels (canvas alpha) map to air.
-        const { canvases, durationsMs } = await decodeGif(gif);
+        const { canvases, durationsMs, capped } = await decodeGif(gif, { signal });
         // a 0-frame decode (ImageDecoder reports frameCount 0 for a truncated/corrupt GIF) would
         // dereference canvases[0] below - fail with a clean message instead of a TypeError.
         if (!canvases.length) throw new Error(`couldn't decode ${gif.name} (the GIF has no frames)`);
@@ -868,7 +894,8 @@ async function setup3dViewer(): Promise<void> {
           depth: 2,
           isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
         });
-        showFrames(frames, `gif ${gif.name} · flat`, durationsMs, true);
+        // an over-budget GIF keeps its first N frames - the label says so (video path's pattern)
+        showFrames(frames, `gif ${gif.name} · flat${gifCapNote(capped)}`, durationsMs, true);
         flatFramesRgb = rgb; // remember the imported frames so build-from-image / transforms follow them
         flatVolFrames = frames; // and the plain flat frames, so a block-motion effect can play over them
         flatDurationsMs = durationsMs; // and its real per-frame timing, for a faithful GIF export
@@ -891,6 +918,7 @@ async function setup3dViewer(): Promise<void> {
           fps,
           maxFrames: Math.ceil(fps * 660), // 11-minute ceiling at ANY fps - the count scales with fps
           targetWidth: decodeW,
+          signal, // the cancel button aborts between seeks - no state below is written
           onFrame: (c, i, total) => {
             if (i === 0) {
               const aspect = (c.height || 9) / (c.width || 16);
@@ -973,8 +1001,18 @@ async function setup3dViewer(): Promise<void> {
         hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), .gif, a video (.mp4/.webm/.mov), or an image";
       }
     } catch (err) {
-      log.warn("3D import failed", err);
-      hud.textContent = `import failed: ${(err as Error).message}`;
+      if ((err as Error).name === "AbortError") {
+        // user-driven cancel: the decode threw BEFORE any state write, so the section keeps
+        // whatever it was showing - say so honestly instead of a scary "import failed"
+        hud.textContent = IMPORT_CANCELLED_TEXT;
+      } else {
+        log.warn("3D import failed", err);
+        hud.textContent = `import failed: ${(err as Error).message}`;
+      }
+    } finally {
+      importing = false;
+      importAbort = null;
+      setImportBusy(false);
     }
   }
 

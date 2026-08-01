@@ -23,7 +23,26 @@ export const SECTION3_CONTROL_IDS: readonly string[] = [
   "v3-audio-mode",
   "v3-url",
   "v3-url-go",
+  "v3-cancel",
 ];
+
+/** Controls that can START an import (picker, URL box + go). Disabled while one is decoding:
+ *  importFiles has three fire-and-forget entry points, and a second import interleaving with
+ *  the first's post-decode state writes corrupts the flatVolFrames/flatDurationsMs pairing. */
+export const IMPORT_TRIGGER_IDS: readonly string[] = ["v3-import", "v3-url", "v3-url-go"];
+
+/** HUD line when an import is refused because another one is still decoding. */
+export function importBusyText(name: string): string {
+  return `an import is already running - cancel it (or let it finish) before importing ${name}`;
+}
+
+/** HUD line after the user cancels an in-flight import. */
+export const IMPORT_CANCELLED_TEXT = "import cancelled · nothing was changed - import another file to continue";
+
+/** Honest label suffix when the GIF decode hit its retained-pixel memory budget. */
+export function gifCapNote(capped: { kept: number; total: number } | undefined): string {
+  return capped ? ` · capped at ${capped.kept}/${capped.total} frames (memory)` : "";
+}
 
 /** HUD line when the 3D viewer cannot start (was: "building…" forever with dead controls). */
 export function viewer3dUnavailableText(msg: string): string {

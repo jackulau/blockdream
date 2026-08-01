@@ -295,6 +295,7 @@
             <label class="ui" style="cursor:pointer">import .gltf / .glb / .obj / .gif / video → blocks
               <input id="v3-import" type="file" multiple accept=".gltf,.glb,.obj,.gif,.mp4,.webm,.mov,.m4v,image/gif,video/*,model/gltf+json,model/gltf-binary" style="display:none" />
             </label>
+            <button id="v3-cancel" class="ui" hidden>cancel import</button>
             <label style="font-size:.78rem;color:var(--dim)" title="Video decode + playback rate. Minecraft itself plays at most 20 fps (1 frame per game tick) - the datapack export samples down to 20 when you pick more.">fps
               <select id="v3-fps">
                 <option value="10">10</option>
