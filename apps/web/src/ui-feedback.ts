@@ -80,6 +80,13 @@ export function settingsChangeNote(clipLoaded: boolean): string | null {
   return clipLoaded ? "fps/resolution applies on the next import - re-import to apply" : null;
 }
 
+/** Datapack-palette honesty for the block-art exports (§02 + the standalone tester): the
+ *  preview may show the 244-colour MAP palette, but the pack always RE-QUANTIZES against the
+ *  placeable SOLID-block palette (deliberate - map-palette cells resolve through the solid
+ *  resolver into air holes + collapsed blocks). The export status line says so, instead of
+ *  silently shipping a pack that differs from a map-palette preview. */
+export const DATAPACK_PALETTE_NOTE = "pack quantized against the placeable solid-block palette";
+
 /** §02 export status line. A still is honest as "1 frame"; an animated GIF says explicitly
  *  that only the current frame exports here (the full animation lives in section 03). */
 export function blockArtExportText(width: number, height: number, frameCount: number): string {

@@ -49,6 +49,7 @@ import {
   AUDIO_BLOCKED_TEXT,
   settingsChangeNote,
   blockArtExportText,
+  DATAPACK_PALETTE_NOTE,
   resetDisabled,
 } from "./ui-feedback";
 import { log } from "./log";
@@ -201,6 +202,9 @@ const ba = createBlockArt({
   out: $<HTMLCanvasElement>("ba-out"),
   bom: $<HTMLUListElement>("ba-bom"),
   tooltip: $<HTMLDivElement>("ba-tooltip"),
+  // palette select (map 244 vs placeable solid gamut) - the same choice the standalone
+  // tester has had; createBlockArt re-quantizes on change and the tooltip/BOM track it.
+  palette: $<HTMLSelectElement>("ba-palette"),
 }, {
   onRender: (q) => {
     // both exports need a frame: enable them together (PNG used to ship enabled and silently
@@ -230,7 +234,7 @@ $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
   });
   const animatedNote =
     ba.getFrameCount() > 1 ? " · animated GIF: current frame only - use section 03 for the full animation" : "";
-  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream:setup${animatedNote}`;
+  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · ${DATAPACK_PALETTE_NOTE} · load /function blockdream:setup${animatedNote}`;
   downloadDatapack("blockdream-blockart-datapack", pack.files);
 });
 

@@ -207,7 +207,7 @@
           <p class="kicker"><span class="num">02</span> Block-art</p>
           <h2>Image → Minecraft block-art</h2>
         </div>
-        <p class="desc">Drop any image to map it to the 244-color Minecraft map palette (OKLab matching + dithering). Hover the result to identify the exact block; the bill-of-materials lists every block used with a texture-ish icon and count · what you'd need to build it.</p>
+        <p class="desc">Drop any image to map it to the 244-color Minecraft map palette · or the placeable solid-block gamut · with OKLab matching + dithering. Hover the result to identify the exact block; the bill-of-materials lists every block used with a texture-ish icon and count · what you'd need to build it. The downloadable datapack always builds with the solid-block palette, so every cell places a real block.</p>
         <div class="ba">
           <div class="controls">
             <label>Image <input id="ba-file" type="file" accept="image/*" /></label>
@@ -217,6 +217,12 @@
                 <option value="floyd-steinberg">Floyd–Steinberg</option>
                 <option value="bayer">Bayer (ordered)</option>
                 <option value="none">None (nearest)</option>
+              </select>
+            </label>
+            <label>Palette
+              <select id="ba-palette">
+                <option value="map">Map colors (244)</option>
+                <option value="block">Solid blocks (placeable gamut)</option>
               </select>
             </label>
             <div id="ba-stats" style="font-size:.78rem;color:var(--dim)"></div>
