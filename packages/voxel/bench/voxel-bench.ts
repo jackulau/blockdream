@@ -23,7 +23,7 @@ import { imageToSolid } from "../src/depth";
 import { imageToVolume } from "../src/voxelize";
 import { volumeToFrame } from "../src/project";
 import { solidify } from "../src/obj";
-import { spinSequence, spin, padXZToSquare } from "../src/spin";
+import { spinSequence, spinSequenceReference, spin, padXZToSquare } from "../src/spin";
 import { createVolume, setVoxel, getVoxel, fillRun, EMPTY, forEachSolid, countSolid, type VoxelVolume } from "../src/volume";
 
 // ---- deterministic PRNG (no Math.random → reproducible inputs) ----
@@ -333,6 +333,22 @@ export function runAB(cfg: BenchConfig = {}): ABStage[] {
     };
     const { optMs, refMs } = timeAB(opt, ref, iters, warmup);
     out.push({ name: "spinSequence", optMs, refMs, speedup: refMs / optMs });
+  }
+
+  // 5. spinSequence inner Y copy (goal 089 D19): hoisted running indices (opt) vs the verbatim
+  //    getVoxel/setVoxel column copy (spinSequenceReference). Byte-identical (spin-perf.test.ts);
+  //    isolates exactly what D19 changed (the per-voxel inBounds + voxelIndex overhead).
+  {
+    const build = imageToSolid(discFrame(size), { maxDepth: depth });
+    const frames = 6;
+    const opt = () => {
+      spinSequence(build, frames);
+    };
+    const ref = () => {
+      spinSequenceReference(build, frames);
+    };
+    const { optMs, refMs } = timeAB(opt, ref, iters, warmup);
+    out.push({ name: "spinSequence-inner", optMs, refMs, speedup: refMs / optMs });
   }
 
   return out;

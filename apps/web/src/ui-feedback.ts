@@ -23,15 +23,55 @@ export const SECTION3_CONTROL_IDS: readonly string[] = [
   "v3-audio-mode",
   "v3-url",
   "v3-url-go",
+  "v3-cancel",
 ];
+
+/** Controls that can START an import (picker, URL box + go). Disabled while one is decoding:
+ *  importFiles has three fire-and-forget entry points, and a second import interleaving with
+ *  the first's post-decode state writes corrupts the flatVolFrames/flatDurationsMs pairing. */
+export const IMPORT_TRIGGER_IDS: readonly string[] = ["v3-import", "v3-url", "v3-url-go"];
+
+/** HUD line when an import is refused because another one is still decoding. */
+export function importBusyText(name: string): string {
+  return `an import is already running - cancel it (or let it finish) before importing ${name}`;
+}
+
+/** HUD line after the user cancels an in-flight import. */
+export const IMPORT_CANCELLED_TEXT = "import cancelled · nothing was changed - import another file to continue";
+
+/** Honest label suffix when the GIF decode hit its retained-pixel memory budget. */
+export function gifCapNote(capped: { kept: number; total: number } | undefined): string {
+  return capped ? ` · capped at ${capped.kept}/${capped.total} frames (memory)` : "";
+}
 
 /** HUD line when the 3D viewer cannot start (was: "building…" forever with dead controls). */
 export function viewer3dUnavailableText(msg: string): string {
   return `3D viewer unavailable: ${msg} (WebGL required)`;
 }
 
+/** HUD line while the WebGL context is LOST after a successful start (GPU reset / driver
+ *  crash / low-memory device). Rendering + playback are stopped and the section's controls
+ *  disabled - the old behavior was a frozen black canvas with live controls. */
+export const VIEWER3D_CONTEXT_LOST_TEXT =
+  "3D viewer paused: the browser lost the WebGL context (GPU reset) · waiting for it to be restored…";
+
+/** HUD line once the browser restores the context and the frame is re-meshed. */
+export const VIEWER3D_CONTEXT_RESTORED_TEXT = "3D viewer restored · press play to resume";
+
 /** HUD line when the browser's autoplay policy blocks clip audio / the note-block synth. */
 export const AUDIO_BLOCKED_TEXT = "audio blocked by the browser - click play again to enable sound";
+
+/** HUD line when the imported clip's audio can't be decoded/transcribed. The note-block
+ *  toggle is disabled on every import and only re-enabled when a transcription lands, so a
+ *  decode failure used to leave "Note blocks" greyed FOREVER with no reason - while the
+ *  audio-mode select still offered "note blocks" (pure silence). Say why, and what the
+ *  silence means. The visual import is unaffected and has already succeeded. */
+export function audioAnalysisFailedText(name: string, msg: string): string {
+  return (
+    `${name}: couldn't transcribe the clip's audio (${msg}) · ` +
+    `note blocks unavailable for this clip - the "note blocks" audio mode will stay silent`
+  );
+}
 
 /** The fps/resolution selects are read once at import time. Changing them mid-clip used to be
  *  a silent no-op; now the HUD says when the change takes effect. Null when nothing is loaded
@@ -39,6 +79,13 @@ export const AUDIO_BLOCKED_TEXT = "audio blocked by the browser - click play aga
 export function settingsChangeNote(clipLoaded: boolean): string | null {
   return clipLoaded ? "fps/resolution applies on the next import - re-import to apply" : null;
 }
+
+/** Datapack-palette honesty for the block-art exports (§02 + the standalone tester): the
+ *  preview may show the 244-colour MAP palette, but the pack always RE-QUANTIZES against the
+ *  placeable SOLID-block palette (deliberate - map-palette cells resolve through the solid
+ *  resolver into air holes + collapsed blocks). The export status line says so, instead of
+ *  silently shipping a pack that differs from a map-palette preview. */
+export const DATAPACK_PALETTE_NOTE = "pack quantized against the placeable solid-block palette";
 
 /** §02 export status line. A still is honest as "1 frame"; an animated GIF says explicitly
  *  that only the current frame exports here (the full animation lives in section 03). */

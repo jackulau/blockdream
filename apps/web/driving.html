@@ -22,13 +22,17 @@
       .stage { display: flex; gap: 1rem; flex-wrap: wrap; }
       figure { margin: 0; }
       figcaption { font: 12px ui-monospace, monospace; color: #9aa0a6; margin-top: 0.3rem; }
-      canvas { image-rendering: pixelated; width: 320px; height: 320px; background: #000; border: 1px solid #24262c; border-radius: 6px; }
+      /* max-width + aspect-ratio (not a fixed height): the canvases shrink on narrow phones and
+         stay square instead of forcing horizontal scroll (same pattern as index.html) */
+      canvas { image-rendering: pixelated; width: 320px; max-width: 100%; aspect-ratio: 1; height: auto; background: #000; border: 1px solid #24262c; border-radius: 6px; }
       .panel { min-width: 240px; display: flex; flex-direction: column; gap: 0.85rem; }
       label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: #aeb2b9; }
       input, button { background: #14161b; color: #e8e8ea; border: 1px solid #333842; border-radius: 5px; padding: 0.45rem; }
       button { cursor: pointer; }
       button.primary { background: #14532d; border-color: #1e7a43; }
-      .hud { font: 12px ui-monospace, monospace; color: #b9f6ca; white-space: pre; }
+      /* pre-wrap (not pre): long one-line HUD errors wrap instead of forcing the whole document
+         to scroll sideways on mobile; the \n multi-line stats lines still break as written */
+      .hud { font: 12px ui-monospace, monospace; color: #b9f6ca; white-space: pre-wrap; overflow-wrap: anywhere; }
       .status.ok { color: #69f0ae; } .status.err { color: #ff8a80; } .status.idle { color: #9aa0a6; }
       .keys { font: 12px ui-monospace, monospace; color: #9aa0a6; line-height: 1.7; }
       kbd { background: #1c1f26; border: 1px solid #333842; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }

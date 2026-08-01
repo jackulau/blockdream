@@ -58,7 +58,7 @@ describe("round-trip: emit → simulate → matches, within budget", () => {
 
   it("reconstructs every animation frame exactly", () => {
     const grid: Grid = new Map();
-    applyLines(grid, (pack.files.get("data/blockdream/function/setup.mcfunction") ?? "").split("\n")); // box clear
+    applyLines(grid, (pack.files.get("data/blockdream/function/setup.mcfunction") ?? "").split("\n")); // scores/forceload (box clear now leads frames/0)
     for (let f = 0; f < frames.length; f++) {
       applyLines(grid, frameLines(pack, f)); // keyframe then deltas, cumulative
       const want = expectedGrid(frames[f]!, origin);
@@ -74,6 +74,6 @@ describe("round-trip: emit → simulate → matches, within budget", () => {
     // keyframe: 16×4 cells in two solid halves → /fill collapses each row-half → far < 64
     const kf = frameLines(pack, 0).filter((l) => /^\s*(setblock|fill)\b/.test(l));
     expect(kf.length).toBeLessThan(16 * 4); // fill-batched, not one setblock per cell
-    expect(kf.length).toBe(8); // 4 rows × 2 halves = 8 /fill commands
+    expect(kf.length).toBe(9); // wrap-safe box-clear fill + 4 rows × 2 halves = 8 /fill commands
   });
 });

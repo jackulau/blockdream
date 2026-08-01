@@ -292,9 +292,10 @@ export interface MeshData {
  * block onto one key (single texture). Geometry centered so the volume's middle sits at the origin.
  *
  * Optimized form of meshByMaterialReference (byte-identical output, locked by mesh3d-perf.test.ts):
- * pass 1 resolves each quad's key once and counts quads per key; pass 2 writes every component
- * directly into exact-size typed arrays. Keys enter both Maps in first-encounter order, matching
- * the reference accumulator's insertion order.
+ * pass 1 resolves each quad's key once into a dense integer SLOT (the only string-keyed Map work);
+ * pass 2 writes every component directly into exact-size typed arrays, reaching its buffers by
+ * indexing the slot arrays - no string-keyed Map.get per quad on the rAF fill loop. Keys enter the
+ * output Map in first-encounter order, matching the reference accumulator's insertion order.
  */
 export function meshByMaterial(
   v: VoxelVolume,
@@ -304,37 +305,50 @@ export function meshByMaterial(
   const cx = v.sx / 2;
   const cy = v.sy / 2;
   const cz = v.sz / 2;
-  // pass 1: key + count per material (keyOf called exactly once per quad, like the reference)
-  const keys: string[] = new Array(quads.length);
-  const counts = new Map<string, { quads: number; id: number }>();
+  // pass 1: key -> slot + count per material (keyOf called exactly once per quad, like the
+  // reference); each quad records its material's integer slot so pass 2 never touches a string key
+  const slotOf = new Map<string, number>();
+  const slotKeys: string[] = [];
+  const slotIds: number[] = [];
+  const slotQuadCounts: number[] = [];
+  const slots = new Int32Array(quads.length);
   for (let qi = 0; qi < quads.length; qi++) {
     const Q = quads[qi]!;
     const key = keyOf(Q.id, Q.dir);
-    keys[qi] = key;
-    const c = counts.get(key);
-    if (c === undefined) counts.set(key, { quads: 1, id: Q.id });
-    else c.quads++;
+    let s = slotOf.get(key);
+    if (s === undefined) {
+      s = slotKeys.length;
+      slotOf.set(key, s);
+      slotKeys.push(key);
+      slotIds.push(Q.id);
+      slotQuadCounts.push(0);
+    }
+    slotQuadCounts[s] = slotQuadCounts[s]! + 1;
+    slots[qi] = s;
   }
-  // allocate every buffer at its exact final size
+  // allocate every buffer at its exact final size (slot order = first-encounter order)
   const out = new Map<string, MeshData>();
-  const cursors = new Map<string, { m: MeshData; quad: number }>();
-  for (const [key, c] of counts) {
+  const meshes: MeshData[] = new Array(slotKeys.length);
+  const quadCursor = new Int32Array(slotKeys.length);
+  for (let s = 0; s < slotKeys.length; s++) {
+    const n = slotQuadCounts[s]!;
     const m: MeshData = {
-      positions: new Float32Array(c.quads * 12),
-      normals: new Float32Array(c.quads * 12),
-      uvs: new Float32Array(c.quads * 8),
-      indices: new Uint32Array(c.quads * 6),
-      id: c.id,
+      positions: new Float32Array(n * 12),
+      normals: new Float32Array(n * 12),
+      uvs: new Float32Array(n * 8),
+      indices: new Uint32Array(n * 6),
+      id: slotIds[s]!,
     };
-    out.set(key, m);
-    cursors.set(key, { m, quad: 0 });
+    out.set(slotKeys[s]!, m);
+    meshes[s] = m;
   }
   // pass 2: fill (4 corners centered, per-quad normals, UVs, two outward-wound triangles)
   for (let qi = 0; qi < quads.length; qi++) {
     const Q = quads[qi]!;
-    const cur = cursors.get(keys[qi]!)!;
-    const m = cur.m;
-    const q = cur.quad++;
+    const s = slots[qi]!;
+    const m = meshes[s]!;
+    const q = quadCursor[s]!;
+    quadCursor[s] = q + 1;
     const verts = Q.verts;
     const uv = Q.uv;
     const nrm = FACE_NORMALS[Q.dir]!;

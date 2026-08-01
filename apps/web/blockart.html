@@ -32,7 +32,10 @@
       .canvases { display: flex; gap: 1.25rem; flex-wrap: wrap; }
       figure { margin: 0; }
       figcaption { font-size: 0.75rem; color: #9aa0a6; margin-top: 0.4rem; }
-      canvas { image-rendering: pixelated; border: 1px solid #2a2c30; background: #0b0c0d; max-width: 512px; }
+      /* min(512px, 100%): keeps the 512px desktop cap but lets the canvas shrink with the viewport,
+         because blockart-core sets an inline style.width up to 512px which would otherwise force
+         horizontal scroll on a 375px phone (same responsive intent as index.html) */
+      canvas { image-rendering: pixelated; border: 1px solid #2a2c30; background: #0b0c0d; max-width: min(512px, 100%); height: auto; }
       #drop.drag { outline: 2px dashed #0a7; outline-offset: 6px; border-radius: 8px; }
       .stat { font-size: 0.8rem; color: #9aa0a6; }
       code { color: #7dd3fc; }
@@ -47,6 +50,10 @@
       .tooltip .id { color: #7dd3fc; }
       .materials { min-width: 260px; max-width: 340px; }
       .materials h2 { font-size: 0.9rem; margin: 0 0 0.5rem; }
+      .materials .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+      .materials .row button { background: #1a1c1f; color: #e6e6e6; border: 1px solid #3a3d42; border-radius: 6px; padding: 0.35rem 0.6rem; font: inherit; cursor: pointer; }
+      .materials .row button:hover:not(:disabled) { border-color: #0a7; color: #7ff2c9; }
+      .materials .row button:disabled { opacity: 0.4; cursor: not-allowed; }
       .materials label.tex { font-size: 0.75rem; color: #9aa0a6; display: flex; gap: 0.35rem; align-items: center; margin-bottom: 0.5rem; }
       .bom { list-style: none; margin: 0; padding: 0; max-height: 560px; overflow: auto; }
       .bom li { display: grid; grid-template-columns: 28px 1fr auto; gap: 0.5rem; align-items: center; padding: 0.25rem 0.3rem; border-radius: 5px; }
@@ -62,7 +69,7 @@
     <header>
       <h1>blockdream · block-art tester</h1>
       <a href="/index.html" style="color:#7dd3fc;font-size:.85rem;text-decoration:none">← home</a> <a href="/world-model.html" style="color:#7dd3fc;font-size:.85rem;text-decoration:none">world-model tester →</a> <a href="/driving.html" style="color:#7dd3fc;font-size:.85rem;text-decoration:none">driving tester →</a>
-      <p>Drop an image to preview how it maps to the Minecraft map palette (OKLab + dithering). The full GIF/video → datapack/.mcstructure pipeline lives in the <code>blockdream</code> CLI.</p>
+      <p>Drop an image to preview how it maps to the Minecraft map palette (OKLab + dithering), then download it as a vanilla datapack (.zip) or a crisp PNG. The full GIF/video → datapack/.mcstructure pipeline lives in the <code>blockdream</code> CLI.</p>
     </header>
     <main>
       <section class="controls">
@@ -94,6 +101,11 @@
       </section>
       <section class="materials">
         <h2>Blocks used</h2>
+        <div class="row">
+          <button id="download" disabled>Download datapack (.zip)</button>
+          <button id="png" disabled>Download PNG</button>
+        </div>
+        <div id="export" class="stat"></div>
         <ul id="bom" class="bom"></ul>
       </section>
     </main>

@@ -116,7 +116,8 @@ export function zipStore(
     ldv.setUint32(0, 0x04034b50, true); // local file header
     ldv.setUint16(4, 20, true); // version needed
     ldv.setUint16(8, 0, true); // method 0 = store
-    ldv.setUint16(12, 0x21, true); // dos date (1980-01-01)
+    // last-mod TIME @10 stays 0 (00:00:00); DATE @12 = 0x21 (1980-01-01)
+    ldv.setUint16(12, 0x21, true);
     ldv.setUint32(14, crc, true);
     ldv.setUint32(18, data.length, true); // compressed size
     ldv.setUint32(22, data.length, true); // uncompressed size
@@ -130,7 +131,11 @@ export function zipStore(
     cdv.setUint16(4, 20, true);
     cdv.setUint16(6, 20, true);
     cdv.setUint16(10, 0, true); // store
-    cdv.setUint16(12, 0x21, true);
+    // central-directory offsets shift by 2 vs the local header: TIME @12, DATE @14.
+    // The DATE value 0x21 used to be written into the TIME slot (@12), leaving date 0 -
+    // `unzip -l` showed the invalid "00-00-1980 00:01". Mirror the local header exactly.
+    cdv.setUint16(12, 0, true); // last-mod time (00:00:00, matches local @10)
+    cdv.setUint16(14, 0x21, true); // dos date 1980-01-01 (matches local @12)
     cdv.setUint32(16, crc, true);
     cdv.setUint32(20, data.length, true);
     cdv.setUint32(24, data.length, true);

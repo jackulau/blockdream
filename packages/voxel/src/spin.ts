@@ -4,6 +4,10 @@
 
 import { createVolume, getVoxel, setVoxel, forEachSolid, EMPTY, type VoxelVolume } from "./volume";
 
+// Module-local alias for the hot loops below: under vite-node an imported binding compiles to an
+// exports-getter lookup per access, so the innermost loop must not touch `EMPTY` directly.
+const AIR = EMPTY;
+
 export type SpinAxis = "x" | "y" | "z";
 
 function rotate(v: VoxelVolume, angle: number, axis: SpinAxis): VoxelVolume {
@@ -117,12 +121,71 @@ export function spinSequence(v: VoxelVolume, frames = 24): VoxelVolume[] {
   // column is ~sy× fewer trig ops (measured ~3× faster at 256²/depth-24, vs a forward-map that was
   // faster still but dropped ~17% of voxels to rounding collisions at 45°). The viewer's
   // `spin()`/`rotate()` are untouched.
+  //
+  // Innermost Y copy uses HOISTED RUNNING INDICES instead of getVoxel/setVoxel: ssx/ssz are
+  // range-checked just above and y runs the loop bound, so both accesses are provably in bounds and
+  // the per-voxel 6-compare inBounds + 2-mult voxelIndex are pure overhead. With index =
+  // x + sx*(y + sy*z), BOTH the source and destination step +sx per y - same visit order, same
+  // EMPTY skip, byte-identical by construction (locked against the verbatim
+  // {@link spinSequenceReference} twin in test/spin-perf.test.ts).
   const base = padXZToSquare(v);
   const { sx, sy, sz } = base;
   const cx = (sx - 1) / 2;
   const cz = (sz - 1) / 2;
   // 2D mask of which (x,z) columns hold ANY solid - on a cube-padded build most columns are pure pad
   // air, so skipping their (otherwise no-op) Y copy is the bulk of the win. Built once for all frames.
+  const colSolid = new Uint8Array(sx * sz);
+  forEachSolid(base, (x, _y, z) => {
+    colSolid[z * sx + x] = 1;
+  });
+  const srcData = base.data;
+  const plane = sx * sy; // backing-index step between consecutive Z layers
+  const out: VoxelVolume[] = [];
+  for (let f = 0; f < frames; f++) {
+    const angle = (2 * Math.PI * f) / frames;
+    const c = Math.cos(-angle); // inverse rotation (matches rotate()'s sign convention)
+    const s = Math.sin(-angle);
+    const frame = createVolume(sx, sy, sz);
+    const dstData = frame.data;
+    for (let z = 0; z < sz; z++) {
+      const dz = z - cz;
+      const zBase = plane * z;
+      for (let x = 0; x < sx; x++) {
+        const dx = x - cx;
+        const ssx = Math.round(cx + dx * c - dz * s);
+        if (ssx < 0 || ssx >= sx) continue;
+        const ssz = Math.round(cz + dx * s + dz * c);
+        if (ssz < 0 || ssz >= sz) continue;
+        if (colSolid[ssz * sx + ssx] === 0) continue; // source column is all air → nothing to copy
+        // Y is invariant under a Y-spin: copy the source column (ssx,*,ssz) → (x,*,z).
+        let src = ssx + plane * ssz; // index of (ssx, 0, ssz)
+        let dst = x + zBase; // index of (x, 0, z)
+        for (let y = 0; y < sy; y++) {
+          const val = srcData[src]!;
+          if (val !== AIR) dstData[dst] = val;
+          src += sx;
+          dst += sx;
+        }
+      }
+    }
+    out.push(frame);
+  }
+  return out;
+}
+
+/**
+ * VERBATIM pre-optimization spinSequence - the reference twin for the hoisted-running-index inner
+ * loop above. Kept exported (house convention, see trisToVolumeReference in obj.ts) so
+ * test/spin-perf.test.ts can prove byte-identity and time an honest same-run A/B. Not for
+ * production use.
+ */
+export function spinSequenceReference(v: VoxelVolume, frames = 24): VoxelVolume[] {
+  // integer check included: NaN slips past a bare `<= 0` (NaN <= 0 is false) and would return []
+  if (!Number.isInteger(frames) || frames <= 0) throw new Error("spinSequence needs an integer frames > 0");
+  const base = padXZToSquare(v);
+  const { sx, sy, sz } = base;
+  const cx = (sx - 1) / 2;
+  const cz = (sz - 1) / 2;
   const colSolid = new Uint8Array(sx * sz);
   forEachSolid(base, (x, _y, z) => {
     colSolid[z * sx + x] = 1;

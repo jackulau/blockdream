@@ -8,6 +8,7 @@ import {
   type BlockArtEls,
 } from "../src/blockart-core";
 import { resolveBlock } from "../src/resolve-block";
+import { DATAPACK_PALETTE_NOTE } from "../src/ui-feedback";
 
 // blockart.html tester revival (goal 088 D10). The standalone page used to load two BLANK
 // canvases (no preload), navigate away when a file was dropped (no drop handlers), and ship a
@@ -217,6 +218,19 @@ describe("palette select (map vs solid-block gamut)", () => {
     expect(paletteForChoice("block")).toBe(block);
   });
 
+  it("onRender fires per (re)quantize - the hook both pages' export buttons ride on", () => {
+    const { els, palette } = fullEls();
+    const rendered: Array<{ w: number; h: number }> = [];
+    const art = createBlockArt(els, { onRender: (q) => rendered.push({ w: q.width, h: q.height }) });
+    art.loadUrl("/test-assets/pixelart.png");
+    images.at(-1)!.onload!();
+    expect(rendered.length).toBe(1);
+    expect(rendered[0]!.w).toBeGreaterThan(0);
+    palette.value = "block";
+    palette.dispatchEvent(new Event("change")); // a palette switch re-renders → re-fires the hook
+    expect(rendered.length).toBe(2);
+  });
+
   it("changing the select re-quantizes against the chosen palette (block ⇒ zero air-resolving cells)", () => {
     const { els, stats, palette } = fullEls();
     const art = createBlockArt(els);
@@ -238,5 +252,58 @@ describe("palette select (map vs solid-block gamut)", () => {
     }
     // and the stats line was rewritten for the new quantization
     expect(stats.textContent).toContain("blocks");
+  });
+});
+
+// --- goal 089 D13: exports on the standalone page + §02 palette select ----------------------
+
+describe("blockart.html exports (goal 089 D13)", () => {
+  const main = read("../src/main.ts");
+  const html = read("../blockart.html");
+
+  it("blockart.html ships both export buttons disabled + an export status line", () => {
+    expect(html).toMatch(/id="download"[^>]*disabled/);
+    expect(html).toMatch(/id="png"[^>]*disabled/);
+    expect(html).toContain('id="export"');
+  });
+
+  it("main.ts enables them together in onRender (previously never passed) via shared helpers", () => {
+    expect(main).toContain("onRender: (q) => {");
+    expect(main).toContain('$<HTMLButtonElement>("download").disabled = false');
+    expect(main).toContain('$<HTMLButtonElement>("png").disabled = false');
+    expect(main).toContain("blockArtExportText(q.width, q.height, ba.getFrameCount())");
+  });
+
+  it("the datapack handler re-quantizes via the page-agnostic quantizeForDatapack + zips via downloadDatapack", () => {
+    expect(main).toContain("quantizeForDatapack(rgb,");
+    expect(main).toContain("generateJavaDatapack([q], resolveBlock,");
+    expect(main).toContain('downloadDatapack("blockdream-blockart-datapack", pack.files)');
+  });
+
+  it("the PNG handler uses the raster pipeline + honest reportPngDownload status", () => {
+    expect(main).toContain("upscaleNearest(quantizedToRaster(q), fitScale(q.width, q.height, 512))");
+    expect(main).toContain("reportPngDownload(");
+    expect(main).toContain('downloadPng("blockdream-blockart.png", raster)');
+  });
+
+  it("both pages' datapack status lines state which palette the pack builds with", () => {
+    expect(DATAPACK_PALETTE_NOTE).toContain("solid-block palette");
+    expect(main).toContain("${DATAPACK_PALETTE_NOTE} · load /function blockdream:setup");
+    const showcase = read("../src/showcase.ts");
+    expect(showcase).toContain("${DATAPACK_PALETTE_NOTE} · load /function blockdream:setup");
+  });
+});
+
+describe("index §02 palette select (goal 089 D13)", () => {
+  it("index.html has the ba-palette select with both palette options", () => {
+    const index = read("../index.html");
+    expect(index).toContain('id="ba-palette"');
+    expect(index).toMatch(/id="ba-palette"[\s\S]{0,120}<option value="map">/);
+    expect(index).toMatch(/id="ba-palette"[\s\S]{0,220}<option value="block">/);
+  });
+
+  it("the showcase passes the select into createBlockArt (no longer pinned to map)", () => {
+    const showcase = read("../src/showcase.ts");
+    expect(showcase).toContain('palette: $<HTMLSelectElement>("ba-palette")');
   });
 });

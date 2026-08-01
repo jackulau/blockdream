@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { QuantizedFrame } from "@blockdream/color-core";
-import { computeDeltas, type FrameDelta } from "./delta";
+import { computePlacedDeltas } from "./delta";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
 import { greedyBoxes, type PlacedCell } from "./fill";
 import type { GeneratedPack } from "./datapack";
@@ -35,32 +35,17 @@ function setblockLine(x: number, y: number, z: number, block: string): string {
   return `setblock ${x} ${y} ${z} ${block} replace`;
 }
 
+/** Cells already carry WORLD coords (computePlacedDeltas fuses delta + grid→world map). */
 function frameSetblockLines(
-  delta: FrameDelta,
-  height: number,
-  origin: { x: number; y: number; z: number },
+  cells: PlacedCell[],
   resolveBlock: (id: number) => string | undefined,
   fallback: string,
 ): string[] {
   const lines: string[] = [];
-  for (const c of delta.cells) {
-    lines.push(setblockLine(origin.x + c.x, origin.y + (height - 1 - c.y), origin.z, resolveBlock(c.mapColorId) ?? fallback));
+  for (const c of cells) {
+    lines.push(setblockLine(c.x, c.y, c.z, resolveBlock(c.mapColorId) ?? fallback));
   }
   return lines;
-}
-
-/** Map a 2D delta's cells to WORLD-coordinate placed cells (image row 0 at top of wall). */
-function framePlacedCells(
-  delta: FrameDelta,
-  height: number,
-  origin: { x: number; y: number; z: number },
-): PlacedCell[] {
-  return delta.cells.map((c) => ({
-    x: origin.x + c.x,
-    y: origin.y + (height - 1 - c.y),
-    z: origin.z,
-    mapColorId: c.mapColorId,
-  }));
 }
 
 /**
@@ -117,7 +102,8 @@ export function generateBedrockBehaviorPack(
   const { width: W, height: H } = frames[0]!;
   const limit = Math.max(1, Math.floor(opts.maxCommandsPerFunction ?? DEFAULT_MAX_COMMANDS));
   const optimizeFills = opts.optimizeFills ?? true;
-  const deltas = computeDeltas(frames);
+  // fused delta + world map: one PlacedCell per changed cell, single pass (delta.ts)
+  const deltas = computePlacedDeltas(frames, H, origin);
   const files = new Map<string, string>();
 
   let totalSetblocks = 0;
@@ -125,8 +111,8 @@ export function generateBedrockBehaviorPack(
   for (const d of deltas) {
     totalSetblocks += d.cells.length;
     const lines = optimizeFills
-      ? greedyBoxes(framePlacedCells(d, H, origin), (id) => resolveBlock(id) ?? fallback)
-      : frameSetblockLines(d, H, origin, resolveBlock, fallback);
+      ? greedyBoxes(d.cells, (id) => resolveBlock(id) ?? fallback)
+      : frameSetblockLines(d.cells, resolveBlock, fallback);
     totalCommands += lines.length;
     const header = `# frame ${d.index}${d.keyframe ? " (keyframe)" : ` (Δ ${d.cells.length})`}`;
     writeSplitFunction(

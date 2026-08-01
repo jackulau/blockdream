@@ -19,8 +19,11 @@ describe("generateVoxelDatapack (3D)", () => {
     const pack = generateVoxelDatapack([lineVolume()], resolve, { origin: { x: 0, y: 64, z: 0 } });
     const setup = pack.files.get("data/blockdream/function/setup.mcfunction")!;
     expect(setup).toContain("forceload add 0 0 2 0");
-    expect(setup).toContain("fill 0 64 0 2 64 0 minecraft:air replace"); // clears the build box
+    expect(setup).not.toContain("minecraft:air"); // the box clear moved into frames/0 (wrap-safe)
     const f0 = pack.files.get("data/blockdream/function/frames/0.mcfunction")!;
+    expect(f0).toContain("fill 0 64 0 2 64 0 minecraft:air replace"); // clears the build box every wrap
+    // clear BEFORE paint (same tick, no flicker)
+    expect(f0.indexOf("minecraft:air")).toBeLessThan(f0.indexOf("minecraft:c1"));
     expect(f0).toContain("setblock 0 64 0 minecraft:c1 replace");
     expect(f0).toContain("setblock 2 64 0 minecraft:c2 replace");
     expect(pack.files.get("data/minecraft/tags/function/tick.json")).toContain("blockdream:driver");

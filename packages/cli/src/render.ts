@@ -108,19 +108,33 @@ function analyzeMusicForInput(opts: RenderOptions): NoteEvent[] | undefined {
  * at --max-notes, so the old `min(music.length, cap)` could report 150 notes when 2 were actually
  * emitted. Reads the generators' additive musicNoteCount/musicLoopTicks result fields
  * structurally; while they are absent the text degrades to the old arithmetic.
+ *
+ * Zero surviving notes = the emitters skip the music machinery entirely (no music.mcfunction,
+ * no tick registration), so the note says the pack plays NO music and names the REAL animation
+ * loop (`animLoopTicks` = frames x speedTicks, from the caller) - pack.musicLoopTicks is 0 then,
+ * and the old text claimed a nonsensical "trimmed to the 0-tick animation loop".
+ * Exported for the music-zero-notes test.
  */
-function describeMusicNotes(
+export function describeMusicNotes(
   music: NoteEvent[],
   pack: { musicNoteCount?: number; musicLoopTicks?: number },
   opts: RenderOptions,
+  animLoopTicks?: number,
 ): string {
   const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
   const requested = Math.min(music.length, cap);
   const emitted = pack.musicNoteCount ?? requested;
+  if (emitted === 0) {
+    const loop = animLoopTicks != null ? `the ${animLoopTicks}-tick animation loop` : "the animation loop";
+    return (
+      `note-block music: omitted - none of the ${music.length} transcribed notes start inside ` +
+      `${loop}, so the pack plays no music (lengthen the clip, slow it with --speed, or raise --max-notes)`
+    );
+  }
   let s = `note-block music: ${emitted} notes from the audio track`;
   if (music.length > cap) s += ` (capped from ${music.length}; raise --max-notes for the full song)`;
   if (emitted < requested) {
-    const loop = pack.musicLoopTicks != null ? `${pack.musicLoopTicks}-tick ` : "";
+    const loop = pack.musicLoopTicks ? `${pack.musicLoopTicks}-tick ` : "";
     s += ` (trimmed to the ${loop}animation loop: ${emitted} of ${requested} notes)`;
   }
   return s;
@@ -389,7 +403,11 @@ export function render(opts: RenderOptions): RenderResult {
       ].join("\n") + "\n",
     );
     if (music?.length) {
-      notes.push(describeMusicNotes(music, pack, opts) + `; plays on /function ${pack.namespace}:start.`);
+      // real animation loop = frames x speed (the emitters' loopTicksOverride); emitter speed default 2
+      const animLoop = screenFrames.length > 1 ? screenFrames.length * Math.max(1, Math.floor(speedTicksAuto ?? 2)) : undefined;
+      const desc = describeMusicNotes(music, pack, opts, animLoop);
+      // an all-notes-trimmed pack has NO music machinery - nothing "plays on :start"
+      notes.push((pack.musicNoteCount ?? 0) > 0 ? desc + `; plays on /function ${pack.namespace}:start.` : desc);
     }
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
@@ -400,6 +418,13 @@ export function render(opts: RenderOptions): RenderResult {
       `TRUE-RGB screen datapack (${opts.width}x${opts.height} px, ${screenFrames.length} frame(s), ${pack.totalCommands} delta cmds): drop ${pack.namespace}.zip into world/datapacks/, /function ${pack.namespace}:setup then :start. Teardown with :teardown.`,
     );
     return { target: opts.target, frameCount: screenFrames.length, width: opts.width, height: opts.height, filesWritten, notes };
+  }
+
+  // --temporal is hysteresis against the PREVIOUS frame; a single still has none, so quantizeAll
+  // takes the exact-match path and the threshold cannot apply. Say so instead of silently
+  // dropping it. (rgbscreen and model3d returned above: they never quantize a frame sequence.)
+  if (opts.temporalThreshold !== undefined && frames.length <= 1) {
+    notes.push(`--temporal only applies to multi-frame input - ignored for a single still.`);
   }
 
   if (opts.target === "map") {
@@ -507,9 +532,14 @@ export function render(opts: RenderOptions): RenderResult {
         opts.musicEngine === "redstone"
           ? "a physical redstone delay-line plays the note blocks"
           : "a tick-driven playsound clock";
+      // real animation loop = frames x speed (the emitters' loopTicksOverride); emitter speed default 2
+      const animLoop = volumes.length > 1 ? volumes.length * Math.max(1, Math.floor(speedTicksAuto ?? 2)) : undefined;
+      const desc = describeMusicNotes(music, pack, opts, animLoop);
+      // an all-notes-trimmed pack has NO music machinery - nothing "plays on :start"
       notes.push(
-        describeMusicNotes(music, pack, opts) +
-          ` (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`,
+        (pack.musicNoteCount ?? 0) > 0
+          ? desc + ` (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`
+          : desc,
       );
     }
     const vv = volumes[0]!;
@@ -573,7 +603,7 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   if (opts.target === "bedrock-script") {
-    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: speedTicksAuto });
+    const pack = generateBedrockScriptAddon(q, resolveBlock, { speedTicks: speedTicksAuto, origin: opts.origin });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const mcpack = join(opts.out, "blockdream-script.mcpack");
@@ -588,6 +618,7 @@ export function render(opts: RenderOptions): RenderResult {
       speedTicks: speedTicksAuto,
       packFormat: mc.packFormat,
       supportedFormats: JAVA_DATAPACK_SUPPORTED,
+      origin: opts.origin,
     });
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
@@ -599,7 +630,7 @@ export function render(opts: RenderOptions): RenderResult {
   }
 
   // behaviorpack
-  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: speedTicksAuto });
+  const pack = generateBedrockBehaviorPack(q, resolveBlock, { speedTicks: speedTicksAuto, origin: opts.origin });
   writePack(pack, opts.out);
   filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
   const mcpack = join(opts.out, "blockdream.mcpack");

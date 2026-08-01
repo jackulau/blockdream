@@ -86,6 +86,13 @@ export interface PitchResult {
   rms: number;
 }
 
+// Module-scratch prefix-sum buffer for detectPitchHz. analyzeAudio calls detectPitchHz once per
+// 20ms hop (~3000 calls per 60s clip), so a fresh Float64Array(n+1) per call is pure allocator/GC
+// churn. Grown on demand and reused; ONLY indices 0..n are read and every one of 1..n is written
+// each call, so the single correctness trap is sq[0], which a fresh allocation zeroed implicitly -
+// the reuse path re-zeroes it EXPLICITLY. Safe: detectPitchHz is synchronous and never re-enters.
+let sqScratch = new Float64Array(0);
+
 /**
  * Single-window fundamental-frequency estimate via normalised autocorrelation
  * with parabolic interpolation. Pure; safe to call from anywhere.
@@ -102,6 +109,104 @@ export function detectPitchHz(
    * energy pass, not the full pitch search. Default 0 = never short-circuit (the returned
    * `rms` is identical either way, so this is purely a speedup, never a behaviour change).
    */
+  rmsGate = 0,
+): PitchResult {
+  const n = window.length;
+  if (n < 4) return { hz: 0, clarity: 0, rms: 0 };
+
+  // Prefix sums of squares → O(1) window energy for any lag alignment. Module-scratch buffer (see
+  // sqScratch above); the summation itself is verbatim, so every sq[i] is bit-identical to the
+  // reference's fresh-allocation version.
+  if (sqScratch.length < n + 1) sqScratch = new Float64Array(n + 1);
+  const sq = sqScratch;
+  sq[0] = 0; // fresh allocations were implicitly zero here; the reused scratch is not
+  for (let i = 0; i < n; i++) sq[i + 1] = sq[i]! + window[i]! * window[i]!;
+  const totalEnergy = sq[n]!;
+  const rms = Math.sqrt(totalEnergy / n);
+  // Bail before the O(n·maxLag) autocorrelation for windows the caller will gate out anyway
+  // (the returned rms is the same value the caller compares, so the result is unchanged).
+  if (rms < rmsGate) return { hz: 0, clarity: 0, rms };
+  if (rms < 1e-7) return { hz: 0, clarity: 0, rms };
+
+  const minLag = Math.max(2, Math.floor(sampleRate / maxHz));
+  const maxLag = Math.min(n - 2, Math.ceil(sampleRate / minHz));
+  if (maxLag <= minLag) return { hz: 0, clarity: 0, rms };
+
+  const nc = new Float64Array(maxLag + 2); // normalised correlation by lag
+  let globalMax = 0;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    // Energy of the two aligned half-windows: leading [0,n-lag), trailing [lag,n). Computed BEFORE
+    // the O(n) dot product: when denom is degenerate the reference discarded corr entirely
+    // (c = 0), so skipping the dot product outright is bit-identical - corr was never used. e0/e1
+    // are >= 0 by prefix-sum monotonicity, so denom is never NaN and the branch matches the
+    // reference's `denom > 1e-12 ? corr / denom : 0` exactly.
+    const e0 = sq[n - lag]!;
+    const e1 = totalEnergy - sq[lag]!;
+    const denom = Math.sqrt(e0 * e1);
+    if (!(denom > 1e-12)) {
+      nc[lag] = 0; // c would be 0; 0 never beats globalMax (>= 0), so no update - same as reference
+      continue;
+    }
+    let corr = 0;
+    const lim = n - lag; // hoisted loop bound: the reference recomputed `i + lag < n` per iteration
+    for (let i = 0; i < lim; i++) corr += window[i]! * window[i + lag]!; // same order → bit-identical
+    const c = corr / denom;
+    nc[lag] = c;
+    if (c > globalMax) globalMax = c;
+  }
+  if (globalMax <= 0) return { hz: 0, clarity: 0, rms };
+
+  // Octave-error fix: a pure tone autocorrelates equally at every multiple of its
+  // true period, so the global peak is ambiguous (it can land on a subharmonic an
+  // octave+ too low). Pick the SHORTEST-lag local maximum within 90% of the global
+  // peak — that is the fundamental, not a subharmonic (YIN-style absolute threshold).
+  const threshold = 0.9 * globalMax;
+  let bestLag = -1;
+  for (let lag = minLag + 1; lag < maxLag; lag++) {
+    if (nc[lag]! >= threshold && nc[lag]! >= nc[lag - 1]! && nc[lag]! >= nc[lag + 1]!) {
+      bestLag = lag;
+      break;
+    }
+  }
+  if (bestLag < 0) {
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      if (nc[lag]! === globalMax) {
+        bestLag = lag;
+        break;
+      }
+    }
+  }
+  const bestCorr = nc[bestLag]!;
+
+  // Parabolic interpolation around the peak for sub-sample lag accuracy.
+  let refined = bestLag;
+  if (bestLag > minLag && bestLag < maxLag) {
+    const lo = nc[bestLag - 1]!;
+    const mid = nc[bestLag]!;
+    const hi = nc[bestLag + 1]!;
+    const denom = lo - 2 * mid + hi;
+    if (denom !== 0) {
+      let shift = (0.5 * (lo - hi)) / denom;
+      if (shift > 1) shift = 1;
+      else if (shift < -1) shift = -1;
+      refined = bestLag + shift;
+    }
+  }
+  return { hz: sampleRate / refined, clarity: bestCorr, rms };
+}
+
+/**
+ * VERBATIM pre-optimization detectPitchHz - the reference twin for the goal-089 D20 gates above
+ * (module-scratch prefix sums, hoisted dot-product bound, denom-before-dot skip). Kept exported
+ * (house convention, see spinSequenceReference / trisToVolumeReference in @blockdream/voxel) so
+ * test/pitch-perf.test.ts can prove BIT-identity and time an honest same-run A/B. Not for
+ * production use.
+ */
+export function detectPitchHzReference(
+  window: Float32Array,
+  sampleRate: number,
+  minHz: number,
+  maxHz: number,
   rmsGate = 0,
 ): PitchResult {
   const n = window.length;

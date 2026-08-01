@@ -13,13 +13,30 @@ import type { VoxelVolume } from "@blockdream/voxel";
 
 const AIR = 255; // VoxelVolume air sentinel (EMPTY in @blockdream/voxel)
 
-// mapColorId -> [r,g,b], built once from the prepared map palette (every usable shade carries its id).
+// mapColorId -> [r,g,b], built once from the prepared map palette (every usable shade carries its
+// id). Used only by the retained reference renderers below; the live renderers read MAP_RGB_FLAT.
 const MAP_RGB: Array<[number, number, number] | undefined> = (() => {
   const table = new Array<[number, number, number] | undefined>(256);
   for (const e of preparePalette(javaMapPalette as unknown as MapPalette).entries) {
     table[e.color.mapColorId] = [e.color.r, e.color.g, e.color.b];
   }
   return table;
+})();
+
+// mapColorId -> flat r,g,b at id*3, prefilled 0 so an unknown id (air id 0 is the common one)
+// reads opaque black with NO branch and NO allocation - the boxed table's `?? [0, 0, 0]` fallback
+// allocated a fresh tuple per miss pixel on the per-frame export hot path.
+const MAP_RGB_FLAT: Uint8Array = (() => {
+  const flat = new Uint8Array(256 * 3);
+  for (let id = 0; id < 256; id++) {
+    const rgb = MAP_RGB[id];
+    if (rgb !== undefined) {
+      flat[id * 3] = rgb[0];
+      flat[id * 3 + 1] = rgb[1];
+      flat[id * 3 + 2] = rgb[2];
+    }
+  }
+  return flat;
 })();
 
 /** An RGBA raster (row-major, 4 bytes/px) - the common currency between renderers and the encoders. */
@@ -29,8 +46,28 @@ export interface Raster {
   data: Uint8ClampedArray; // length width*height*4
 }
 
-/** A block-art frame (map-palette quantized) -> opaque RGBA. Every pixel is a placed block's colour. */
+/**
+ * A block-art frame (map-palette quantized) -> opaque RGBA. Every pixel is a placed block's colour.
+ * Optimized form of quantizedToRasterReference (byte-identical, locked by pixel-export-perf.test.ts):
+ * flat Uint8Array palette reads replace the boxed-tuple lookup + per-miss `?? [0, 0, 0]` allocation.
+ */
 export function quantizedToRaster(q: QuantizedFrame): Raster {
+  const n = q.width * q.height;
+  const data = new Uint8ClampedArray(n * 4);
+  const ids = q.mapColorId;
+  const flat = MAP_RGB_FLAT;
+  for (let p = 0, o = 0; p < n; p++, o += 4) {
+    const f = ids[p]! * 3;
+    data[o] = flat[f]!;
+    data[o + 1] = flat[f + 1]!;
+    data[o + 2] = flat[f + 2]!;
+    data[o + 3] = 255;
+  }
+  return { width: q.width, height: q.height, data };
+}
+
+/** RETAINED REFERENCE (the original boxed-tuple quantizedToRaster, verbatim) - byte-identity oracle. */
+export function quantizedToRasterReference(q: QuantizedFrame): Raster {
   const data = new Uint8ClampedArray(q.width * q.height * 4);
   for (let p = 0; p < q.width * q.height; p++) {
     const rgb = MAP_RGB[q.mapColorId[p]!] ?? [0, 0, 0];
@@ -50,8 +87,42 @@ export function quantizedToRaster(q: QuantizedFrame): Raster {
  * rotated). imageToFlat flips image-row 0 to the TOP of the volume (world Y up), so we read world
  * y = sy-1-iy to un-flip back to an upright picture. Air columns stay transparent, so an imported
  * GIF's transparency survives into the exported GIF.
+ *
+ * Optimized form of flatVolumeToRasterReference (byte-identical, locked by pixel-export-perf.test.ts):
+ * flat Uint8Array palette reads replace the boxed-tuple lookup + per-miss `?? [0, 0, 0]` allocation.
  */
 export function flatVolumeToRaster(v: VoxelVolume): Raster {
+  const w = v.sx;
+  const h = v.sy;
+  const zStride = v.sx * v.sy;
+  const data = new Uint8ClampedArray(w * h * 4);
+  const flat = MAP_RGB_FLAT;
+  for (let iy = 0; iy < h; iy++) {
+    const wy = h - 1 - iy;
+    for (let ix = 0; ix < w; ix++) {
+      const col = ix + v.sx * wy;
+      let id = AIR;
+      for (let z = 0; z < v.sz; z++) {
+        const c = v.data[col + z * zStride]!;
+        if (c !== AIR) {
+          id = c;
+          break;
+        }
+      }
+      if (id === AIR) continue; // leave transparent (alpha 0)
+      const f = id * 3;
+      const o = (iy * w + ix) * 4;
+      data[o] = flat[f]!;
+      data[o + 1] = flat[f + 1]!;
+      data[o + 2] = flat[f + 2]!;
+      data[o + 3] = 255;
+    }
+  }
+  return { width: w, height: h, data };
+}
+
+/** RETAINED REFERENCE (the original boxed-tuple flatVolumeToRaster, verbatim) - byte-identity oracle. */
+export function flatVolumeToRasterReference(v: VoxelVolume): Raster {
   const w = v.sx;
   const h = v.sy;
   const zStride = v.sx * v.sy;
@@ -80,8 +151,45 @@ export function flatVolumeToRaster(v: VoxelVolume): Raster {
   return { width: w, height: h, data };
 }
 
-/** Integer nearest-neighbour upscale so a small block grid exports as crisp, chunky pixels (never blurry). */
+/**
+ * Integer nearest-neighbour upscale so a small block grid exports as crisp, chunky pixels (never blurry).
+ * Optimized form of upscaleNearestReference (byte-identical, locked by pixel-export-perf.test.ts):
+ * builds the FIRST destination row of each source row (no per-pixel division - the source advances
+ * every s pixels by construction), then bulk-copies it into the remaining s-1 rows via copyWithin.
+ */
 export function upscaleNearest(src: Raster, scale: number): Raster {
+  const s = Math.max(1, Math.floor(scale));
+  if (s === 1) return src;
+  const w = src.width * s;
+  const h = src.height * s;
+  const data = new Uint8ClampedArray(w * h * 4);
+  const sd = src.data;
+  const rowBytes = w * 4;
+  for (let sy = 0; sy < src.height; sy++) {
+    const rowStart = sy * s * rowBytes;
+    let di = rowStart;
+    let si = sy * src.width * 4;
+    for (let sx = 0; sx < src.width; sx++, si += 4) {
+      const r = sd[si]!;
+      const g = sd[si + 1]!;
+      const b = sd[si + 2]!;
+      const a = sd[si + 3]!;
+      for (let k = 0; k < s; k++, di += 4) {
+        data[di] = r;
+        data[di + 1] = g;
+        data[di + 2] = b;
+        data[di + 3] = a;
+      }
+    }
+    for (let k = 1; k < s; k++) {
+      data.copyWithin(rowStart + k * rowBytes, rowStart, rowStart + rowBytes);
+    }
+  }
+  return { width: w, height: h, data };
+}
+
+/** RETAINED REFERENCE (the original per-pixel-division upscaleNearest, verbatim) - byte-identity oracle. */
+export function upscaleNearestReference(src: Raster, scale: number): Raster {
   const s = Math.max(1, Math.floor(scale));
   if (s === 1) return src;
   const w = src.width * s;

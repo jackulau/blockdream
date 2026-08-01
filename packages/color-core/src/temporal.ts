@@ -57,9 +57,14 @@ export interface VideoQuantizeOptions extends QuantizeOptions {
  * otherwise), then applies the keep/switch decision on top. With no previous
  * frame (or a threshold that never retains) the output is element-identical to
  * per-frame `quantizeFrame`. Any method other than "bayer"/"floyd-steinberg"
- * quantizes hysteresis candidates as plain nearest ("none"). The per-frame hot
- * loop is quantizeFrameHysteresis in dither.ts (allocation-free; element-
- * identical to quantizeVideoReference, locked by dither-perf.test.ts).
+ * quantizes hysteresis candidates as plain nearest ("none"). An omitted
+ * `method` means floyd-steinberg, exactly as `quantizeFrame` documents - so
+ * no-method + temporalThreshold takes the per-frame floyd path (hysteresis
+ * never applies to error diffusion) rather than silently downgrading to
+ * plain-nearest hysteresis, a default the still and video quantizers used to
+ * disagree on. The per-frame hot loop is quantizeFrameHysteresis in dither.ts
+ * (allocation-free; element-identical to quantizeVideoReference, locked by
+ * dither-perf.test.ts).
  */
 export function quantizeVideo(
   frames: RgbImage[],
@@ -67,7 +72,7 @@ export function quantizeVideo(
   opts: VideoQuantizeOptions = {},
 ): QuantizedFrame[] {
   const threshold = opts.temporalThreshold ?? 0;
-  const useHysteresis = threshold > 0 && opts.method !== "floyd-steinberg";
+  const useHysteresis = threshold > 0 && (opts.method ?? "floyd-steinberg") !== "floyd-steinberg";
   const out: QuantizedFrame[] = [];
   let prev: QuantizedFrame | undefined;
 
@@ -95,7 +100,8 @@ export function quantizeVideoReference(
   opts: VideoQuantizeOptions = {},
 ): QuantizedFrame[] {
   const threshold = opts.temporalThreshold ?? 0;
-  const useHysteresis = threshold > 0 && opts.method !== "floyd-steinberg";
+  // same no-method default as quantizeVideo (the twins must stay element-identical)
+  const useHysteresis = threshold > 0 && (opts.method ?? "floyd-steinberg") !== "floyd-steinberg";
   const out: QuantizedFrame[] = [];
   let prev: QuantizedFrame | undefined;
 

@@ -32,6 +32,18 @@ export interface VideoSampleOptions {
    *  accumulated (the returned `canvases` is empty) - the only way a whole video at real fps
    *  fits in memory. The canvas passed in is reused-safe: consume it synchronously. */
   onFrame?: (canvas: HTMLCanvasElement, index: number, total: number) => void;
+  /** Cancel the decode: checked around every seek (a decode can be thousands of seeks - up to
+   *  ~22 h worst case with every control maxed), and an in-flight seek's 2 s fallback wait is
+   *  cut short too. On abort, decodeVideo rejects with an AbortError-named error and the
+   *  caller's post-decode state writes never run. */
+  signal?: AbortSignal;
+}
+
+/** The rejection an aborted import decode throws (name matches DOM AbortError conventions). */
+export function importAbortError(): Error {
+  const e = new Error("import cancelled");
+  e.name = "AbortError";
+  return e;
 }
 
 /**
@@ -65,17 +77,21 @@ function durationsFromTimes(times: number[], durationSec: number): Array<number 
 }
 
 /** Resolve when the <video> has seeked to (or near) `t`, with a timeout fallback so a decoder that
- *  never re-fires `seeked` (e.g. seeking to a time it's already at) can't hang the import. */
-function seekTo(video: HTMLVideoElement, t: number): Promise<void> {
+ *  never re-fires `seeked` (e.g. seeking to a time it's already at) can't hang the import. An abort
+ *  also finishes the wait immediately (the caller re-checks the signal and throws), so cancelling
+ *  never has to sit out a stalled seek's 2 s fallback. */
+function seekTo(video: HTMLVideoElement, t: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     let done = false;
     const finish = (): void => {
       if (done) return;
       done = true;
       video.removeEventListener("seeked", finish);
+      signal?.removeEventListener("abort", finish);
       resolve();
     };
     video.addEventListener("seeked", finish);
+    signal?.addEventListener("abort", finish);
     video.currentTime = t;
     setTimeout(finish, 2000);
   });
@@ -112,7 +128,9 @@ export async function decodeVideo(file: File, opts: VideoSampleOptions = {}): Pr
     const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
     const canvases: HTMLCanvasElement[] = [];
     for (let i = 0; i < times.length; i++) {
-      await seekTo(video, times[i]!);
+      if (opts.signal?.aborted) throw importAbortError();
+      await seekTo(video, times[i]!, opts.signal);
+      if (opts.signal?.aborted) throw importAbortError(); // an abort mid-seek lands here
       ctx.drawImage(video, 0, 0, w, h);
       if (opts.onFrame) {
         // STREAMING: hand the shared draw canvas to the consumer and do NOT accumulate a copy.

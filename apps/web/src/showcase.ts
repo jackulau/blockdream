@@ -7,8 +7,7 @@ import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
 import { createBlockArt, wireBlockArtDrop } from "./blockart-core";
-import { planGifExport, gifFrameDelays, packingHudText, reportPngDownload } from "./export-plan";
-import { clampFrameDurations } from "./anim";
+import { planGifExport, gifExportPacing, tickPlanDurations, packingHudText, reportPngDownload } from "./export-plan";
 import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage, type DitherMethod } from "@blockdream/color-core";
 import { quantizeForDatapack } from "./blockart-export";
 import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
@@ -34,15 +33,23 @@ import { rgbFramesToFlat3d, rgbFramesToAnimated3d } from "./video3d";
 import { decodeVideo } from "./video";
 import { ClipAudio, type ClipAudioMode } from "./clip-audio";
 import { analyzeFileAudio } from "./audio";
-import { NotePreview } from "./note-preview";
+import { NotePreview, previewTickWindow } from "./note-preview";
 import type { NoteEvent } from "@blockdream/audio";
 import { initialArrangeState, arrangeReducer, planDatapackPlacement, musicKeyboardHalf } from "./canvas-mod";
 import {
   SECTION3_CONTROL_IDS,
+  IMPORT_TRIGGER_IDS,
+  importBusyText,
+  IMPORT_CANCELLED_TEXT,
+  gifCapNote,
+  audioAnalysisFailedText,
   viewer3dUnavailableText,
+  VIEWER3D_CONTEXT_LOST_TEXT,
+  VIEWER3D_CONTEXT_RESTORED_TEXT,
   AUDIO_BLOCKED_TEXT,
   settingsChangeNote,
   blockArtExportText,
+  DATAPACK_PALETTE_NOTE,
   resetDisabled,
 } from "./ui-feedback";
 import { log } from "./log";
@@ -51,7 +58,7 @@ import { Viewer3D } from "./viewer3d";
 import { localTextureUrl, faceTextureUrl, loadTextureManifest, hasLocalTextures, swatchDataUrl } from "./blocks";
 import { resolveBlock, safeBlockInfo } from "./resolve-block";
 import { volumeBom } from "./bom3d";
-import { downloadDatapack, planExportBudget, planTickPlayback } from "./datapack-export";
+import { downloadDatapack, planExportBudget, planTickPlayback, type TickPlan } from "./datapack-export";
 import {
   quantizedToRaster,
   flatVolumeToRaster,
@@ -63,6 +70,7 @@ import {
   type GifFrame,
 } from "./pixel-export";
 import { decodeGif } from "./gif";
+import { buildHexTable, rgbFromFlatVol as rgbFromFlatVolTable } from "./render-tables";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const MC_URL = "ws://127.0.0.1:8765";
@@ -194,6 +202,9 @@ const ba = createBlockArt({
   out: $<HTMLCanvasElement>("ba-out"),
   bom: $<HTMLUListElement>("ba-bom"),
   tooltip: $<HTMLDivElement>("ba-tooltip"),
+  // palette select (map 244 vs placeable solid gamut) - the same choice the standalone
+  // tester has had; createBlockArt re-quantizes on change and the tooltip/BOM track it.
+  palette: $<HTMLSelectElement>("ba-palette"),
 }, {
   onRender: (q) => {
     // both exports need a frame: enable them together (PNG used to ship enabled and silently
@@ -223,7 +234,7 @@ $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
   });
   const animatedNote =
     ba.getFrameCount() > 1 ? " · animated GIF: current frame only - use section 03 for the full animation" : "";
-  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream:setup${animatedNote}`;
+  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · ${DATAPACK_PALETTE_NOTE} · load /function blockdream:setup${animatedNote}`;
   downloadDatapack("blockdream-blockart-datapack", pack.files);
 });
 
@@ -273,11 +284,10 @@ const CLIP_VOXEL_BUDGET = 360e6;
 const STILL_SOLID_GRID = 96;
 // single-color OKLab match for 3D model imports (vertex colors / material colors → blocks)
 const match3d = (r: number, g: number, b: number) => nearestSrgbHue(r, g, b, pal3d, 0.8).color.mapColorId;
-const hexByMap = new Map<number, number>();
-for (const e of pal3d.entries) {
-  const c = e.color;
-  hexByMap.set(c.mapColorId, (c.r << 16) | (c.g << 8) | c.b);
-}
+// Dense 256-slot hex table (module init) replacing the old per-pixel Map lookup. Serves BOTH
+// call sites: the viewer's colorFor and rgbFromFlatVol's whole-clip double loop - the hot
+// loop itself lives in render-tables.ts (byte-locked + perf-gated in render-tables-perf).
+const hexByMap = buildHexTable(pal3d.entries);
 
 // a neutral mid-gray solid block id for monochrome .obj imports (low channel spread, mid brightness)
 let grayId = 0;
@@ -430,6 +440,11 @@ async function setup3dViewer(): Promise<void> {
     }
   }
 
+  // audio-analysis failure reason. onFrame rewrites the HUD on every frame advance, so a one-shot
+  // write in the catch survives <100ms once playback starts - the reason has to ride the per-frame
+  // line to stay readable for as long as the failed clip is the one playing.
+  let audioFailNote: string | null = null;
+
   const viewer = new Viewer3D({
     canvas,
     // hover picking: same tooltip contract as the 2D block-art canvas (name, id, rgb swatch)
@@ -458,19 +473,45 @@ async function setup3dViewer(): Promise<void> {
       const face = dir === 2 ? "top" : dir === 3 ? "bottom" : "side";
       return faceTextureUrl(info.id, face);
     },
-    colorFor: (id) => hexByMap.get(id) ?? 0x808080,
+    colorFor: (id) => hexByMap[id & 255]!,
     onFrame: (i, n) => {
       scrub.value = String(i);
-      hud.textContent = `frame ${i + 1}/${n} · drag to orbit`;
+      hud.textContent = `frame ${i + 1}/${n} · drag to orbit${audioFailNote ? ` · ${audioFailNote}` : ""}`;
       // audio, per the audio-mode select. "original": the clip's own soundtrack follows the frame
       // clock (only when the shown frames carry the clip's real timing - an effect sequence has its
       // own uniform clock, so the soundtrack pauses rather than desync). "note blocks": the synth
       // preview of the in-game datapack sound, frame-windowed. Scrubbing while paused stays silent.
       clipAudio.frameShown(i, viewer.isPlaying && !!current3dDurations);
       if (viewer.isPlaying && current3dDurations && audioModeSel.value === "noteblocks") {
-        const tpf = Math.max(1, Math.round((current3dDurations[i] ?? 100) / 50));
-        notePreview.frameShown(i, tpf);
+        // Preview pacing == pack pacing: the SAME tick plan the datapack export uses decides
+        // each frame's tick window (uniform speedTicks dwell + the loop trim at kept-frames ×
+        // speedTicks). The old per-frame round(rawDuration/50) let a 30 fps import preview the
+        // whole melody while the pack's locked music loop dropped everything past its trim.
+        if (previewPlan === null || previewPlanFor !== current3dDurations) {
+          previewPlan = planTickPlayback(current3d.length, tickPlanDurations(current3dDurations));
+          previewPlanFor = current3dDurations;
+        }
+        const w = previewTickWindow(previewPlan, i);
+        notePreview.windowShown(w.t0, w.t1);
       }
+    },
+    // GPU reset mid-session: the renderer used to keep rAF-ing into the dead context - a frozen
+    // black canvas with every control still live. Now the section pauses, disables, and explains
+    // (same disable-and-explain surface as the construction-failure catch below).
+    onContextLost: () => {
+      playBtn.textContent = "play";
+      clipAudio.pause();
+      hud.textContent = VIEWER3D_CONTEXT_LOST_TEXT;
+      for (const id of SECTION3_CONTROL_IDS) $<HTMLButtonElement>(id).disabled = true;
+    },
+    onContextRestored: () => {
+      for (const id of SECTION3_CONTROL_IDS) $<HTMLButtonElement>(id).disabled = false;
+      // re-enabling everything must not over-promise: exports need frames, the note-block
+      // toggle needs a transcription, and an in-flight import keeps its triggers locked.
+      if (!current3d.length) for (const id of ["v3-download", "v3-gif", "v3-png"]) $<HTMLButtonElement>(id).disabled = true;
+      musicToggle.disabled = current3dMusic.length === 0;
+      setImportBusy(importing);
+      hud.textContent = VIEWER3D_CONTEXT_RESTORED_TEXT;
     },
   });
 
@@ -480,6 +521,10 @@ async function setup3dViewer(): Promise<void> {
   // GIF export replays at the source's speed. null ⇒ uniform (a baked spin / block-motion sequence).
   let current3dDurations: Array<number | undefined> | null = null;
   let flatDurationsMs: Array<number | undefined> | null = null; // the active flat clip's timing (for restore)
+  // memoized tick plan for the note-block preview (recomputed when the shown timing changes) -
+  // the preview windows come from the SAME plan the datapack export builds, never a per-frame guess
+  let previewPlan: TickPlan | null = null;
+  let previewPlanFor: unknown = null;
   let current3dMusic: NoteEvent[] = []; // note-block music transcribed from an imported video's audio
   let baseVolume: VoxelVolume | null = null; // the single built solid (source for block-motion anims)
 
@@ -582,22 +627,8 @@ async function setup3dViewer(): Promise<void> {
   // Reconstruct an RGB image from a flat wall frame's FRONT layer (palette colour per block).
   // Whole-video clips are too long to keep their raw decoded RGB in memory; the wall itself is the
   // compact record, and its palette colours are exactly what any re-quantize would land on anyway.
-  function rgbFromFlatVol(v: VoxelVolume): RgbImage {
-    const { sx, sy } = v;
-    const data = new Uint8Array(sx * sy * 3);
-    for (let iy = 0; iy < sy; iy++) {
-      const wy = sy - 1 - iy; // world Y is flipped vs image rows (imageToFlat keeps builds upright)
-      for (let ix = 0; ix < sx; ix++) {
-        const id = v.data[ix + sx * wy]!;
-        const hex = id === EMPTY ? 0 : hexByMap.get(id) ?? 0x808080;
-        const j = (iy * sx + ix) * 3;
-        data[j] = (hex >> 16) & 255;
-        data[j + 1] = (hex >> 8) & 255;
-        data[j + 2] = hex & 255;
-      }
-    }
-    return { width: sx, height: sy, data };
-  }
+  // The per-pixel hot loop lives in render-tables.ts, fed by the module-init dense hex table.
+  const rgbFromFlatVol = (v: VoxelVolume): RgbImage => rgbFromFlatVolTable(v, hexByMap);
 
   // The image "build 3D from image" should solidify: the SUBJECT the user imported (the currently
   // displayed frame of an active GIF/video) when one is loaded, else the §02 block-art source. This is
@@ -804,6 +835,20 @@ async function setup3dViewer(): Promise<void> {
     importedFrames = frames;
   }
 
+  // Re-entrancy guard + cancel for the import pipeline. All three entry points (picker, drop,
+  // URL) are fire-and-forget; two interleaved imports would race the state reset above the try
+  // against the other's post-decode writes and corrupt the flatVolFrames/flatDurationsMs
+  // pairing. While one runs: the triggers are disabled, a second request is refused with a
+  // clear HUD line, and the visible cancel button aborts the decode cleanly (no state write).
+  let importing = false;
+  let importAbort: AbortController | null = null;
+  const cancelBtn = $<HTMLButtonElement>("v3-cancel");
+  function setImportBusy(busy: boolean): void {
+    for (const id of IMPORT_TRIGGER_IDS) $<HTMLButtonElement>(id).disabled = busy;
+    cancelBtn.hidden = !busy;
+  }
+  cancelBtn.addEventListener("click", () => importAbort?.abort());
+
   // import a real animation → block animation: a Blender glTF/.glb (node-TRS animation sampled to
   // frames), an .obj-per-frame sequence (select multiple), a single .obj model, an animated .gif,
   // a VIDEO file (.mp4/.webm/.mov - decoded natively in the browser, no ffmpeg), or a still image
@@ -811,11 +856,20 @@ async function setup3dViewer(): Promise<void> {
   // all three funnel through importFiles so every source gets the identical pipeline.
   async function importFiles(files: File[]): Promise<void> {
     if (!files.length) return;
+    if (importing) {
+      hud.textContent = importBusyText(files[0]!.name || "that file");
+      return;
+    }
+    importing = true;
+    importAbort = new AbortController();
+    const signal = importAbort.signal;
+    setImportBusy(true);
     viewer.pause(); // stop the render loop overwriting the status line
     flatFramesRgb = null; // a fresh import invalidates the prior flat import (re-set below on success)
     flatVolFrames = null;
     importedFrames = null; // …and the prior model import (re-set below when this one is a model)
     current3dMusic = []; // a fresh import drops any prior video's note-block music
+    audioFailNote = null; // …and the prior clip's audio-failure reason off the HUD line
     notePreview.setEvents([]);
     clipAudio.dispose(); // …and its original soundtrack (re-loaded below when the new file has one)
     viewer.setMusicArea([]);
@@ -846,7 +900,7 @@ async function setup3dViewer(): Promise<void> {
         // to lift off a "background"; the OLD dome-inflation path turned it into a boiling blob. Here the
         // front face of each thin slab IS the source frame, block-for-block - the frames ARE the motion,
         // played at the GIF's real per-frame timing. Transparent pixels (canvas alpha) map to air.
-        const { canvases, durationsMs } = await decodeGif(gif);
+        const { canvases, durationsMs, capped } = await decodeGif(gif, { signal });
         // a 0-frame decode (ImageDecoder reports frameCount 0 for a truncated/corrupt GIF) would
         // dereference canvases[0] below - fail with a clean message instead of a TypeError.
         if (!canvases.length) throw new Error(`couldn't decode ${gif.name} (the GIF has no frames)`);
@@ -857,7 +911,8 @@ async function setup3dViewer(): Promise<void> {
           depth: 2,
           isAirForFrame: (f, x, y) => decoded[f]!.air[y * rgb[f]!.width + x] === 1,
         });
-        showFrames(frames, `gif ${gif.name} · flat`, durationsMs, true);
+        // an over-budget GIF keeps its first N frames - the label says so (video path's pattern)
+        showFrames(frames, `gif ${gif.name} · flat${gifCapNote(capped)}`, durationsMs, true);
         flatFramesRgb = rgb; // remember the imported frames so build-from-image / transforms follow them
         flatVolFrames = frames; // and the plain flat frames, so a block-motion effect can play over them
         flatDurationsMs = durationsMs; // and its real per-frame timing, for a faithful GIF export
@@ -880,6 +935,7 @@ async function setup3dViewer(): Promise<void> {
           fps,
           maxFrames: Math.ceil(fps * 660), // 11-minute ceiling at ANY fps - the count scales with fps
           targetWidth: decodeW,
+          signal, // the cancel button aborts between seeks - no state below is written
           onFrame: (c, i, total) => {
             if (i === 0) {
               const aspect = (c.height || 9) / (c.width || 16);
@@ -942,6 +998,13 @@ async function setup3dViewer(): Promise<void> {
           }
         } catch (err) {
           log.warn("audio analysis failed", err);
+          // the toggle stays disabled (nothing to toggle) - but the REASON must be visible:
+          // "Note blocks" greyed forever beside an audio-mode select still offering silent
+          // "note blocks" was a dead end. The visual import above already succeeded, so
+          // playback is live and onFrame owns the HUD - the note rides that line (see
+          // audioFailNote) instead of being a one-shot write the next frame erases.
+          audioFailNote = audioAnalysisFailedText(video.name, (err as Error).message);
+          hud.textContent = audioFailNote;
         }
       } else if (image) {
         // still image → a single subject-isolated 3D solid the viewer spins live (its own animation).
@@ -962,8 +1025,18 @@ async function setup3dViewer(): Promise<void> {
         hud.textContent = "unsupported file · use .gltf/.glb, .obj (one or many), .gif, a video (.mp4/.webm/.mov), or an image";
       }
     } catch (err) {
-      log.warn("3D import failed", err);
-      hud.textContent = `import failed: ${(err as Error).message}`;
+      if ((err as Error).name === "AbortError") {
+        // user-driven cancel: the decode threw BEFORE any state write, so the section keeps
+        // whatever it was showing - say so honestly instead of a scary "import failed"
+        hud.textContent = IMPORT_CANCELLED_TEXT;
+      } else {
+        log.warn("3D import failed", err);
+        hud.textContent = `import failed: ${(err as Error).message}`;
+      }
+    } finally {
+      importing = false;
+      importAbort = null;
+      setImportBusy(false);
     }
   }
 
@@ -1068,8 +1141,10 @@ async function setup3dViewer(): Promise<void> {
     if (!allFrames.length) return;
     // HONEST in-game pacing: Minecraft plays one animation step per game tick - 20 fps is the
     // ceiling. A clip decoded above that is resampled EVENLY so the in-game duration matches the
-    // source; at/below 20 fps every frame keeps its nearest whole-tick dwell.
-    const plan = planTickPlayback(allFrames.length, clampFrameDurations(durationsMs));
+    // source; at/below 20 fps every frame keeps its nearest whole-tick dwell. The plan input is
+    // sanitized but NOT per-frame floored (tickPlanDurations): the viewer's MIN_FRAME_MS display
+    // floor inflated every >100 fps source (120 fps 1 s → a 1.20 s pack; the CLI emits 1.00 s).
+    const plan = planTickPlayback(allFrames.length, tickPlanDurations(durationsMs));
     const frames = plan.resampled ? plan.indices.map((i) => allFrames[i]!) : allFrames;
     // Export-budget guard: one .mcfunction per frame; warn (do not block) past the tested budget.
     // The warning + "packing…" go to the HUD BEFORE the synchronous generate+zip (which can take
@@ -1114,8 +1189,15 @@ async function setup3dViewer(): Promise<void> {
   // rendered crisp (integer-upscaled), at the source's real per-frame timing. A video / imported GIF
   // exports its frames; a single spun solid bakes the turntable so the GIF genuinely rotates.
   $<HTMLButtonElement>("v3-gif").addEventListener("click", () => {
-    const { frames, durationsMs } = exportFrames();
-    if (!frames.length) return;
+    const { frames: allFrames, durationsMs } = exportFrames();
+    if (!allFrames.length) return;
+    // GIF pacing == pack pacing: emit the SAME frames the datapack plays (the tick plan's
+    // list - resampled above Minecraft's 20 fps ceiling) with each frame held its uniform
+    // tick dwell, so GIF and in-game animation run the same wall-clock timeline. The old
+    // export kept the unresampled frames at per-frame source delays: [40,40,40] played
+    // 120 ms as a GIF but 100 ms in game. Pack bytes are unchanged by this.
+    const pacing = gifExportPacing(allFrames.length, durationsMs);
+    const frames = pacing.indices.map((i) => allFrames[i]!);
     // Memory-budget guard BEFORE any per-frame raster is allocated: a long high-fps clip
     // (up to 13200 frames) padded + upscaled to RGBA is gigabytes - that synchronous path
     // froze or killed the tab with no warning. Hard cap with the honest math in the HUD.
@@ -1134,12 +1216,10 @@ async function setup3dViewer(): Promise<void> {
       const W = Math.max(...frames.map((f) => f.sx));
       const H = Math.max(...frames.map((f) => f.sy));
       const scale = fitScale(W, H, 384);
-      // delays come from the SAME tick plan the datapack uses, so GIF pacing == in-game pacing
-      // (a spin with no timing used to export at 70 ms/frame while the pack played 100 ms).
-      const delays = gifFrameDelays(frames.length, durationsMs);
-      const gif: GifFrame[] = frames.map((f, i) => ({
+      // uniform delay = the pack's tick dwell (speedTicks × 50 ms) over the pack's frame list
+      const gif: GifFrame[] = frames.map((f) => ({
         raster: upscaleNearest(padRaster(flatVolumeToRaster(f), W, H), scale),
-        delayMs: delays[i]!,
+        delayMs: pacing.delayMs,
       }));
       try {
         downloadGif("blockdream-animation.gif", gif);

@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import {
   SECTION3_CONTROL_IDS,
   viewer3dUnavailableText,
+  VIEWER3D_CONTEXT_LOST_TEXT,
+  VIEWER3D_CONTEXT_RESTORED_TEXT,
   AUDIO_BLOCKED_TEXT,
   settingsChangeNote,
   blockArtExportText,
@@ -11,6 +13,7 @@ import {
 } from "../src/ui-feedback";
 import { ClipAudio } from "../src/clip-audio";
 import { NotePreview } from "../src/note-preview";
+import { wireContextLoss } from "../src/viewer3d";
 
 // Web resilience batch (goal 088 D11). Every silent failure mode gets an honest surface:
 // WebGL-unavailable, sample-404, exports-before-frames, disconnected resets, autoplay-blocked
@@ -167,6 +170,68 @@ describe("(f) animated GIF exports one frame - and says so", () => {
 
   it("the §02 status line is driven by the real frame count (getFrameCount)", () => {
     expect(showcase).toContain("blockArtExportText(q.width, q.height, ba.getFrameCount())");
+  });
+});
+
+describe("(h) WebGL context LOSS after a successful start (goal 089 D10)", () => {
+  // goal 088's resilience covered only CONSTRUCTION failure; a GPU reset mid-session left a
+  // frozen black canvas with live controls (rAF kept rendering into the dead context, and no
+  // contextlost/contextrestored handler existed repo-wide). The event contract is extracted
+  // to wireContextLoss so it is testable without a GL context - simulated here via the
+  // canvas events themselves.
+
+  it("webglcontextlost is preventDefault-ed (required for restore) and fires onLost", () => {
+    const canvas = new EventTarget();
+    let lost = 0;
+    let restored = 0;
+    wireContextLoss(canvas, { onLost: () => lost++, onRestored: () => restored++ });
+    const ev = new Event("webglcontextlost", { cancelable: true });
+    canvas.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true); // without this the browser never restores
+    expect(lost).toBe(1);
+    expect(restored).toBe(0);
+  });
+
+  it("webglcontextrestored fires onRestored; unwiring detaches both handlers", () => {
+    const canvas = new EventTarget();
+    let lost = 0;
+    let restored = 0;
+    const unwire = wireContextLoss(canvas, { onLost: () => lost++, onRestored: () => restored++ });
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(restored).toBe(1);
+    unwire();
+    canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(lost).toBe(0);
+    expect(restored).toBe(1); // nothing fires after dispose
+  });
+
+  it("Viewer3D stops the rAF loop on loss and re-meshes + restarts on restore", () => {
+    const viewer3d = read("../src/viewer3d.ts");
+    expect(viewer3d).toContain("this.unwireContextLoss = wireContextLoss(cfg.canvas");
+    // loss: playback + rAF stop, host notified
+    expect(viewer3d).toMatch(/handleContextLost\(\): void \{\s*this\.playing = false;\s*if \(this\.raf\) \{\s*cancelAnimationFrame\(this\.raf\);/);
+    expect(viewer3d).toContain("this.cfg.onContextLost?.()");
+    // restore: dead GPU-side groups dropped, current frame re-meshed, loop restarted
+    expect(viewer3d).toMatch(/handleContextRestored\(\): void \{\s*this\.disposeGroups\(\);/);
+    expect(viewer3d).toContain("if (this.frames.length) this.showFrame(this.index)");
+    expect(viewer3d).toContain("this.cfg.onContextRestored?.()");
+    // dispose unwires the handlers
+    expect(viewer3d).toContain("this.unwireContextLoss();");
+  });
+
+  it("the showcase disables-and-explains on loss and honestly re-enables on restore", () => {
+    expect(showcase).toContain("onContextLost: () => {");
+    expect(showcase).toContain("VIEWER3D_CONTEXT_LOST_TEXT");
+    expect(showcase).toContain("VIEWER3D_CONTEXT_RESTORED_TEXT");
+    // both transitions sweep the SAME control list as the construction-failure path
+    const sweeps = showcase.match(/for \(const id of SECTION3_CONTROL_IDS\)/g) ?? [];
+    expect(sweeps.length).toBeGreaterThanOrEqual(3); // construction catch + lost + restored
+    // restore must not over-promise: exports still need frames, note blocks a transcription
+    expect(showcase).toContain('if (!current3d.length) for (const id of ["v3-download", "v3-gif", "v3-png"])');
+    expect(showcase).toContain("musicToggle.disabled = current3dMusic.length === 0");
+    expect(VIEWER3D_CONTEXT_LOST_TEXT).toContain("lost the WebGL context");
+    expect(VIEWER3D_CONTEXT_RESTORED_TEXT).toContain("restored");
   });
 });
 

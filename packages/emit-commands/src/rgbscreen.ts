@@ -17,6 +17,7 @@
 import type { RgbImage } from "@blockdream/color-core";
 import type { NoteEvent } from "@blockdream/audio";
 import { DEFAULT_MAX_COMMANDS, writeSplitFunction } from "./chunk";
+import { forceloadLines } from "./fill";
 import { noteSequencer, type Vec3 } from "./note-sequencer";
 import { redstoneSequencer } from "./redstone-sequencer";
 import type { GeneratedPack } from "./datapack";
@@ -326,7 +327,7 @@ export function generateRgbScreenDatapack(
   const music = opts.music && opts.music.length ? opts.music : undefined;
   const musicOrigin = opts.musicOrigin ?? { x: scrX1 + 2, y: origin.y, z: scrZ1 };
   const loopTicksOverride = frames.length > 1 ? frames.length * speed : undefined;
-  const seq = !music
+  const seqBuilt = !music
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
@@ -357,6 +358,10 @@ export function generateRgbScreenDatapack(
               : undefined,
           };
         })();
+  // Zero SURVIVING notes (loop trim / note cap emptied the melody) = NO music machinery:
+  // no music.mcfunction, no tick.json registration, no #mt/#mtcount scores (else #mt
+  // ticked forever against a never-created #mtcount for a pack that plays nothing).
+  const seq = seqBuilt && seqBuilt.noteCount > 0 ? seqBuilt : undefined;
 
   // forceload rect: the screen plane PLUS the physical music area (setblock into an
   // unloaded chunk fails, and a redstone delay line only ticks in loaded chunks)
@@ -376,7 +381,8 @@ export function generateRgbScreenDatapack(
       `scoreboard players set #speed ma ${speed}`,
       `scoreboard players set #count ma ${frames.length}`,
       ...(seq ? seq.setupScores : []),
-      `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
+      // split at the 256-chunk /forceload cap (a long redstone spine can exceed it)
+      ...forceloadLines(flx0, flz0, flx1, flz1, "add"),
       `kill @e[type=minecraft:text_display,tag=${ns}]`, // idempotent re-setup
       `function ${ns}:screen`,
       ...(seq ? seq.physical : []),
@@ -387,11 +393,11 @@ export function generateRgbScreenDatapack(
 
   files.set(
     `${fnDir}/start.mcfunction`,
-    [`forceload add ${flx0} ${flz0} ${flx1} ${flz1}`, `scoreboard players set #play ma 1`, ""].join("\n"),
+    [...forceloadLines(flx0, flz0, flx1, flz1, "add"), `scoreboard players set #play ma 1`, ""].join("\n"),
   );
   files.set(
     `${fnDir}/stop.mcfunction`,
-    [`scoreboard players set #play ma 0`, `forceload remove ${flx0} ${flz0} ${flx1} ${flz1}`, ""].join("\n"),
+    [`scoreboard players set #play ma 0`, ...forceloadLines(flx0, flz0, flx1, flz1, "remove"), ""].join("\n"),
   );
   files.set(
     `${fnDir}/teardown.mcfunction`,
@@ -399,10 +405,10 @@ export function generateRgbScreenDatapack(
       `# remove the screen entirely (entities persist in the world save)`,
       `# forceload first: kill only reaches LOADED entities, and after :stop the`,
       `# screen chunks may have unloaded (teardown from far away would leak pixels)`,
-      `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
+      ...forceloadLines(flx0, flz0, flx1, flz1, "add"),
       `scoreboard players set #play ma 0`,
       `kill @e[type=minecraft:text_display,tag=${ns}]`,
-      `forceload remove ${flx0} ${flz0} ${flx1} ${flz1}`,
+      ...forceloadLines(flx0, flz0, flx1, flz1, "remove"),
       "",
     ].join("\n"),
   );
@@ -546,7 +552,7 @@ export function generateRgbScreenDatapackReference(
   const music = opts.music && opts.music.length ? opts.music : undefined;
   const musicOrigin = opts.musicOrigin ?? { x: scrX1 + 2, y: origin.y, z: scrZ1 };
   const loopTicksOverride = frames.length > 1 ? frames.length * speed : undefined;
-  const seq = !music
+  const seqBuilt = !music
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
@@ -577,6 +583,10 @@ export function generateRgbScreenDatapackReference(
               : undefined,
           };
         })();
+  // Zero SURVIVING notes (loop trim / note cap emptied the melody) = NO music machinery:
+  // no music.mcfunction, no tick.json registration, no #mt/#mtcount scores (else #mt
+  // ticked forever against a never-created #mtcount for a pack that plays nothing).
+  const seq = seqBuilt && seqBuilt.noteCount > 0 ? seqBuilt : undefined;
 
   // forceload rect: the screen plane PLUS the physical music area (setblock into an
   // unloaded chunk fails, and a redstone delay line only ticks in loaded chunks)
@@ -596,7 +606,8 @@ export function generateRgbScreenDatapackReference(
       `scoreboard players set #speed ma ${speed}`,
       `scoreboard players set #count ma ${frames.length}`,
       ...(seq ? seq.setupScores : []),
-      `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
+      // split at the 256-chunk /forceload cap (a long redstone spine can exceed it)
+      ...forceloadLines(flx0, flz0, flx1, flz1, "add"),
       `kill @e[type=minecraft:text_display,tag=${ns}]`, // idempotent re-setup
       `function ${ns}:screen`,
       ...(seq ? seq.physical : []),
@@ -607,11 +618,11 @@ export function generateRgbScreenDatapackReference(
 
   files.set(
     `${fnDir}/start.mcfunction`,
-    [`forceload add ${flx0} ${flz0} ${flx1} ${flz1}`, `scoreboard players set #play ma 1`, ""].join("\n"),
+    [...forceloadLines(flx0, flz0, flx1, flz1, "add"), `scoreboard players set #play ma 1`, ""].join("\n"),
   );
   files.set(
     `${fnDir}/stop.mcfunction`,
-    [`scoreboard players set #play ma 0`, `forceload remove ${flx0} ${flz0} ${flx1} ${flz1}`, ""].join("\n"),
+    [`scoreboard players set #play ma 0`, ...forceloadLines(flx0, flz0, flx1, flz1, "remove"), ""].join("\n"),
   );
   files.set(
     `${fnDir}/teardown.mcfunction`,
@@ -619,10 +630,10 @@ export function generateRgbScreenDatapackReference(
       `# remove the screen entirely (entities persist in the world save)`,
       `# forceload first: kill only reaches LOADED entities, and after :stop the`,
       `# screen chunks may have unloaded (teardown from far away would leak pixels)`,
-      `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
+      ...forceloadLines(flx0, flz0, flx1, flz1, "add"),
       `scoreboard players set #play ma 0`,
       `kill @e[type=minecraft:text_display,tag=${ns}]`,
-      `forceload remove ${flx0} ${flz0} ${flx1} ${flz1}`,
+      ...forceloadLines(flx0, flz0, flx1, flz1, "remove"),
       "",
     ].join("\n"),
   );

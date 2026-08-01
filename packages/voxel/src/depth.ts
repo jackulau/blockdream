@@ -24,7 +24,11 @@ export interface SolidifyImageOptions {
   /** Background handling. "auto" removes the border-connected dominant colour; "none" keeps all
    *  pixels as subject. Default "auto". */
   background?: "auto" | "none";
-  /** Explicit background test (overrides auto detection) - e.g. a palette's air id. */
+  /** Explicit background test (overrides auto detection) - e.g. a palette's air id.
+   *  CALLBACK CONTRACT (applies to isBackground/depthOf/shadingOf alike): these run per PIXEL, so
+   *  they are hoisted off the options object and invoked as FREE functions - `this` is undefined,
+   *  not the options object. Pass an arrow (every in-repo caller does) or a bound method; an
+   *  unbound `this`-dependent method is not supported. Locked by test/depth-hoist.test.ts. */
   isBackground?: (mapColorId: number) => boolean;
   /** Real per-pixel depth in [0,1] (1 = thickest). Overrides the silhouette-inflation heuristic.
    *  This is the hook a depth MODEL or a Blender depth pass feeds. (x,y) are image coords. */
@@ -203,6 +207,110 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
   const symmetric = opts.symmetric ?? true;
 
   // subject mask
+  // The per-pixel callbacks (isBackground here, depthOf/shadingOf below) are hoisted off the
+  // options object ONCE instead of re-loading `opts.x` per pixel (same hoist flat.ts applies to
+  // isAir). Hot on video->3D: video3d.ts calls imageToSolid per frame with arrow callbacks (~19M
+  // calls on a 1000-frame clip); also the live cast (rcon-bridge.ts). See the CALLBACK CONTRACT on
+  // SolidifyImageOptions: hoisted calls pass `this` = undefined, byte-identical for the
+  // arrow/bound callbacks every in-repo caller uses.
+  const isBackground = opts.isBackground;
+  let mask: Uint8Array;
+  if (isBackground) {
+    mask = new Uint8Array(width * height);
+    for (let i = 0; i < mask.length; i++) mask[i] = isBackground(mapColorId[i]!) ? 0 : 1;
+  } else if ((opts.background ?? "auto") === "none") {
+    mask = new Uint8Array(width * height).fill(1);
+  } else {
+    const bg = detectBackgroundMask(frame);
+    mask = new Uint8Array(width * height);
+    for (let i = 0; i < mask.length; i++) mask[i] = bg[i] ? 0 : 1;
+  }
+  // DEGENERATE-INPUT GUARD: if auto background-removal erased the whole image (e.g. a single solid
+  // colour, where the border colour == every pixel), there is no subject to inflate. Rather than
+  // silently emit an empty build, treat the whole frame as the subject (a flat-ish slab). A truly
+  // empty result still throws below.
+  let anySubject = 0;
+  for (let i = 0; i < mask.length; i++) anySubject |= mask[i]!;
+  if (!anySubject) mask.fill(1);
+
+  // thickness field in [0,1]
+  const depthOf = opts.depthOf; // hoisted (per-pixel; see CALLBACK CONTRACT)
+  const thickness = new Float32Array(width * height);
+  if (depthOf) {
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        const d = depthOf(x, y);                                   // sanitize NaN/Inf -> 0 (no silent drop)
+        thickness[i] = mask[i] ? Math.max(0, Math.min(1, Number.isFinite(d) ? d : 0)) : 0;
+      }
+  } else {
+    const dist = silhouetteDistance(mask, width, height);
+    let maxd = 0;
+    for (let i = 0; i < dist.length; i++) if (dist[i]! > maxd) maxd = dist[i]!;
+    const inv = maxd > 0 ? 1 / maxd : 0;
+    // envelope thickness from the silhouette (the rounded dome)...
+    for (let i = 0; i < dist.length; i++) thickness[i] = mask[i] ? Math.pow(dist[i]! * inv, curve) : 0;
+    // ...then SHAPE-FROM-SHADING: modulate the envelope by per-pixel luminance so internal structure
+    // appears instead of a featureless dome. mix in [eps,1] keeps the subject floor (no holes even at
+    // gain=1, shade=0 → mix=eps → the >=1-voxel floor below still fills the column).
+    const shadingOf = opts.shadingOf; // hoisted (per-pixel; see CALLBACK CONTRACT)
+    if (shadingOf) {
+      const gain = Math.max(0, Math.min(1, opts.shadingGain ?? 0.5));
+      for (let y = 0; y < height; y++)
+        for (let x = 0; x < width; x++) {
+          const i = y * width + x;
+          if (!mask[i]) continue;
+          const s = shadingOf(x, y);
+          const shade = Math.max(0, Math.min(1, Number.isFinite(s) ? s : 0));
+          const mix = Math.max(1e-3, 1 - gain + gain * shade);
+          thickness[i] = thickness[i]! * mix;
+        }
+    }
+  }
+
+  const v = createVolume(width, height, maxDepth);
+  const center = (maxDepth - 1) / 2; // mid-plane the solid is centered on
+  const zStride = v.sx * v.sy; // backing-index step between consecutive Z layers
+  for (let iy = 0; iy < height; iy++) {
+    for (let ix = 0; ix < width; ix++) {
+      const i = iy * width + ix;
+      if (!mask[i]) continue;
+      const t = thickness[i]!;
+      if (t <= 0) continue;
+      const d = Math.max(1, Math.min(maxDepth, Math.round(t * maxDepth)));
+      const wy = height - 1 - iy;
+      const c = mapColorId[i]!;
+      let zlo: number;
+      if (symmetric) {
+        zlo = Math.round(center - (d - 1) / 2); // centered about the mid-plane → double-sided
+        zlo = Math.max(0, Math.min(maxDepth - d, zlo));
+      } else {
+        zlo = 0; // one-sided relief, flush at the front face
+      }
+      // (ix, wy, zlo..zlo+d) is provably in bounds (clamped above) → direct strided fill, no per-voxel branch
+      fillRun(v, ix + v.sx * wy + zStride * zlo, zStride, d, c);
+    }
+  }
+  // NOTE: an empty result is legitimate per-frame (framesToAnimated3d passes a 0 depth field for an
+  // all-background video frame), so the "no subject" guard lives at the CLI/aggregate level (render.ts),
+  // not here - throwing per-frame would reject valid empty frames in an animation.
+  return v;
+}
+
+/**
+ * VERBATIM pre-optimization imageToSolid - the reference twin for the goal-089 D22 callback hoists
+ * above (isBackground/depthOf/shadingOf re-loaded off the options object per pixel, invoked with
+ * `this` = opts). Kept exported (house convention, see trisToVolumeReference in obj.ts) so
+ * test/depth-hoist.test.ts can prove byte-identity. Not for production use.
+ */
+export function imageToSolidReference(frame: QuantizedFrame, opts: SolidifyImageOptions = {}): VoxelVolume {
+  const { width, height, mapColorId } = frame;
+  if (width <= 0 || height <= 0) throw new Error(`imageToSolid: empty frame ${width}x${height}`);
+  const maxDepth = Math.max(1, Math.min(MAX_DIM, Math.floor(opts.maxDepth ?? 16)));  // clamp (no OOM)
+  const curve = opts.curve ?? 0.5;
+  const symmetric = opts.symmetric ?? true;
+
+  // subject mask
   let mask: Uint8Array;
   if (opts.isBackground) {
     mask = new Uint8Array(width * height);
@@ -274,12 +382,8 @@ export function imageToSolid(frame: QuantizedFrame, opts: SolidifyImageOptions =
       } else {
         zlo = 0; // one-sided relief, flush at the front face
       }
-      // (ix, wy, zlo..zlo+d) is provably in bounds (clamped above) → direct strided fill, no per-voxel branch
       fillRun(v, ix + v.sx * wy + zStride * zlo, zStride, d, c);
     }
   }
-  // NOTE: an empty result is legitimate per-frame (framesToAnimated3d passes a 0 depth field for an
-  // all-background video frame), so the "no subject" guard lives at the CLI/aggregate level (render.ts),
-  // not here - throwing per-frame would reject valid empty frames in an animation.
   return v;
 }

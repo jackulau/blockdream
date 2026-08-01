@@ -20,7 +20,9 @@
       header a { color: #7dd3fc; text-decoration: none; font-size: 0.85rem; }
       main { display: flex; gap: 1.5rem; padding: 1.5rem; flex-wrap: wrap; }
       .stage { position: relative; }
-      canvas { image-rendering: pixelated; width: 480px; height: 480px; background: #000; border: 1px solid #24262c; border-radius: 6px; }
+      /* max-width + aspect-ratio (not a fixed height): the canvas shrinks on narrow phones and
+         stays square instead of forcing horizontal scroll (same pattern as index.html) */
+      canvas { image-rendering: pixelated; width: 480px; max-width: 100%; aspect-ratio: 1; height: auto; background: #000; border: 1px solid #24262c; border-radius: 6px; }
       .hud { position: absolute; top: 8px; left: 8px; font: 12px ui-monospace, monospace; background: rgba(0,0,0,0.55); padding: 4px 8px; border-radius: 4px; color: #b9f6ca; pointer-events: none; }
       .panel { min-width: 240px; display: flex; flex-direction: column; gap: 0.85rem; }
       .panel label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: #aeb2b9; }

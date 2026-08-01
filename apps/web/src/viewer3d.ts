@@ -28,6 +28,36 @@ export interface Viewer3DConfig {
   onFrame?: (index: number, count: number) => void;
   /** Hover picking: fired on mousemove with the voxel under the cursor (null = none). */
   onPick?: (pick: VoxelPick | null, ev: MouseEvent) => void;
+  /** GPU dropped the WebGL context (driver reset / GPU crash): rendering + playback are
+   *  stopped; the host disables the section and explains, instead of the old frozen black
+   *  canvas with live controls. */
+  onContextLost?: () => void;
+  /** The browser restored the context: the current frame is re-meshed and the render loop is
+   *  running again; the host re-enables its controls. */
+  onContextRestored?: () => void;
+}
+
+/**
+ * Wire WebGL context-loss handling on a canvas. `preventDefault()` on `webglcontextlost` is
+ * REQUIRED for the browser to attempt a restore - without it `webglcontextrestored` never
+ * fires and the canvas stays dead. Returns the unwire function (for dispose). Extracted from
+ * Viewer3D so the event contract is unit-testable without a GL context (jsdom-free repo).
+ */
+export function wireContextLoss(
+  canvas: Pick<EventTarget, "addEventListener" | "removeEventListener">,
+  hooks: { onLost: () => void; onRestored: () => void },
+): () => void {
+  const lost = (ev: Event): void => {
+    ev.preventDefault();
+    hooks.onLost();
+  };
+  const restored = (): void => hooks.onRestored();
+  canvas.addEventListener("webglcontextlost", lost);
+  canvas.addEventListener("webglcontextrestored", restored);
+  return () => {
+    canvas.removeEventListener("webglcontextlost", lost);
+    canvas.removeEventListener("webglcontextrestored", restored);
+  };
 }
 
 export interface VoxelPick {
@@ -67,6 +97,7 @@ export class Viewer3D {
   private drag: DragSession | null = null;
   private showMusicFlag = true;
   private onArrangeChange?: (s: ArrangeSnapshot) => void;
+  private readonly unwireContextLoss: () => void;
 
   constructor(private cfg: Viewer3DConfig) {
     this.fps = cfg.fps ?? 8;
@@ -96,7 +127,34 @@ export class Viewer3D {
     // a touch interaction can end with pointercancel (palm rejection / system gesture) and no
     // pointerup - without this, a drag could leave OrbitControls stuck disabled.
     window.addEventListener("pointercancel", this.onPointerUp);
+    // GPU reset / driver crash: stop rendering into the dead context and tell the host; on
+    // restore, re-mesh the current frame and resume (goal 088 covered only construction failure).
+    this.unwireContextLoss = wireContextLoss(cfg.canvas, {
+      onLost: () => this.handleContextLost(),
+      onRestored: () => this.handleContextRestored(),
+    });
     this.loop(0);
+  }
+
+  /** Context lost: stop the rAF loop (rendering into a dead context is wasted work and the
+   *  canvas is frozen anyway) and pause playback so the clock doesn't run ahead silently. */
+  private handleContextLost(): void {
+    this.playing = false;
+    if (this.raf) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    }
+    this.cfg.onContextLost?.();
+  }
+
+  /** Context restored: the GPU-side buffers died with the old context, so drop every cached
+   *  mesh group, rebuild the current frame from its CPU-side volume, and restart the loop. */
+  private handleContextRestored(): void {
+    this.disposeGroups();
+    this.groups = new Array(this.frames.length).fill(null);
+    if (this.frames.length) this.showFrame(this.index);
+    if (!this.raf) this.loop(performance.now());
+    this.cfg.onContextRestored?.();
   }
 
   // --- hover picking: ray → merged greedy-quad mesh → voxel cell → id from the volume ---
@@ -458,6 +516,7 @@ export class Viewer3D {
     this.cfg.canvas.removeEventListener("pointermove", this.onPointerDrag);
     window.removeEventListener("pointerup", this.onPointerUp);
     window.removeEventListener("pointercancel", this.onPointerUp);
+    this.unwireContextLoss();
     this.clearMusicGroup();
     this.disposeGroups();
     for (const m of this.matCache.values()) m.dispose();
