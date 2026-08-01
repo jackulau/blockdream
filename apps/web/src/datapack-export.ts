@@ -3,10 +3,18 @@
 // don't need compression) via fflate - and trigger a download.
 
 import { zipSync, strToU8 } from "fflate";
+// Pure-data subpath (no node:fs) - the registry is the single source of truth for versions.
+import { MC_VERSIONS } from "@blockdream/palette/versions";
 
 // Playback planning moved to @blockdream/emit-commands (tick-plan.ts) so the CLI resamples
 // >20 fps clips identically to this exporter; re-exported here to keep existing imports.
 export { planTickPlayback, type TickPlan } from "@blockdream/emit-commands";
+
+/** Human-readable supported Java range, DERIVED from the version registry - never hardcoded.
+ *  This string ships inside every exported pack's HOW_TO_LOAD.txt, so a stale hardcode would
+ *  bundle wrong instructions into every download (it said "1.21 through 1.21.10" while the
+ *  registry already reached 26.2). */
+export const JAVA_VERSION_RANGE = `${MC_VERSIONS[0]!.id} through ${MC_VERSIONS[MC_VERSIONS.length - 1]!.id}`;
 
 /** Export-budget ceiling on per-frame .mcfunction files in one web-exported datapack.
  *  2191 frames is the largest pack validated end-to-end on a REAL server (whole-video
@@ -41,11 +49,12 @@ export function planExportBudget(frameCount: number, budget: number = EXPORT_FRA
 export function loadInstructions(files: Map<string, string>): string {
   const setup = [...files.keys()].find((k) => /^data\/[^/]+\/function\/setup\.mcfunction$/.test(k));
   const ns = setup ? setup.split("/")[1]! : "blockdream";
+  const title = `HOW TO LOAD THIS INTO MINECRAFT (Java Edition - any release ${JAVA_VERSION_RANGE})`;
   return [
-    "HOW TO LOAD THIS INTO MINECRAFT (Java Edition - any 1.21.x: 1.21 through 1.21.10)",
-    "================================================================================",
-    "(One pack works across the whole 1.21 line - it declares supported_formats, so",
-    " Minecraft loads it without the red 'incompatible pack' warning on any 1.21.x.)",
+    title,
+    "=".repeat(title.length),
+    "(One pack works across the whole supported line - it declares supported_formats,",
+    " so Minecraft loads it without the red 'incompatible pack' warning on any of them.)",
     "",
     "1. Find your world's datapacks folder:",
     "     Singleplayer: open the world, pause, 'Open World Folder' then datapacks/",

@@ -48,13 +48,17 @@
         <div class="hud" id="hud">idle</div>
       </div>
       <div class="panel">
-        <label>Demo
+        <label>Movement
           <select id="demo">
-            <option value="walking">walking</option>
+            <option value="general">general</option>
+            <option value="walk" selected>walk</option>
+            <option value="sprint">sprint</option>
+            <option value="jump">jump</option>
+            <option value="swim">swim</option>
             <option value="boat">boat</option>
             <option value="elytra">elytra</option>
-            <option value="world">world</option>
-            <option value="gameplay">gameplay</option>
+            <option value="pig">pig</option>
+            <option value="minecart">minecart</option>
           </select>
         </label>
         <label>Server
@@ -72,12 +76,11 @@
           <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> camera (look)
         </div>
         <div class="keys" style="opacity:.7">
-          <strong>Engine</strong> · server (WebSocket, default).
-          A server-free browser engine (few-step latent diffusion via
-          <code>onnxruntime-web</code>, ported to <code>apps/web/src/rollout.ts</code>) runs the
-          model entirely client-side from the exported <code>/onnx</code> models · the &gt;=30fps
-          route (frame latent denoised in parallel, no token-by-token decode). Train + export with
-          <code>ml/scripts/goal020_diffusion.sh</code>; fidelity scales with training.
+          <strong>Engine</strong> · this page talks to the Python server over WebSocket
+          (that is the only engine wired here). A server-free browser engine (few-step
+          latent diffusion via <code>onnxruntime-web</code>, <code>apps/web/src/rollout.ts</code>)
+          ships in the repo but is not wired to this page yet; train + export its models
+          with <code>ml/scripts/goal020_diffusion.sh</code>.
         </div>
       </div>
     </main>

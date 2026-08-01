@@ -185,10 +185,10 @@ ml/               # Workstream B - world model (Python / PyTorch)
 ## Minecraft version support
 
 Every exported artifact is version-stamped from one registry ([`packages/palette/src/versions.ts`](./packages/palette/src/versions.ts)),
-so it loads cleanly across the whole **Java 1.21.x line (1.21 → 1.21.10)** and on **Bedrock 1.21+**:
+so it loads cleanly across the whole **supported Java line (1.21 → 26.2)** and on **Bedrock 1.21+**:
 
 - **Java datapacks** (2D + 3D voxel) declare `supported_formats`, so a single `.zip` loads without the
-  red "incompatible pack" warning on any 1.21.x - the function content (setblock/fill/scoreboard/macros/`#minecraft:tick`)
+  red "incompatible pack" warning on any supported release - the function content (setblock/fill/scoreboard/macros/`#minecraft:tick`)
   is uniform across the line.
 - **`--version <ver>`** pins the exact `pack_format` / `DataVersion` for a specific release (e.g. `--version 1.21.5`
   → `pack_format 71`); an unsupported version fails fast with the list of supported ids instead of a cryptic crash.
