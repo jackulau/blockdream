@@ -26,17 +26,47 @@ describe("nav ring", () => {
 });
 
 describe("mobile CSS", () => {
-  it(".hud wraps long error lines (pre-wrap + overflow-wrap), never bare white-space: pre", () => {
-    const hudRule = index.match(/\.hud\s*\{[^}]*\}/)?.[0] ?? "";
-    expect(hudRule).toContain("white-space: pre-wrap");
-    expect(hudRule).toContain("overflow-wrap: anywhere");
-    expect(hudRule).not.toMatch(/white-space:\s*pre\s*[;}]/); // bare pre forces document-wide horizontal scroll
+  // The standalone testers must follow the same responsive pattern index.html already has:
+  // max-width so canvases shrink on narrow phones, aspect-ratio (not a fixed px height) so they
+  // stay square while shrinking, and .hud never bare white-space: pre (forces sideways scroll).
+  const worldModel = read("../world-model.html");
+  const driving = read("../driving.html");
+  const blockart = read("../blockart.html");
+
+  const rule = (html: string, selector: RegExp): string => html.match(selector)?.[0] ?? "";
+
+  it(".hud wraps long error lines (pre-wrap + overflow-wrap), never bare white-space: pre, on every page that has one", () => {
+    for (const [name, html] of [["index", index], ["driving", driving]] as const) {
+      const hudRule = rule(html, /\.hud\s*\{[^}]*\}/);
+      expect(hudRule, `${name} .hud`).toContain("white-space: pre-wrap");
+      expect(hudRule, `${name} .hud`).toContain("overflow-wrap: anywhere");
+    }
+    for (const [name, html] of [["index", index], ["world-model", worldModel], ["driving", driving]] as const) {
+      // bare pre forces document-wide horizontal scroll on the first long one-line error
+      expect(rule(html, /\.hud\s*\{[^}]*\}/), `${name} .hud`).not.toMatch(/white-space:\s*pre\s*[;}]/);
+    }
   });
 
-  it("square canvases keep their aspect via aspect-ratio, not a fixed height", () => {
-    const mc = index.match(/\.mc-canvas\s*\{[^}]*\}/)?.[0] ?? "";
+  it("index.html square canvases keep their aspect via aspect-ratio, not a fixed height", () => {
+    const mc = rule(index, /\.mc-canvas\s*\{[^}]*\}/);
     expect(mc).toContain("aspect-ratio: 1");
     expect(mc).not.toMatch(/height:\s*\d+px/); // fixed height + max-width:100% squashed it below ~340px viewports
+  });
+
+  it("world-model and driving tester canvases shrink on phones (max-width:100% + aspect-ratio, no fixed height)", () => {
+    for (const [name, html] of [["world-model", worldModel], ["driving", driving]] as const) {
+      const canvas = rule(html, /\n\s*canvas\s*\{[^}]*\}/);
+      expect(canvas, `${name} canvas`).toContain("max-width: 100%");
+      expect(canvas, `${name} canvas`).toContain("aspect-ratio: 1");
+      // a fixed 480px/320px height with no max-width forced a ~528px minimum document width
+      expect(canvas, `${name} canvas`).not.toMatch(/height:\s*\d+px/);
+    }
+  });
+
+  it("blockart tester canvas caps at min(512px, 100%) so the inline style.width (up to 512px) cannot overflow a 375px phone", () => {
+    const canvas = rule(blockart, /\n\s*canvas\s*\{[^}]*\}/);
+    expect(canvas).toMatch(/max-width:\s*min\(512px,\s*100%\)/);
+    expect(canvas).not.toMatch(/max-width:\s*512px/); // the old bare cap ignored the viewport
   });
 });
 

@@ -32,7 +32,10 @@
       .canvases { display: flex; gap: 1.25rem; flex-wrap: wrap; }
       figure { margin: 0; }
       figcaption { font-size: 0.75rem; color: #9aa0a6; margin-top: 0.4rem; }
-      canvas { image-rendering: pixelated; border: 1px solid #2a2c30; background: #0b0c0d; max-width: 512px; }
+      /* min(512px, 100%): keeps the 512px desktop cap but lets the canvas shrink with the viewport,
+         because blockart-core sets an inline style.width up to 512px which would otherwise force
+         horizontal scroll on a 375px phone (same responsive intent as index.html) */
+      canvas { image-rendering: pixelated; border: 1px solid #2a2c30; background: #0b0c0d; max-width: min(512px, 100%); height: auto; }
       #drop.drag { outline: 2px dashed #0a7; outline-offset: 6px; border-radius: 8px; }
       .stat { font-size: 0.8rem; color: #9aa0a6; }
       code { color: #7dd3fc; }
