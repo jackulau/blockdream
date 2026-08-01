@@ -1,4 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { crc32Reference, crc32Sliced, unzip, unzipText, zipStore } from "../src/zip";
 
 const median = (xs: number[]): number => {
@@ -71,6 +75,51 @@ describe("zipStore roundtrip", () => {
     expect([...back.keys()].sort()).toEqual(["bin/blob", "data/ns/function/setup.mcfunction", "pack.mcmeta"]);
     expect(back.get("bin/blob")).toEqual(bytes);
     expect(unzipText(zip).get("data/ns/function/setup.mcfunction")).toBe("say hi\n");
+  });
+});
+
+describe("zipStore last-mod timestamps (central directory mirrors the local header)", () => {
+  // central-directory offsets are the local header's shifted by 2: TIME @12, DATE @14.
+  // The DATE value 0x21 was once written into the central TIME slot (@12), leaving the
+  // date field 0 - `unzip -l` listed the invalid "00-00-1980 00:01".
+  it("central time/date bytes equal the local header's (date 1980-01-01, time 00:00)", () => {
+    const zip = zipStore(new Map([["pack.mcmeta", '{"pack":{}}']]));
+    const dv = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+    // local file header at offset 0: time @10, date @12
+    expect(dv.getUint32(0, true)).toBe(0x04034b50);
+    const localTime = dv.getUint16(10, true);
+    const localDate = dv.getUint16(12, true);
+    expect(localTime).toBe(0); // 00:00:00
+    expect(localDate).toBe(0x21); // 1980-01-01
+    // first central-directory header: time @+12, date @+14
+    let cd = -1;
+    for (let i = 0; i < zip.length - 3; i++) {
+      if (dv.getUint32(i, true) === 0x02014b50) { cd = i; break; }
+    }
+    expect(cd).toBeGreaterThan(0);
+    expect(dv.getUint16(cd + 12, true)).toBe(localTime); // central TIME == local time (was 0x21)
+    expect(dv.getUint16(cd + 14, true)).toBe(localDate); // central DATE == local date (was 0)
+  });
+
+  it("a real `unzip -l` lists 1980-01-01 00:00, not the corrupt 00-00-1980", () => {
+    const dir = mkdtempSync(join(tmpdir(), "blockdream-zip-"));
+    try {
+      const p = join(dir, "pack.zip");
+      writeFileSync(p, zipStore(new Map([["data/ns/function/setup.mcfunction", "say hi\n"]])));
+      let out: string;
+      try {
+        out = execFileSync("unzip", ["-l", p]).toString();
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === "ENOENT") return; // no unzip binary here; byte assertions above still gate
+        throw e;
+      }
+      // Info-ZIP prints MM-DD-YYYY (some builds YYYY-MM-DD); either way it must be Jan 1 1980, 00:00
+      expect(out).toMatch(/01-01-1980|1980-01-01/);
+      expect(out).toContain("00:00");
+      expect(out).not.toContain("00-00-1980");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
