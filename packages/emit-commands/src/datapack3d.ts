@@ -1,8 +1,11 @@
 // 3D voxel datapack emitter - the command-block builder for 3D block builds and 3D
 // animations (e.g. a spin). Same 100%-vanilla playback machinery as the 2D wall
 // (tick-driven scoreboard counter + macro dispatch), but each frame is a VoxelVolume
-// and cells carry a Z. The build region is cleared once with /fill, then keyframe 0
-// places the solids and later frames place only changed voxels (air transitions included).
+// and cells carry a Z. The build region's air-clear /fill lives at the TOP of frames/0
+// (clear then paint, same tick), then later frames place only changed voxels (air
+// transitions included) - so every LOOP WRAP back to frame 0 re-clears the box. A
+// setup-only clear left voxels solid in the last frame but air in frame 0 uncleared
+// forever: a looping spin degraded to the union of all poses after the first pass.
 
 import { EMPTY, getVoxel, type VoxelVolume } from "@blockdream/voxel";
 import type { NoteEvent } from "@blockdream/audio";
@@ -112,9 +115,11 @@ export interface VoxelLiveOptions {
 
 /**
  * A 3D build's blocks as standalone `setblock`/`fill` commands at `origin` - the LIVE counterpart of
- * {@link generateVoxelDatapack}. By construction it is byte-identical to that datapack's frame-0
- * keyframe function body (same `computeVoxelDeltas` cells, same world offset, same `greedyBoxes`
- * merge), so casting a static build live over RCON places exactly what baking + loading would. No
+ * {@link generateVoxelDatapack}. By construction it is byte-identical to the PAINT portion of that
+ * datapack's frame-0 keyframe function body (same `computeVoxelDeltas` cells, same world offset,
+ * same `greedyBoxes` merge) - the datapack's frames/0 additionally leads with the box-clear `fill`
+ * lines, which the live CLI folds in the same way (buildBoxSetupCommands, same fillLines). So
+ * casting a static build live over RCON places exactly what baking + loading would. No
  * scoreboard/macro wrapper, no `forceload`: just the block commands. An all-air volume yields `[]`.
  * Orient the build before calling (e.g. `rotateYQuarterTurns` for `--facing`); this paints as given.
  */
@@ -132,7 +137,9 @@ export function voxelToLiveCommands(
  * sized volumes ({@link computeVoxelDeltas} - frame 0 is the full keyframe, later frames only the
  * changed voxels incl. solid→air) and emit each frame's `setblock`/`fill` commands at `origin`. Frame
  * f's list is byte-identical to the datapack's `frames/f` function body (same cells, offset, and
- * `greedyBoxes` merge), so streaming these over RCON in order IS the 3D animation the datapack bakes.
+ * `greedyBoxes` merge; frames/0 additionally leads with the datapack's box-clear fills, which the
+ * live CLI folds into its own frame 0), so streaming these over RCON in order IS the 3D animation
+ * the datapack bakes.
  * One list per input volume; a single volume yields one keyframe list (== {@link voxelToLiveCommands}).
  */
 export function voxelFramesToLiveCommands(
@@ -173,6 +180,21 @@ export function generateVoxelDatapack(
   const files = new Map<string, string>();
   const fnDir = `data/${ns}/function`;
 
+  const x0 = origin.x;
+  const y0 = origin.y;
+  const z0 = origin.z;
+  const x1 = origin.x + sx - 1;
+  const y1 = origin.y + sy - 1;
+  const z1 = origin.z + sz - 1;
+  // Box clear, folded into the TOP of frames/0 (NOT setup): the driver wraps #f to 0 and
+  // re-runs frames/0, so the clear runs on EVERY loop wrap. Frames after 0 only place
+  // changed voxels, so a voxel solid in the LAST frame but air in frame 0 is otherwise
+  // never cleared - a looping animation degraded to the union of all poses after the
+  // first pass. Clear + paint execute in the same tick (one function), so no flicker;
+  // the live RCON path (rcon-bridge-cli --build --setup) folds the identical clear the
+  // same way. Split at the 32768 /fill cap.
+  const clearLines = fillLines(x0, y0, z0, x1, y1, z1, air, "replace");
+
   let totalSetblocks = 0;
   let totalCommands = 0;
   for (const d of deltas) {
@@ -194,27 +216,23 @@ export function generateVoxelDatapack(
     }
     totalSetblocks += d.cells.length;
     totalCommands += lines.length;
+    // frame 0 leads with the wrap-safe box clear (totalCommands stays content-only,
+    // matching the old setup-clear accounting)
+    if (d.keyframe) lines = [...clearLines, ...lines];
     const header = `# frame ${d.index}${d.keyframe ? " (keyframe)" : ` (Δ ${d.cells.length})`}`;
     writeSplitFunction(files, `${fnDir}/frames/${d.index}`, lines, limit, (k) => `function ${ns}:frames/${d.index}/part${k}`, header);
   }
 
   files.set(`${fnDir}/play.mcfunction`, `$function ${ns}:frames/$(idx)\n`);
 
-  const x0 = origin.x;
-  const y0 = origin.y;
-  const z0 = origin.z;
-  const x1 = origin.x + sx - 1;
-  const y1 = origin.y + sy - 1;
-  const z1 = origin.z + sz - 1;
-
   // Optional note-block music. Additive by construction: when there are no notes,
   // `seq` is undefined and every music-conditioned spread below is empty, so the
   // emitted pack is byte-identical to a music-less build.
   const music = opts.music && opts.music.length ? opts.music : undefined;
   const musicOrigin = opts.musicOrigin ?? { x: origin.x + sx + 2, y: origin.y, z: origin.z };
-  // Unified shape over both engines: `physical` is placed in setup (after the build
-  // box is cleared, so it survives), `musicLines` becomes music.mcfunction, and
-  // `setupScores` seeds the shared #mt/#mtcount clock. The playsound branch calls
+  // Unified shape over both engines: `physical` is placed in setup (outside the build
+  // box, which frames/0 force-clears every wrap), `musicLines` becomes music.mcfunction,
+  // and `setupScores` seeds the shared #mt/#mtcount clock. The playsound branch calls
   // noteSequencer with the identical musicOrigin → byte-identical to before.
   // Animation + music: lock the music loop to the animation loop (frames × speed) on
   // BOTH engines. Unequal loop lengths re-phase on every wrap and drift more each cycle.
@@ -286,7 +304,7 @@ export function generateVoxelDatapack(
       `scoreboard players set #count ma ${volumes.length}`,
       ...(seq ? seq.setupScores : []),
       `forceload add ${flx0} ${flz0} ${flx1} ${flz1}`,
-      ...fillLines(x0, y0, z0, x1, y1, z1, air, "replace"), // clear the build box (split at the 32768 /fill cap)
+      // build-box clear lives at the top of frames/0 (called below) so loop wraps re-clear
       // LED glow layer: invisible full-bright light plane fronting the wall ("keep" never clobbers)
       ...(ledBox ? fillLines(ledBox.x0, y0, ledBox.z0, ledBox.x1, y1, ledBox.z1, "minecraft:light[level=15]", "keep") : []),
       ...(seq ? seq.physical : []), // place the physical music area (tuned keyboard or redstone track)

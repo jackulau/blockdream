@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createVolume, setVoxel } from "@blockdream/voxel";
-import { voxelToLiveCommands, voxelFramesToLiveCommands, generateVoxelDatapack, greedyBoxes } from "../src/index";
+import { voxelToLiveCommands, voxelFramesToLiveCommands, generateVoxelDatapack, greedyBoxes, fillLines } from "../src/index";
 
 // a tiny solid resolver: 7 → stone, 9 → oak_planks, else unmapped
 const resolve = (id: number): string | undefined =>
@@ -15,7 +15,7 @@ function build(): ReturnType<typeof createVolume> {
 }
 
 describe("voxelToLiveCommands (live 3D build over RCON)", () => {
-  it("is byte-identical to the datapack's frame-0 keyframe (live == offline)", () => {
+  it("is byte-identical to the datapack's frame-0 keyframe paint (live == offline; frames/0 leads with the wrap clear)", () => {
     const v = build();
     const origin = { x: 10, y: 64, z: -5 };
     const live = voxelToLiveCommands(v, origin, resolve);
@@ -23,7 +23,9 @@ describe("voxelToLiveCommands (live 3D build over RCON)", () => {
     const f0 = [...pack.files.entries()].find(([k]) => k.endsWith("frames/0.mcfunction"));
     expect(f0).toBeDefined();
     const datapackCmds = f0![1].split("\n").filter((l) => l.trim() !== "" && !l.startsWith("#"));
-    expect(live).toEqual(datapackCmds);
+    // frames/0 = box-clear fills (wrap-safe, same fillLines the live CLI's --setup folds in) + the paint
+    const clear = fillLines(origin.x, origin.y, origin.z, origin.x + v.sx - 1, origin.y + v.sy - 1, origin.z + v.sz - 1, "minecraft:air", "replace");
+    expect(datapackCmds).toEqual([...clear, ...live]);
     expect(live.length).toBeGreaterThan(0);
   });
 
@@ -58,11 +60,13 @@ describe("voxelFramesToLiveCommands (live 3D animation, delta-encoded)", () => {
     const frames = voxelFramesToLiveCommands(volumes, origin, resolve);
     expect(frames).toHaveLength(2);
     const pack = generateVoxelDatapack(volumes, resolve, { origin, optimize: (c, r) => greedyBoxes(c, r) });
+    // datapack frames/0 leads with the wrap-safe box clear; the paint after it is the live list
+    const clear = fillLines(origin.x, origin.y, origin.z, origin.x + a.sx - 1, origin.y + a.sy - 1, origin.z + a.sz - 1, "minecraft:air", "replace");
     for (let f = 0; f < 2; f++) {
       const fn = [...pack.files.entries()].find(([k]) => k.endsWith(`frames/${f}.mcfunction`));
       expect(fn, `datapack frames/${f}`).toBeDefined();
       const dp = fn![1].split("\n").filter((l) => l.trim() !== "" && !l.startsWith("#"));
-      expect(frames[f]).toEqual(dp);
+      expect(f === 0 ? [...clear, ...frames[f]!] : frames[f]).toEqual(dp);
     }
     expect(frames[1]!.length).toBeLessThan(frames[0]!.length); // frame 1 is a delta, smaller than the keyframe
   });
