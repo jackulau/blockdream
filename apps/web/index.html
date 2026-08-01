@@ -170,7 +170,7 @@
                   <option value="minecart">minecart</option>
                 </select>
               </label>
-              <button id="mc-reset" class="ui">reset</button>
+              <button id="mc-reset" class="ui" disabled>reset</button>
               <button id="mc-connect" class="ui">reconnect</button>
             </div>
             <div id="mc-hud" class="hud">idle</div>
@@ -189,12 +189,12 @@
                 <figcaption>LiDAR - n/a (camera-only)</figcaption>
               </figure>
             </div>
-            <div class="row"><button id="dr-reset" class="ui">reset</button> <button id="dr-connect" class="ui">reconnect</button></div>
+            <div class="row"><button id="dr-reset" class="ui" disabled>reset</button> <button id="dr-connect" class="ui">reconnect</button></div>
             <div id="dr-hud" class="hud">idle</div>
           </div>
         </div>
         <p class="keyhint">Tip: click a canvas, then use the keys. Both worlds keep generating even with no input.</p>
-        <p class="keyhint">Standalone testers (server URL + engine controls): <a href="/world-model.html">world-model</a> · <a href="/driving.html">driving</a> · <a href="/blockart.html">block-art</a></p>
+        <p class="keyhint">Standalone testers (server URL + movement selector): <a href="/world-model.html">world-model</a> · <a href="/driving.html">driving</a> · <a href="/blockart.html">block-art</a></p>
       </section>
 
       <section class="block" data-reveal>
@@ -274,8 +274,8 @@
             </label>
             <button id="v3-rebuild" class="ui">build 3D from image</button>
             <button id="v3-download" class="ui" disabled>Download 3D datapack</button>
-            <button id="v3-gif" class="ui">Download GIF</button>
-            <button id="v3-png" class="ui">Download PNG</button>
+            <button id="v3-gif" class="ui" disabled>Download GIF</button>
+            <button id="v3-png" class="ui" disabled>Download PNG</button>
           </div>
           <div class="row" id="v3-arrange-row">
             <label style="font-size:.78rem;color:var(--dim);cursor:pointer" title="Drag the build or the note-block music area on the ground; orbit is suspended mid-drag">

@@ -58,6 +58,9 @@ export function capturePageHtml({ width, height, fps }: CapturePageOptions): str
   .hint { color:var(--muted); font-size:13px; margin-top:16px; }
   .grid-meta { color:var(--muted); font-size:12px; margin-top:10px; letter-spacing:.02em; }
   code { color:var(--jade); background:#0b0b0d; padding:1px 6px; border-radius:5px; }
+  footer { margin-top:22px; color:var(--muted); font-size:12px; }
+  footer a { color:var(--jade); text-decoration:none; }
+  footer a:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -74,26 +77,46 @@ export function capturePageHtml({ width, height, fps }: CapturePageOptions): str
       <div class="stats">
         <span><span class="dot" id="wsdot"></span><span id="ws">connecting</span></span>
         <span>sent <b id="sent">0</b></span>
+        <span>painted <b id="painted">0</b></span>
         <span><b id="rate">0</b> fps</span>
+        <span id="mode"></span>
       </div>
     </div>
     <div class="grid-meta">grid <code>${width}&times;${height}</code> · cap <code>${fps} fps</code> · the bridge relays each frame to Minecraft over RCON.</div>
     <div class="hint" id="status">Pick a screen, window, or browser tab. It streams to this port and into your world - no upload, all local.</div>
   </div>
+  <footer>part of <a href="https://github.com/jackulau/blockdream" target="_blank" rel="noopener">blockdream</a> · <a href="https://github.com/jackulau/blockdream/blob/master/docs/screen-share.md" target="_blank" rel="noopener">how screen share works</a></footer>
 <script>
 (function(){
   var W = ${width}, H = ${height}, FPS = ${fps};
   var ws = null, stream = null, timer = null, framesSent = 0, connected = false, lastRateT = 0, lastRateN = 0;
+  var lastPaintedSeen = -1, lastSentSeen = 0, stalledPolls = 0, stallWarned = false;
+  var SHARING_MSG = 'Sharing live to Minecraft. Walk up to the wall in-game to watch.';
   var grid = document.getElementById('grid');
   var gctx = grid.getContext('2d', { willReadFrequently: true });
   var video = document.createElement('video');
   video.muted = true; video.playsInline = true;
   function stat(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
   function setWs(state, on){ stat('ws', state); document.getElementById('wsdot').className = 'dot' + (on ? ' on' : ''); connected = !!on; }
+  function secureOriginHint(){
+    return 'open http://127.0.0.1:' + (location.port || '8770') + ' on the machine running the bridge, or serve this page over https';
+  }
+
+  // getDisplayMedia only exists on a secure origin (https, or plain http on localhost). On a LAN
+  // http:// host (--host 0.0.0.0) or iOS Safari, navigator.mediaDevices is undefined and calling
+  // through it is a SYNCHRONOUS TypeError the promise .catch never sees - so detect up front,
+  // gate the button, and say exactly how to fix it instead of a silently dead button.
+  var captureSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  if (!captureSupported){
+    document.getElementById('shareBtn').disabled = true;
+    stat('status', 'Screen capture is unavailable here: browsers only allow it on a secure origin - ' + secureOriginHint() + '.');
+  }
 
   function connect(){
+    // constructor throw and onclose take the SAME 1s retry path - a throw here (bad URL edge,
+    // proxy quirk) used to set a dead-end 'failed' state while onclose retried forever
     try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host); }
-    catch (e) { setWs('failed', false); return; }
+    catch (e) { setWs('reconnecting', false); setTimeout(connect, 1000); return; }
     ws.binaryType = 'arraybuffer';
     ws.onopen = function(){ setWs('connected', true); };
     ws.onclose = function(){ setWs('reconnecting', false); setTimeout(connect, 1000); };
@@ -101,20 +124,48 @@ export function capturePageHtml({ width, height, fps }: CapturePageOptions): str
   }
   connect();
 
+  // Bridge truth: 'sent' only proves frames left the browser. The bridge's /stats (same origin)
+  // reports framesPainted - what actually reached Minecraft - so poll it ~1s, show painted next
+  // to sent, surface dry-run mode, and warn when sends keep flowing but painted stalls
+  // (RCON down, wrong password, server gone: the bridge logs it, now the page says it too).
+  function pollStats(){
+    fetch('/stats').then(function(r){ return r.json(); }).then(function(s){
+      stat('painted', s.framesPainted);
+      stat('mode', s.dryRun ? 'dry-run (no RCON)' : '');
+      var sending = framesSent > lastSentSeen;
+      var advanced = s.framesPainted !== lastPaintedSeen;
+      lastSentSeen = framesSent;
+      lastPaintedSeen = s.framesPainted;
+      if (stream && sending && !advanced) stalledPolls++; else stalledPolls = 0;
+      if (stalledPolls >= 3 && !stallWarned){
+        stallWarned = true;
+        stat('status', 'Frames are not reaching the server - check the bridge terminal / RCON password.');
+      } else if (stallWarned && advanced){
+        stallWarned = false;
+        if (stream) stat('status', SHARING_MSG);
+      }
+    }).catch(function(){});
+  }
+  setInterval(pollStats, 1000);
+
   function share(){
-    navigator.mediaDevices.getDisplayMedia({ video: { frameRate: FPS }, audio: false }).then(function(s){
-      stream = s;
-      video.srcObject = s;
-      video.play();
-      s.getVideoTracks()[0].addEventListener('ended', stop);
-      document.getElementById('ph').style.display = 'none';
-      document.getElementById('shareBtn').disabled = true;
-      document.getElementById('stopBtn').disabled = false;
-      stat('status', 'Sharing live to Minecraft. Walk up to the wall in-game to watch.');
-      lastRateT = performance.now(); lastRateN = 0;
-      if (timer) clearInterval(timer);
-      timer = setInterval(tick, Math.max(16, Math.round(1000 / FPS)));
-    }).catch(function(e){ stat('status', 'Capture cancelled (' + (e && e.message ? e.message : e) + ').'); });
+    try {
+      navigator.mediaDevices.getDisplayMedia({ video: { frameRate: FPS }, audio: false }).then(function(s){
+        stream = s;
+        video.srcObject = s;
+        video.play();
+        s.getVideoTracks()[0].addEventListener('ended', stop);
+        document.getElementById('ph').style.display = 'none';
+        document.getElementById('shareBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+        stat('status', SHARING_MSG);
+        lastRateT = performance.now(); lastRateN = 0;
+        if (timer) clearInterval(timer);
+        timer = setInterval(tick, Math.max(16, Math.round(1000 / FPS)));
+      }).catch(function(e){ stat('status', 'Capture cancelled (' + (e && e.message ? e.message : e) + ').'); });
+    } catch (e) {
+      stat('status', 'Screen capture failed to start (' + (e && e.message ? e.message : e) + ') - ' + secureOriginHint() + '.');
+    }
   }
 
   function tick(){
@@ -136,8 +187,11 @@ export function capturePageHtml({ width, height, fps }: CapturePageOptions): str
   function stop(){
     if (timer){ clearInterval(timer); timer = null; }
     if (stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+    // per-session counters: the next share starts from 0 instead of inheriting this session's count
+    framesSent = 0; lastRateN = 0; lastSentSeen = 0; stalledPolls = 0; stallWarned = false;
+    stat('sent', 0);
     document.getElementById('ph').style.display = '';
-    document.getElementById('shareBtn').disabled = false;
+    document.getElementById('shareBtn').disabled = !captureSupported;
     document.getElementById('stopBtn').disabled = true;
     stat('status', 'Stopped. Share again anytime.');
     stat('rate', 0);

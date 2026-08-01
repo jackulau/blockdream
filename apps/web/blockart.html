@@ -33,6 +33,7 @@
       figure { margin: 0; }
       figcaption { font-size: 0.75rem; color: #9aa0a6; margin-top: 0.4rem; }
       canvas { image-rendering: pixelated; border: 1px solid #2a2c30; background: #0b0c0d; max-width: 512px; }
+      #drop.drag { outline: 2px dashed #0a7; outline-offset: 6px; border-radius: 8px; }
       .stat { font-size: 0.8rem; color: #9aa0a6; }
       code { color: #7dd3fc; }
       #out { cursor: crosshair; }
@@ -82,12 +83,13 @@
         <label>Palette
           <select id="palette">
             <option value="map">Map colors (244)</option>
+            <option value="block">Solid blocks (placeable gamut)</option>
           </select>
         </label>
         <div id="stats" class="stat"></div>
       </section>
-      <section class="canvases">
-        <figure><canvas id="src" width="256" height="256"></canvas><figcaption>source</figcaption></figure>
+      <section class="canvases" id="drop">
+        <figure><canvas id="src" width="256" height="256"></canvas><figcaption>source · drag &amp; drop an image</figcaption></figure>
         <figure><canvas id="out" width="256" height="256"></canvas><figcaption>block-art · hover to identify a block</figcaption></figure>
       </section>
       <section class="materials">

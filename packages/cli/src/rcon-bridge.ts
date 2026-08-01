@@ -266,6 +266,118 @@ function toRgb(frame: WallFrame): RgbImage {
 
 const wkey = (x: number, y: number, z: number) => `${x}|${y}|${z}`;
 
+// Dense-slot cap for the pending assembly (goal 088 D15a): the wall + carry bounding box is
+// planar in practice (W*H slots; a 1024x1024 wall is 1M), so anything past this means a carry
+// cell far off the wall - fall back to the sparse keyed map rather than allocate a huge grid.
+const MAX_DENSE_SLOTS = 1 << 24;
+
+/** The assembled per-frame write set: insertion-ordered cells + a lookup by world coordinate. */
+export interface PendingWall {
+  /** Written cells in first-write order, last write winning per coordinate (Map semantics). */
+  cells: PlacedCell[];
+  /** The cell last written at (x,y,z). Only valid for coordinates actually written. */
+  get(x: number, y: number, z: number): PlacedCell;
+}
+
+/**
+ * Merge carried-over cells with a frame's delta cells into the per-coordinate write set
+ * (fresh delta wins per coordinate; a rewrite keeps the FIRST write's position, exactly like an
+ * insertion-ordered Map). This is {@link frameToWallCommands}'s hot inner stage, run per painted
+ * frame at 10-20 fps: instead of a `${x}|${y}|${z}`-string-keyed Map with two object allocations
+ * per cell (the goal 050 greedyBoxes trap), it indexes a dense Int32Array slot grid over the
+ * wall + carry bounding box (slot value = 1 + index into `cells`) and inlines placeCell to
+ * per-facing affine scalars - zero string keys, one object per written cell.
+ */
+export function assemblePlacedCells(
+  cells: readonly Cell[],
+  carry: readonly PlacedCell[],
+  origin: { x: number; y: number; z: number },
+  facing: WallFacing,
+  W: number,
+  H: number,
+): PendingWall {
+  // bounding box: the wall's own extent for this facing, widened by any carry cell outside it
+  let minX = origin.x;
+  let minY = origin.y;
+  let minZ = origin.z;
+  let maxX = origin.x;
+  const maxYWall = origin.y + H - 1;
+  let maxY = maxYWall;
+  let maxZ = origin.z;
+  if (facing === "east" || facing === "west") maxZ = origin.z + W - 1;
+  else maxX = origin.x + W - 1;
+  for (const c of carry) {
+    if (c.x < minX) minX = c.x;
+    else if (c.x > maxX) maxX = c.x;
+    if (c.y < minY) minY = c.y;
+    else if (c.y > maxY) maxY = c.y;
+    if (c.z < minZ) minZ = c.z;
+    else if (c.z > maxZ) maxZ = c.z;
+  }
+  const nx = maxX - minX + 1;
+  const ny = maxY - minY + 1;
+  const nz = maxZ - minZ + 1;
+
+  if (nx * ny * nz > MAX_DENSE_SLOTS) {
+    // adversarial carry far off the wall: sparse keyed map (the reference path, correctness only)
+    return assemblePlacedCellsReference(cells, carry, origin, facing, W, H);
+  }
+
+  const slots = new Int32Array(nx * ny * nz); // 0 = empty, else 1 + index into `order`
+  const order: PlacedCell[] = [];
+  // carry first: a fresh delta cell at the same coordinate overwrites it in place below
+  for (const c of carry) {
+    const s = (c.z - minZ) * ny * nx + (c.y - minY) * nx + (c.x - minX);
+    const at = slots[s]!;
+    if (at === 0) slots[s] = order.push(c);
+    else order[at - 1] = c;
+  }
+  // placeCell inlined to affine scalars: x = xBase + xStep*cx, z = zBase + zStep*cx, y = yBase - cy
+  // (placeCell itself is unchanged for the reference/other callers)
+  const yBase = origin.y + (H - 1);
+  const xBase = facing === "north" ? origin.x + (W - 1) : origin.x;
+  const xStep = facing === "south" ? 1 : facing === "north" ? -1 : 0;
+  const zBase = facing === "west" ? origin.z + (W - 1) : origin.z;
+  const zStep = facing === "east" ? 1 : facing === "west" ? -1 : 0;
+  for (const c of cells) {
+    const x = xBase + xStep * c.x;
+    const y = yBase - c.y;
+    const z = zBase + zStep * c.x;
+    const s = (z - minZ) * ny * nx + (y - minY) * nx + (x - minX);
+    const at = slots[s]!;
+    const p: PlacedCell = { x, y, z, mapColorId: c.mapColorId };
+    if (at === 0) slots[s] = order.push(p);
+    else order[at - 1] = p;
+  }
+  return {
+    cells: order,
+    get: (x, y, z) => order[slots[(z - minZ) * ny * nx + (y - minY) * nx + (x - minX)]! - 1]!,
+  };
+}
+
+/**
+ * Verbatim pre-optimization inner stage (string-keyed insertion-ordered Map, two allocations per
+ * cell) - the byte-identity/perf twin for {@link assemblePlacedCells}, and the fallback when a
+ * carry cell lies pathologically far from the wall.
+ */
+export function assemblePlacedCellsReference(
+  cells: readonly Cell[],
+  carry: readonly PlacedCell[],
+  origin: { x: number; y: number; z: number },
+  facing: WallFacing,
+  W: number,
+  H: number,
+): PendingWall {
+  const pending = new Map<string, PlacedCell>();
+  for (const c of carry) pending.set(wkey(c.x, c.y, c.z), c);
+  for (const c of cells) {
+    const pos = placeCell(origin, facing, W, H, c.x, c.y);
+    const p: PlacedCell = { x: pos.x, y: pos.y, z: pos.z, mapColorId: c.mapColorId };
+    pending.set(wkey(p.x, p.y, p.z), p);
+  }
+  return { cells: [...pending.values()], get: (x, y, z) => pending.get(wkey(x, y, z))! };
+}
+
 /** Parse the box a greedyBoxes command covers (setblock = a 1×1×1 box). */
 function commandBox(line: string): { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number } {
   const t = line.split(/\s+/);
@@ -316,6 +428,67 @@ export function frameToWallCommands(
     prevRgb = toRgb(prevFrame);
     // reuse the caller's prior `quantized` for prevFrame when its dimensions match (the live
     // loop threads it back so each frame is quantized exactly once); else quantize fresh.
+    const reuse =
+      opts.prevQuantized &&
+      opts.prevQuantized.width === prevFrame.width &&
+      opts.prevQuantized.height === prevFrame.height;
+    prevQ = reuse ? opts.prevQuantized! : quantizeFrame(prevRgb, pal, { method: dither });
+  }
+  const curQ = quantizeFrame(toRgb(frame), pal, { method: dither, prevImage: prevRgb, prevQuantized: prevQ });
+  const cells: Cell[] = prevFrame
+    ? computeDeltas([prevQ!, curQ])[1]!.cells
+    : computeDeltas([curQ])[0]!.cells; // full keyframe when no prev
+
+  // image → world cells, merged with carried-over cells (fresh delta wins per coordinate) -
+  // dense slot map, goal 088 D15a; byte-identical to frameToWallCommandsReference
+  const pending = assemblePlacedCells(cells, opts.carry ?? [], origin, facing, W, H);
+
+  const lines = greedyBoxes(pending.cells, resolve);
+  const cap = Math.max(1, Math.floor(opts.maxCommands ?? DEFAULT_MAX_COMMANDS));
+  if (lines.length <= cap) return { commands: lines, remainder: [], quantized: curQ };
+
+  // over budget: send the cap-largest boxes (max pixels per command), defer the rest
+  const ranked = lines
+    .map((line, i) => {
+      const b = commandBox(line);
+      return { line, i, b, vol: (b.x1 - b.x0 + 1) * (b.y1 - b.y0 + 1) * (b.z1 - b.z0 + 1) };
+    })
+    .sort((a, b) => b.vol - a.vol || a.i - b.i);
+  const kept = ranked.slice(0, cap).sort((a, b) => a.i - b.i); // restore deterministic order
+  const remainder: PlacedCell[] = [];
+  for (const d of ranked.slice(cap)) {
+    for (let z = d.b.z0; z <= d.b.z1; z++)
+      for (let y = d.b.y0; y <= d.b.y1; y++)
+        for (let x = d.b.x0; x <= d.b.x1; x++) remainder.push(pending.get(x, y, z));
+  }
+  return { commands: kept.map((k) => k.line), remainder, quantized: curQ };
+}
+
+/**
+ * VERBATIM pre-goal-088 frameToWallCommands (string-keyed pending Map + placeCell object per
+ * cell) - kept as the byte-identity twin: wall-commands-perf.test.ts locks the ENTIRE
+ * command/remainder output of the optimized function against this on adversarial cases.
+ */
+export function frameToWallCommandsReference(
+  frame: WallFrame,
+  origin: { x: number; y: number; z: number },
+  prevFrame?: WallFrame,
+  opts: WallCommandOptions = {},
+): WallCommands {
+  const dither = opts.dither ?? "bayer";
+  const pal = solidPalette(opts.paletteVersion);
+  const resolve = makeBlockResolver(opts.paletteVersion);
+  const H = frame.height;
+  const W = frame.width;
+  const facing = opts.facing ?? "south";
+
+  let prevQ: QuantizedFrame | undefined;
+  let prevRgb: RgbImage | undefined;
+  if (prevFrame) {
+    if (prevFrame.width !== frame.width || prevFrame.height !== frame.height) {
+      throw new Error(`prevFrame ${prevFrame.width}×${prevFrame.height} != frame ${frame.width}×${frame.height}`);
+    }
+    prevRgb = toRgb(prevFrame);
     const reuse =
       opts.prevQuantized &&
       opts.prevQuantized.width === prevFrame.width &&

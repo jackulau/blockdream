@@ -8,12 +8,12 @@
 // model translates/rotates/deforms in place rather than being re-fit each frame - the key to a
 // coherent block animation. Each frame is voxelized solid via the shared trisToVolume rasterizer.
 
-import { parseObj, trisToVolume, meshBounds, unionBounds, type V3, type Tri, type Bounds } from "./obj";
+import { parseObj, trisToVolume, meshBounds, unionBounds, DEFAULT_MODEL_MAP_COLOR_ID, type V3, type Tri, type Bounds } from "./obj";
 import type { VoxelVolume } from "./volume";
 
 export interface SequenceOptions {
   resolution?: number; // cube grid size (default 32)
-  mapColorId?: number; // block colour id (default 0; the fallback for colorless geometry)
+  mapColorId?: number; // block colour id (default DEFAULT_MODEL_MAP_COLOR_ID; the fallback for colorless geometry)
   solid?: boolean; // flood-fill interiors (default true for models)
   /** sRGB (0..255) → mapColorId (e.g. color-core OKLab nearest against the placeable palette).
    *  When supplied, COLOR_0 vertex colors and material baseColorFactor drive per-triangle
@@ -45,7 +45,7 @@ function rasterizeSequence(meshes: Mesh[], opts: SequenceOptions): VoxelVolume[]
       const tc = m.triColors;
       colorOf = (t: number) => {
         const c = tc[t];
-        if (!c) return opts.mapColorId ?? 0;
+        if (!c) return opts.mapColorId ?? DEFAULT_MODEL_MAP_COLOR_ID;
         const key = (Math.round(c[0]) << 16) | (Math.round(c[1]) << 8) | Math.round(c[2]);
         let id = cache.get(key);
         if (id === undefined) cache.set(key, (id = match(c[0], c[1], c[2])));

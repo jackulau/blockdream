@@ -3,6 +3,7 @@
 
 import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
+import { resetDisabled } from "./ui-feedback";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -22,19 +23,20 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => held.delete(e.key.toLowerCase()));
 
-// demo selector → movement-type (skill) the conditioned model understands.
-// Covers all 9 movement types (same order as ml/src/blockdream_wm/movement.py
-// MOVEMENT_TYPES), plus the legacy demo names the selector has always offered.
-const DEMO_SKILL: Record<string, string> = {
-  general: "general", walk: "walk", sprint: "sprint", jump: "jump", swim: "swim",
-  boat: "boat", elytra: "elytra", pig: "pig", minecart: "minecart",
-  walking: "walk", world: "general", gameplay: "general",
-};
-const skill = () => DEMO_SKILL[demoSel.value] ?? "general";
+// Movement selector = the 9 movement types the conditioned model understands
+// (same set and order as ml/src/blockdream_wm/movement.py MOVEMENT_TYPES and the
+// index.html live-control selector). Anything else falls back to "general".
+const MOVEMENT_TYPES: readonly string[] = [
+  "general", "walk", "sprint", "jump", "swim", "boat", "elytra", "pig", "minecart",
+];
+const skill = () => (MOVEMENT_TYPES.includes(demoSel.value) ? demoSel.value : "general");
 
 function setStatus(text: string, cls: "ok" | "err" | "idle") {
   statusEl.textContent = cls === "ok" ? `connected · ${demoSel.value}` : text;
   statusEl.className = `status ${cls}`;
+  // Reset only does anything while connected (Viewer.reset() early-returns) - the button
+  // follows the same connect/disconnect transitions as the status line.
+  resetBtn.disabled = resetDisabled(cls);
 }
 
 const viewer = new Viewer({

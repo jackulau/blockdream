@@ -25,7 +25,7 @@ import { analyzeAudio, type NoteEvent } from "@blockdream/audio";
 import { buildMapDat, splitIntoMaps, buildFramePool, MAP_DIM } from "@blockdream/emit-java";
 import { buildMcStructure, buildVoxelMcStructure } from "@blockdream/emit-bedrock";
 import { generateJavaDatapack, generateVoxelDatapack, generateRgbScreenDatapack, rgbImageToScreenFrame, greedyBoxes, packageJavaDatapack, packageMcpack, makeBlockResolver, resolveSolidBlockId, solidBlockByMapColorId, planTickPlayback } from "@blockdream/emit-commands";
-import { framesToAnimated3d, framesToFlat3d, objToVolume, gltfToFrames, glbToFrames, countSolid, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
+import { framesToAnimated3d, framesToFlat3d, objToVolume, gltfToFrames, glbToFrames, generateBaked, rotateYQuarterTurns, BAKEABLE_ANIMS, SEQUENCE_ANIMS, DEFAULT_MODEL_MAP_COLOR_ID, EMPTY, type BakeableAnimName, type VoxelVolume } from "@blockdream/voxel";
 import {
   generateBedrockBehaviorPack,
   generateBedrockScriptAddon,
@@ -102,6 +102,30 @@ function analyzeMusicForInput(opts: RenderOptions): NoteEvent[] | undefined {
   return events.length ? events : undefined;
 }
 
+/**
+ * Honest headline for the note-block music CLI note. The emitters trim the melody to the
+ * animation loop (notes at/after frames x speedTicks are dropped via loopTicksOverride) and cap
+ * at --max-notes, so the old `min(music.length, cap)` could report 150 notes when 2 were actually
+ * emitted. Reads the generators' additive musicNoteCount/musicLoopTicks result fields
+ * structurally; while they are absent the text degrades to the old arithmetic.
+ */
+function describeMusicNotes(
+  music: NoteEvent[],
+  pack: { musicNoteCount?: number; musicLoopTicks?: number },
+  opts: RenderOptions,
+): string {
+  const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
+  const requested = Math.min(music.length, cap);
+  const emitted = pack.musicNoteCount ?? requested;
+  let s = `note-block music: ${emitted} notes from the audio track`;
+  if (music.length > cap) s += ` (capped from ${music.length}; raise --max-notes for the full song)`;
+  if (emitted < requested) {
+    const loop = pack.musicLoopTicks != null ? `${pack.musicLoopTicks}-tick ` : "";
+    s += ` (trimmed to the ${loop}animation loop: ${emitted} of ${requested} notes)`;
+  }
+  return s;
+}
+
 /** Compass direction a 3D build faces. south = +Z = the un-rotated default. */
 export type Facing = "north" | "south" | "east" | "west";
 const FACINGS: ReadonlySet<string> = new Set(["north", "south", "east", "west"]);
@@ -143,8 +167,12 @@ function writeFile(path: string, data: Buffer | string): void {
 }
 
 /** Loader notes bundled into a 3D datapack zip (Minecraft ignores the .txt). Mirrors the web export,
- *  including the force-clear warning the CLI zip previously lacked. */
-function howToLoad3d(namespace: string, sx: number, sy: number, sz: number): string {
+ *  including the force-clear warning the CLI zip previously lacked. `origin` is the ACTUAL --origin
+ *  the emitter builds at (default 0,64,0, matching generateVoxelDatapack) - the text used to
+ *  hardcode x=0 y=64 z=0, sending --origin users to clear-check the wrong coordinates. */
+function howToLoad3d(namespace: string, sx: number, sy: number, sz: number, origin?: { x: number; y: number; z: number }): string {
+  const o = origin ?? { x: 0, y: 64, z: 0 };
+  const at = `x=${o.x} y=${o.y} z=${o.z}`;
   return [
     `blockdream 3D build — how to load`,
     ``,
@@ -152,19 +180,32 @@ function howToLoad3d(namespace: string, sx: number, sy: number, sz: number): str
     `2. In game: /reload`,
     `3. /function ${namespace}:setup    then    /function ${namespace}:start`,
     ``,
-    `WARNING: setup force-CLEARS a ${sx}×${sy}×${sz} box at x=0 y=64 z=0 (fill ... air) before building.`,
+    `The build appears at ${at} (its --origin corner).`,
+    ``,
+    `WARNING: setup force-CLEARS a ${sx}×${sy}×${sz} box at ${at} (fill ... air) before building.`,
     `Run it somewhere safe (a flat/empty area), not on top of anything you want to keep.`,
     `Stop with /function ${namespace}:stop (frees the force-loaded chunks).`,
   ].join("\n") + "\n";
 }
 
 /** Guard against a silent empty 3D build (degenerate input: a solid-colour / fully-transparent image
- *  yields zero voxels). Throws a clear error rather than writing a valid-but-empty datapack. */
-function assertNonEmpty3d(volumes: VoxelVolume[]): void {
-  if (volumes.length === 0 || volumes.every((v) => countSolid(v) === 0)) {
+ *  yields zero voxels). Throws a clear error rather than writing a valid-but-empty datapack.
+ *  `resolvesToBlock` tightens the check to voxels that resolve to a REAL placeable block: a volume
+ *  whose every voxel resolves to air (e.g. the model importers' old air-sentinel default of 0) is
+ *  just as empty in-world as one with no voxels at all, and used to ship an air-only pack. */
+function assertNonEmpty3d(volumes: VoxelVolume[], resolvesToBlock?: (mapColorId: number) => boolean): void {
+  const hasRealBlock = volumes.some((v) => {
+    for (let i = 0; i < v.data.length; i++) {
+      const c = v.data[i]!;
+      if (c !== EMPTY && (resolvesToBlock === undefined || resolvesToBlock(c))) return true;
+    }
+    return false;
+  });
+  if (!hasRealBlock) {
     throw new Error(
-      "no subject detected: the input produced an empty 3D build (try a clearer subject/background, " +
-        "a non-zero --depth, or check the image isn't a single flat colour)",
+      "no subject detected: the input produced an empty 3D build (zero voxels, or every voxel " +
+        "resolves to air; try a clearer subject/background, a non-zero --depth, or check the " +
+        "image isn't a single flat colour)",
     );
   }
 }
@@ -213,21 +254,25 @@ export function render(opts: RenderOptions): RenderResult {
     };
     const resolution = Math.max(2, opts.width); // width = cube grid resolution for models
     const lower = opts.input.toLowerCase();
+    // Explicit non-air fallback for colorless geometry (belt to the voxelizers' own default
+    // braces): mapColorId 0 is the AIR sentinel, and the old implicit 0 turned the shipped
+    // sample cube.obj into a datapack whose only command was a `fill ... air`.
+    const modelOpts = { resolution, solid: true, matchColor, mapColorId: DEFAULT_MODEL_MAP_COLOR_ID };
     let volumes: VoxelVolume[];
     if (lower.endsWith(".glb")) {
       const buf = readFileSync(opts.input);
       const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-      volumes = glbToFrames(ab, { resolution, solid: true, matchColor });
+      volumes = glbToFrames(ab, modelOpts);
     } else if (lower.endsWith(".gltf")) {
-      volumes = gltfToFrames(readFileSync(opts.input, "utf8"), { resolution, solid: true, matchColor });
+      volumes = gltfToFrames(readFileSync(opts.input, "utf8"), modelOpts);
     } else {
-      volumes = [objToVolume(readFileSync(opts.input, "utf8"), { resolution, solid: true, matchColor })];
+      volumes = [objToVolume(readFileSync(opts.input, "utf8"), modelOpts)];
     }
     // animate BEFORE the non-empty assert (same order as voxel3d/mcstructure3d): a degenerate
     // animation (e.g. animateFrames 0 → []) must hit the clear error here, not a deep "no frames"
     // in the Java emitter or a TypeError on volumes[0] in the Bedrock branch below.
     volumes = applyAnimate(volumes, opts); // --animate: procedural block-motion of the built model
-    assertNonEmpty3d(volumes);
+    assertNonEmpty3d(volumes, (id) => resolveSolidBlockId(solidIds, id) !== undefined);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     if (edition === "bedrock") {
       volumes.forEach((vol, fi) => {
@@ -244,7 +289,7 @@ export function render(opts: RenderOptions): RenderResult {
         supportedFormats: JAVA_DATAPACK_SUPPORTED, optimize: (cells, r) => greedyBoxes(cells, r),
       });
       const mv = volumes[0]!;
-      pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, mv.sx, mv.sy, mv.sz));
+      pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, mv.sx, mv.sy, mv.sz, opts.origin));
       writePack(pack, opts.out);
       filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
       const zip = join(opts.out, `${pack.namespace}.zip`);
@@ -344,12 +389,7 @@ export function render(opts: RenderOptions): RenderResult {
       ].join("\n") + "\n",
     );
     if (music?.length) {
-      const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
-      notes.push(
-        `note-block music: ${Math.min(music.length, cap)} notes from the audio track` +
-          (music.length > cap ? ` (capped from ${music.length}; raise --max-notes for the full song)` : "") +
-          `; plays on /function ${pack.namespace}:start.`,
-      );
+      notes.push(describeMusicNotes(music, pack, opts) + `; plays on /function ${pack.namespace}:start.`);
     }
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
@@ -444,7 +484,7 @@ export function render(opts: RenderOptions): RenderResult {
           }),
       opts,
     );
-    assertNonEmpty3d(volumes);
+    assertNonEmpty3d(volumes, (id) => resolveSolidBlockId(solidIds, id) !== undefined);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     // --music: if the video carries audio, transcribe it to a note-block music area + sequencer.
     const music = analyzeMusicForInput(opts);
@@ -467,15 +507,13 @@ export function render(opts: RenderOptions): RenderResult {
         opts.musicEngine === "redstone"
           ? "a physical redstone delay-line plays the note blocks"
           : "a tick-driven playsound clock";
-      const cap = opts.musicMaxNotes ?? (opts.musicEngine === "redstone" ? 800 : 1500);
       notes.push(
-        `note-block music: ${Math.min(music.length, cap)} notes from the audio track` +
-          (music.length > cap ? ` (capped from ${music.length}; raise --max-notes for the full song)` : "") +
+        describeMusicNotes(music, pack, opts) +
           ` (instrument ${opts.musicInstrument ?? "harp"}; ${engine}); plays on /function ${pack.namespace}:start.`,
       );
     }
     const vv = volumes[0]!;
-    pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, vv.sx, vv.sy, vv.sz));
+    pack.files.set("HOW_TO_LOAD.txt", howToLoad3d(pack.namespace, vv.sx, vv.sy, vv.sz, opts.origin));
     writePack(pack, opts.out);
     filesWritten.push(...[...pack.files.keys()].map((k) => join(opts.out, k)));
     const zip = join(opts.out, `${pack.namespace}.zip`);
@@ -519,7 +557,7 @@ export function render(opts: RenderOptions): RenderResult {
       framesToAnimated3d(q, { maxDepth: opts.depth ?? 8, smooth: opts.smooth, curve: opts.curve, symmetric: opts.symmetric }),
       opts,
     );
-    assertNonEmpty3d(volumes);
+    assertNonEmpty3d(volumes, (id) => resolveSolidBlockId(solidIds, id) !== undefined);
     volumes = applyFacing(volumes, opts.facing); // --facing: orient the build (static yaw)
     volumes.forEach((vol, fi) => {
       const buf = buildVoxelMcStructure(vol, resolveMcStructureBlock, { blockVersion: BEDROCK_BLOCK_VERSION, origin: opts.origin });

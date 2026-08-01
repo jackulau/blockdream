@@ -42,6 +42,9 @@ export class ClipAudio {
   private url: string | null = null;
   private starts: Float64Array = new Float64Array(0);
   private mode: ClipAudioMode = "original";
+  /** Fired when the browser's autoplay policy rejects play() - the host surfaces it (the
+   *  rejection used to be swallowed silently, leaving the user with mysteriously mute audio). */
+  onAutoplayBlocked?: () => void;
 
   /** Adopt a freshly-imported clip + its per-frame timing (replaces any previous clip). */
   load(file: File, durationsMs: ReadonlyArray<number | undefined | null>): void {
@@ -77,7 +80,8 @@ export class ClipAudio {
     const t = clipTimeOf(this.starts, frame);
     if (el.paused) {
       el.currentTime = t;
-      void el.play().catch(() => {}); // autoplay-policy rejection: stay silent until next gesture
+      // autoplay-policy rejection: stay silent until the next gesture, but SAY so
+      void el.play().catch(() => this.onAutoplayBlocked?.());
       return;
     }
     if (needsResnap(el.currentTime, t)) el.currentTime = t;

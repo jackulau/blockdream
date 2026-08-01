@@ -232,3 +232,25 @@ describe("planExportBudget (function-file export budget guard)", () => {
     expect(planExportBudget(11, 10).warn).toBe(true);
   });
 });
+
+describe("loadInstructions origin (goal 088 D9g: the guide points where the pack builds)", () => {
+  const files = new Map([["data/myns/function/setup.mcfunction", "# setup"]]);
+
+  it("threads the pack's REAL origin into the bundled instructions", () => {
+    const text = loadInstructions(files, { x: 40, y: 70, z: -12 });
+    expect(text).toContain("around x=40 y=70 z=-12");
+    expect(text).toContain("/tp 40 86 -12"); // teleport hovers 16 blocks above the origin
+    expect(text).not.toContain("x=0 y=64 z=0");
+  });
+
+  it("defaults to the emitters' shared 0,64,0 origin when no origin is given", () => {
+    const text = loadInstructions(files);
+    expect(text).toContain("around x=0 y=64 z=0");
+    expect(text).toContain("/tp 0 80 0");
+  });
+
+  it("zipDatapack carries the origin into the bundled HOW_TO_LOAD.txt", () => {
+    const unzipped = unzipSync(zipDatapack(files, { x: 40, y: 70, z: -12 }));
+    expect(strFromU8(unzipped["HOW_TO_LOAD.txt"]!)).toContain("/tp 40 86 -12");
+  });
+});

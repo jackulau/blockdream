@@ -38,6 +38,13 @@ export function planTickPlayback(n: number, durationsMs: ReadonlyArray<number | 
     return { indices: identity, speedTicks, fps: 20 / speedTicks, resampled: false };
   }
   const target = Math.max(2, Math.round(totalMs / 50));
+  if (target >= n) {
+    // A tiny above-20fps clip (e.g. 2 frames at 25 ms) cannot be thinned below n
+    // frames: the plan is the identity, nothing is skipped, and the in-game clip
+    // runs n ticks (longer than the source). Claiming resampled here made the CLI
+    // print "resampled 2 -> 2 frames ... same duration" while stretching time.
+    return { indices: identity, speedTicks: 1, fps: 20, resampled: false };
+  }
   const indices = Array.from({ length: target }, (_, i) => Math.min(n - 1, Math.floor((i * n) / target)));
   return { indices, speedTicks: 1, fps: 20, resampled: true };
 }

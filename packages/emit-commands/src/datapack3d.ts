@@ -216,22 +216,46 @@ export function generateVoxelDatapack(
   // box is cleared, so it survives), `musicLines` becomes music.mcfunction, and
   // `setupScores` seeds the shared #mt/#mtcount clock. The playsound branch calls
   // noteSequencer with the identical musicOrigin → byte-identical to before.
+  // Animation + music: lock the music loop to the animation loop (frames × speed) on
+  // BOTH engines. Unequal loop lengths re-phase on every wrap and drift more each cycle.
+  const loopTicksOverride = volumes.length > 1 ? volumes.length * speed : undefined;
+  // `bounds` is the physical music area's XZ footprint: setblock into an unloaded chunk
+  // fails and redstone only ticks in loaded chunks, so the forceload rect must cover it
+  // (the repro: a 199-cell delay line built past the build-box forceload silently died).
   const seq = !music
     ? undefined
     : (opts.musicEngine ?? "playsound") === "redstone"
       ? (() => {
-          const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes });
-          return { physical: r.blocks, musicLines: r.musicLines, setupScores: r.setupScores };
+          const r = redstoneSequencer(music, { musicOrigin, maxNotes: opts.musicMaxNotes, loopTicksOverride });
+          return {
+            physical: r.blocks,
+            musicLines: r.musicLines,
+            setupScores: r.setupScores,
+            noteCount: r.noteCount,
+            loopTicks: r.loopTicks,
+            // input cell at x-1; spine spans `length` cells; note-block tap row at z+1
+            bounds: r.noteCount
+              ? { x0: r.inputPos.x, x1: musicOrigin.x + r.length - 1, z0: musicOrigin.z, z1: musicOrigin.z + 1 }
+              : undefined,
+          };
         })()
       : (() => {
           const n = noteSequencer(music, {
             musicOrigin,
             maxNotes: opts.musicMaxNotes,
-            // Animation + music: lock the music loop to the animation loop (frames × speed).
-            // Unequal loop lengths re-phase on every wrap and drift a little more each cycle.
-            loopTicksOverride: volumes.length > 1 ? volumes.length * speed : undefined,
+            loopTicksOverride,
           });
-          return { physical: n.keyboard, musicLines: n.musicLines, setupScores: n.setupScores };
+          return {
+            physical: n.keyboard,
+            musicLines: n.musicLines,
+            setupScores: n.setupScores,
+            noteCount: n.noteCount,
+            loopTicks: n.loopTicks,
+            // one keyboard cell per distinct (instrument, note) along +X
+            bounds: n.keyboardNotes
+              ? { x0: musicOrigin.x, x1: musicOrigin.x + n.keyboardNotes - 1, z0: musicOrigin.z, z1: musicOrigin.z }
+              : undefined,
+          };
         })();
 
   // Optional LED glow layer: an invisible light plane one block outside the chosen face.
@@ -243,11 +267,12 @@ export function generateVoxelDatapack(
         z1: opts.ledPlane === "south" ? z1 + 1 : opts.ledPlane === "north" ? z0 - 1 : z1,
       }
     : undefined;
-  // forceload must cover the LED plane too (it can cross into the next chunk row)
-  const flx0 = Math.min(x0, ledBox?.x0 ?? x0);
-  const flx1 = Math.max(x1, ledBox?.x1 ?? x1);
-  const flz0 = Math.min(z0, ledBox?.z0 ?? z0);
-  const flz1 = Math.max(z1, ledBox?.z1 ?? z1);
+  // forceload must cover the LED plane (it can cross into the next chunk row) AND the
+  // physical music area (keyboard or redstone delay line - both live outside the build box)
+  const flx0 = Math.min(x0, ledBox?.x0 ?? x0, seq?.bounds?.x0 ?? x0);
+  const flx1 = Math.max(x1, ledBox?.x1 ?? x1, seq?.bounds?.x1 ?? x1);
+  const flz0 = Math.min(z0, ledBox?.z0 ?? z0, seq?.bounds?.z0 ?? z0);
+  const flz1 = Math.max(z1, ledBox?.z1 ?? z1, seq?.bounds?.z1 ?? z1);
 
   files.set(
     `${fnDir}/setup.mcfunction`,
@@ -311,5 +336,16 @@ export function generateVoxelDatapack(
   if (opts.supportedFormats) packMeta.supported_formats = opts.supportedFormats;
   files.set("pack.mcmeta", JSON.stringify({ pack: packMeta }, null, 2) + "\n");
 
-  return { files, namespace: ns, frameCount: volumes.length, width: sx, height: sy, totalSetblocks, totalCommands };
+  return {
+    files,
+    namespace: ns,
+    frameCount: volumes.length,
+    width: sx,
+    height: sy,
+    totalSetblocks,
+    totalCommands,
+    // honest music reporting: what the pack actually plays, not the input timeline length
+    musicNoteCount: seq ? seq.noteCount : 0,
+    musicLoopTicks: seq ? seq.loopTicks : 0,
+  };
 }

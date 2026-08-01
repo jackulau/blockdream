@@ -43,6 +43,8 @@ side-by-side source | block-art PNG.
 |---|---|---|---|
 | `datapack` *(default)* | `blockdream.zip` | **Vanilla Java** | 2D image/video wall of real blocks - the standard choice |
 | `voxel3d` | `blockdream_3d.zip` | **Vanilla Java** | real 3D builds + 3D animation from an image/video ([how it works](./3d-and-animation.md)) |
+| `rgbscreen` | `blockdream_rgb.zip` | **Vanilla Java** | TRUE-RGB video screen: exact source colors on a `text_display` pixel grid (no palette, no dither) |
+| `model3d` | `blockdream_model.zip` | **Vanilla Java** | a 3D model file (`.glb`/`.gltf`/`.obj`) as a real block build or reveal animation |
 | `behaviorpack` | `blockdream.mcpack` | **Vanilla Bedrock** | the same block wall on phones/consoles/Win10 |
 | `bedrock-script` | `blockdream-script.mcpack` | Bedrock + “Beta APIs” toggle | smoother Bedrock playback (Script API) |
 | `mcstructure` / `mcstructure3d` | `.mcstructure` file(s) | Bedrock structure block | static art / 3D models you place yourself |
@@ -53,10 +55,18 @@ Rule of thumb: **vanilla Java → `datapack`** (or `voxel3d` for 3D), **vanilla 
 `behaviorpack`**. Command-count/FPS budgets and what “too big” looks like:
 [vanilla command budgets](./vanilla-command-budgets.md) · [fps budget](./fps-budget.md).
 
+Placement and full-video knobs (they combine with the targets above): `--origin x,y,z`
+moves the build's fixed corner, `--facing north|south|east|west` turns the wall toward
+your build, `--wall` makes `voxel3d` play a video as a faithful flat wall instead of a
+relief, `--led` backs the wall with an invisible `minecraft:light` plane so it reads at
+night, `--music` turns the clip's audio into note blocks, and `--music-engine
+playsound|redstone` picks whether commands play them or a physical repeater delay-line
+does.
+
 ## Pick a Minecraft version
 
 Usually you don't have to: Java datapacks declare `supported_formats`, so the same
-`blockdream.zip` loads on the **whole Java 1.21.x line (1.21 → 1.21.10)** with no
+`blockdream.zip` loads on the **whole supported Java line (1.21 → 26.2)** with no
 “incompatible pack” warning, and Bedrock packs use a forward-compatible **1.21.0 floor**.
 `--version 1.21.5` pins an exact `pack_format`/`DataVersion` if you want the stamp to
 match one release; an unsupported version fails fast and prints the supported list.
@@ -120,7 +130,7 @@ binary with `BLOCKDREAM_FFMPEG=/path/to/ffmpeg blockdream render …`.
 cheats (world setting, or *Open to LAN → Cheats ON* for an existing world); on a server,
 run it as an op or from the server console.
 
-**Red “incompatible pack” warning** - shouldn't happen on Java 1.21.x (the pack declares
+**Red “incompatible pack” warning** - shouldn't happen on a supported Java release (the pack declares
 `supported_formats`). On older snapshots/releases (< 1.21) the macro-based driver isn't
 supported; on a newer line, regenerate with the matching `--version`.
 

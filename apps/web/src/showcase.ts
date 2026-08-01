@@ -6,9 +6,11 @@ import "./style.css"; // design system: tokens (sumi/washi palette, type/space/m
 import { Viewer } from "./viewer";
 import { actionFromKeys } from "./action";
 import { controlFromKeys } from "./driveAction";
-import { createBlockArt, blockArtDropMessage } from "./blockart-core";
-import { planGifExport, packingHudText, reportPngDownload } from "./export-plan";
-import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage } from "@blockdream/color-core";
+import { createBlockArt, wireBlockArtDrop } from "./blockart-core";
+import { planGifExport, gifFrameDelays, packingHudText, reportPngDownload } from "./export-plan";
+import { clampFrameDurations } from "./anim";
+import { preparePalette, quantizeFrame, nearestSrgbHue, type RgbImage, type DitherMethod } from "@blockdream/color-core";
+import { quantizeForDatapack } from "./blockart-export";
 import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 // Pure-data subpath (no node:fs/url) so the browser bundle never pulls in the fs-based palette loaders.
 import { JAVA_DATAPACK_SUPPORTED } from "@blockdream/palette/versions";
@@ -34,7 +36,15 @@ import { ClipAudio, type ClipAudioMode } from "./clip-audio";
 import { analyzeFileAudio } from "./audio";
 import { NotePreview } from "./note-preview";
 import type { NoteEvent } from "@blockdream/audio";
-import { initialArrangeState, arrangeReducer, planDatapackPlacement } from "./canvas-mod";
+import { initialArrangeState, arrangeReducer, planDatapackPlacement, musicKeyboardHalf } from "./canvas-mod";
+import {
+  SECTION3_CONTROL_IDS,
+  viewer3dUnavailableText,
+  AUDIO_BLOCKED_TEXT,
+  settingsChangeNote,
+  blockArtExportText,
+  resetDisabled,
+} from "./ui-feedback";
 import { log } from "./log";
 import { generateJavaDatapack, generateVoxelDatapack, greedyBoxes } from "@blockdream/emit-commands";
 import { Viewer3D } from "./viewer3d";
@@ -94,7 +104,11 @@ const mcViewer = new Viewer({
   onStats: ({ displayFps, genFps, latencyMs }) => {
     mcHud.textContent = `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(1)} fps · ${latencyMs.toFixed(0)} ms\nmovement: ${mcSkill.value}`;
   },
-  onStatus: (t, cls) => pill(mcStatus, cls === "ok" ? `live · ${mcSkill.value}` : t, cls),
+  onStatus: (t, cls) => {
+    pill(mcStatus, cls === "ok" ? `live · ${mcSkill.value}` : t, cls);
+    // reset only does anything while connected - follow the same transitions as the pill
+    $<HTMLButtonElement>("mc-reset").disabled = resetDisabled(cls);
+  },
 });
 $<HTMLButtonElement>("mc-reset").addEventListener("click", () => mcViewer.reset());
 // retry affordance: without local servers the auto-connect fails once and the section used to be
@@ -161,7 +175,10 @@ const drViewer = new Viewer({
       `display ${displayFps.toFixed(0)} fps · gen ${genFps.toFixed(0)} fps · ${latencyMs.toFixed(0)} ms\n` +
       `speed ${speed.toFixed(1)} m/s · yaw-rate ${yawRate.toFixed(2)}`;
   },
-  onStatus: (t, cls) => pill(drStatus, cls === "ok" ? "live" : t, cls),
+  onStatus: (t, cls) => {
+    pill(drStatus, cls === "ok" ? "live" : t, cls);
+    $<HTMLButtonElement>("dr-reset").disabled = resetDisabled(cls);
+  },
 });
 $<HTMLButtonElement>("dr-reset").addEventListener("click", () => drViewer.reset());
 $<HTMLButtonElement>("dr-connect").addEventListener("click", () => drViewer.connect());
@@ -183,42 +200,30 @@ const ba = createBlockArt({
     // no-op when clicked before the first render)
     $<HTMLButtonElement>("ba-download").disabled = false;
     $<HTMLButtonElement>("ba-png").disabled = false;
-    $<HTMLDivElement>("ba-export").textContent = `${q.width}×${q.height} = ${q.width * q.height} blocks · 1 frame`;
+    // an animated GIF exports its CURRENT frame here - the status says so instead of "1 frame"
+    $<HTMLDivElement>("ba-export").textContent = blockArtExportText(q.width, q.height, ba.getFrameCount());
   },
 });
 ba.loadUrl("/test-assets/pixelart.png"); // preload sample so the section is alive on load
 
-// drag & drop an image onto the block-art canvases
-const baDrop = $<HTMLDivElement>("ba-drop");
-for (const e of ["dragenter", "dragover"]) {
-  baDrop.addEventListener(e, (ev) => {
-    ev.preventDefault();
-    baDrop.classList.add("drag");
-  });
-}
-for (const e of ["dragleave", "drop"]) {
-  baDrop.addEventListener(e, () => baDrop.classList.remove("drag"));
-}
-baDrop.addEventListener("drop", (ev) => {
-  ev.preventDefault();
-  const f = (ev as DragEvent).dataTransfer?.files?.[0];
-  if (!f) return;
-  // extension-first routing (classifyImportFile): an OS drag with an empty MIME type still
-  // loads by its name, and a non-image gets a helpful message instead of a silent no-op.
-  const msg = blockArtDropMessage(f);
-  if (msg) $<HTMLDivElement>("ba-stats").textContent = msg;
-  else void ba.loadFile(f); // GIF → animated, else static
-});
+// drag & drop an image onto the block-art canvases - shared wiring (same helper as blockart.html)
+wireBlockArtDrop($<HTMLDivElement>("ba-drop"), $<HTMLDivElement>("ba-stats"), (f) => ba.loadFile(f));
 
-// Download a vanilla datapack that builds the current image as a block-wall.
+// Download a vanilla datapack that builds the current image as a block-wall. Export parity:
+// the pack RE-QUANTIZES the source against the placeable solid-block palette (the preview's
+// map-palette frame resolved through the solid resolver left air holes + collapsed blocks),
+// so every emitted cell places a real block - the wall is exactly a solid-palette preview.
 $<HTMLButtonElement>("ba-download").addEventListener("click", () => {
-  const q = ba.getFrame();
-  if (!q) return;
+  const rgb = ba.getSourceRgb(Number($<HTMLInputElement>("ba-grid").value) || 128);
+  if (!rgb) return;
+  const q = quantizeForDatapack(rgb, $<HTMLSelectElement>("ba-dither").value as DitherMethod);
   const pack = generateJavaDatapack([q], resolveBlock, {
     namespace: "blockdream",
     supportedFormats: JAVA_DATAPACK_SUPPORTED,
   });
-  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream:setup`;
+  const animatedNote =
+    ba.getFrameCount() > 1 ? " · animated GIF: current frame only - use section 03 for the full animation" : "";
+  $<HTMLDivElement>("ba-export").textContent = `datapack: ${pack.totalSetblocks} setblocks · ${pack.frameCount} frame · load /function blockdream:setup${animatedNote}`;
   downloadDatapack("blockdream-blockart-datapack", pack.files);
 });
 
@@ -380,6 +385,15 @@ async function setup3dViewer(): Promise<void> {
   const fpsSel = $<HTMLSelectElement>("v3-fps");
   const resSel = $<HTMLSelectElement>("v3-res");
   const audioModeSel = $<HTMLSelectElement>("v3-audio-mode");
+  // autoplay-policy rejections used to be swallowed - both audio paths now surface one message
+  clipAudio.onAutoplayBlocked = notePreview.onAutoplayBlocked = () => {
+    hud.textContent = AUDIO_BLOCKED_TEXT;
+  };
+  // GIF/PNG ship disabled like the datapack button (index.html) - all three need frames;
+  // every path that produces frames enables them together.
+  function enable3dExports(): void {
+    for (const id of ["v3-download", "v3-gif", "v3-png"]) $<HTMLButtonElement>(id).disabled = false;
+  }
   await loadTextureManifest();
 
   // bill-of-materials for the built volume - same markup contract as blockart-core's renderBom,
@@ -552,7 +566,7 @@ async function setup3dViewer(): Promise<void> {
     // re-apply the chosen live animation (setFrames defaults a single volume to "spin")
     if (isTransformAnim(animSel.value)) viewer.setAnim(animSel.value);
     scrub.max = "0";
-    $<HTMLButtonElement>("v3-download").disabled = false;
+    enable3dExports();
     viewer.play();
     playBtn.textContent = "pause";
     hud.textContent = `solid ${vol.sx}×${vol.sy}×${vol.sz}${depthOf ? " · depth-mapped" : ""} · ${animSel.value} · drag to orbit`;
@@ -608,6 +622,11 @@ async function setup3dViewer(): Promise<void> {
   // initial source = the preloaded sample image (higher res than the old 28px for a sharper solid)
   const img = new Image();
   img.onload = () => setSource(quantizeFrame(rgbImageFromImg(img, 40), pal3d, QUANT3D_STILL));
+  img.onerror = () => {
+    // 404 / undecodable sample used to leave the section at "building…" forever - say what
+    // happened and how to proceed (pattern from blockart-core's loadUrl onerror).
+    hud.textContent = "couldn't load the sample /test-assets/pixelart.png · import an image, GIF, or video to build";
+  };
   img.src = "/test-assets/pixelart.png";
 
   // Re-extrude a flat wall frame to a new thickness: copy the front layer (z=0) into every layer of
@@ -658,7 +677,7 @@ async function setup3dViewer(): Promise<void> {
         animSel.value = "none"; // the frames are the motion; 3/4 view makes the new depth read
         viewer.setFrames(domed, { durationsMs: flatDurationsMs ?? undefined, faceOn: false });
         scrub.max = String(domed.length - 1);
-        $<HTMLButtonElement>("v3-download").disabled = false;
+        enable3dExports();
         viewer.play();
         playBtn.textContent = "pause";
         hud.textContent = `${flatLabel} · 3D · ${n} frames · drag to orbit`;
@@ -712,7 +731,7 @@ async function setup3dViewer(): Promise<void> {
           if (src.frames[0]) renderBom3d(src.frames[0]);
           viewer.setFrames(src.frames, { faceOn: sel === "none" });
           scrub.max = String(src.frames.length - 1);
-          $<HTMLButtonElement>("v3-download").disabled = false;
+          enable3dExports();
           playBtn.textContent = viewer.isPlaying ? "pause" : "play";
         }
         viewer.reframe(sel === "none"); // none → head-on; any motion → 3/4 so it reads in depth
@@ -730,7 +749,7 @@ async function setup3dViewer(): Promise<void> {
         if (combined[0]) renderBom3d(combined[0]);
         viewer.setFrames(combined, { faceOn: false }); // 3/4 view so the displacement reads; frames carry the motion
         scrub.max = String(combined.length - 1);
-        $<HTMLButtonElement>("v3-download").disabled = false;
+        enable3dExports();
         viewer.play();
         playBtn.textContent = "pause";
         hud.textContent = `${flatLabel} · ${sel} · playing · drag to orbit`;
@@ -772,7 +791,7 @@ async function setup3dViewer(): Promise<void> {
     if (faceOn) animSel.value = "none"; // reflect the head-on, no-transform default in the dropdown
     viewer.setFrames(frames, { durationsMs, faceOn }); // faceOn (flat GIF/video) → head-on, no transform
     scrub.max = String(frames.length - 1);
-    $<HTMLButtonElement>("v3-download").disabled = false;
+    enable3dExports();
     viewer.play();
     playBtn.textContent = "pause";
     hud.textContent = `${label} · ${frames.length} frame${frames.length > 1 ? "s" : ""} · drag to orbit`;
@@ -1007,6 +1026,15 @@ async function setup3dViewer(): Promise<void> {
     if (e.key === "Enter") void importUrl();
   });
 
+  // fps/resolution are read once at import time - changing them mid-clip used to be a silent
+  // no-op; the HUD now says when the new value takes effect.
+  for (const sel of [fpsSel, resSel]) {
+    sel.addEventListener("change", () => {
+      const note = settingsChangeNote(!!flatVolFrames);
+      if (note) hud.textContent = note;
+    });
+  }
+
   // ?src=<url> opens the page WITH an asset already playing (e.g. ?src=/test-assets/badapple.mp4)
   const autoSrc = new URLSearchParams(location.search).get("src");
   if (autoSrc) {
@@ -1041,7 +1069,7 @@ async function setup3dViewer(): Promise<void> {
     // HONEST in-game pacing: Minecraft plays one animation step per game tick - 20 fps is the
     // ceiling. A clip decoded above that is resampled EVENLY so the in-game duration matches the
     // source; at/below 20 fps every frame keeps its nearest whole-tick dwell.
-    const plan = planTickPlayback(allFrames.length, durationsMs);
+    const plan = planTickPlayback(allFrames.length, clampFrameDurations(durationsMs));
     const frames = plan.resampled ? plan.indices.map((i) => allFrames[i]!) : allFrames;
     // Export-budget guard: one .mcfunction per frame; warn (do not block) past the tested budget.
     // The warning + "packing…" go to the HUD BEFORE the synchronous generate+zip (which can take
@@ -1054,10 +1082,11 @@ async function setup3dViewer(): Promise<void> {
       // the viewer centers the build + the note-block row on their group positions; pass each object's
       // half-extent so the export lands them centered where they sit on screen (not corner-offset).
       const v0 = frames[0];
-      const distinctNotes = new Set(current3dMusic.map((n) => n.note)).size;
+      // center the dragged music row on the keyboard the pack will ACTUALLY place (distinct
+      // (instrument, note) pairs after the loop trim), not a note-only Set-size guess.
       const placement = planDatapackPlacement(current3dMusic, arrange, { x: 0, y: 64, z: 0 }, {
         buildHalf: v0 ? { x: v0.sx / 2, z: v0.sz / 2 } : undefined,
-        musicHalf: { x: (distinctNotes - 1) / 2, z: 0 },
+        musicHalf: musicKeyboardHalf(current3dMusic, frames.length, plan.speedTicks),
       });
       const pack = generateVoxelDatapack(frames, resolveBlock, {
         namespace: "blockdream_3d",
@@ -1077,7 +1106,7 @@ async function setup3dViewer(): Promise<void> {
       $<HTMLDivElement>("v3-export").textContent =
         `3D datapack: ${pack.totalSetblocks} blocks → ${cmds} cmds · ${pack.frameCount} frames${musicNote}${paceNote}${budgetNote} · /function blockdream_3d:setup`;
       hud.textContent = `datapack packed · ${pack.frameCount} frames`;
-      downloadDatapack("blockdream-3d-datapack", pack.files);
+      downloadDatapack("blockdream-3d-datapack", pack.files, placement.origin);
     }, 30);
   });
 
@@ -1105,9 +1134,12 @@ async function setup3dViewer(): Promise<void> {
       const W = Math.max(...frames.map((f) => f.sx));
       const H = Math.max(...frames.map((f) => f.sy));
       const scale = fitScale(W, H, 384);
+      // delays come from the SAME tick plan the datapack uses, so GIF pacing == in-game pacing
+      // (a spin with no timing used to export at 70 ms/frame while the pack played 100 ms).
+      const delays = gifFrameDelays(frames.length, durationsMs);
       const gif: GifFrame[] = frames.map((f, i) => ({
         raster: upscaleNearest(padRaster(flatVolumeToRaster(f), W, H), scale),
-        delayMs: durationsMs?.[i] ?? 70,
+        delayMs: delays[i]!,
       }));
       try {
         downloadGif("blockdream-animation.gif", gif);
@@ -1153,7 +1185,15 @@ async function setup3dViewer(): Promise<void> {
     viewer.setFrame(Number(scrub.value));
   });
 }
-void setup3dViewer();
+setup3dViewer().catch((err: unknown) => {
+  // WebGL unavailable (Viewer3D's WebGLRenderer throws) used to leave section 03 at
+  // "building…" forever with every control silently dead - say so and disable them all.
+  $<HTMLDivElement>("v3-hud").textContent = viewer3dUnavailableText((err as Error).message ?? String(err));
+  for (const id of SECTION3_CONTROL_IDS) {
+    const el = document.getElementById(id) as HTMLButtonElement | null;
+    if (el) el.disabled = true;
+  }
+});
 
 // Scroll-reveal: sections fade + rise a little as they enter view (tha.jp - restrained motion
 // modeled on natural deceleration; easing/duration live in style.css). The class is added by JS,

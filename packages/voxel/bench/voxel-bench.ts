@@ -384,8 +384,8 @@ if (isMain) {
     writeFileSync(
       mdPath,
       `# Voxel builder benchmark snapshot\n\nDeterministic disc input. \`pnpm exec tsx packages/voxel/bench/voxel-bench.ts\`.\n\n` +
-        `## Absolute timings (machine + load dependent — reference only, NOT a before/after delta)\n\n${fmt(stages)}\n\n` +
-        `## A/B: optimized vs bounds-checked reference (same run — the rigorous comparison)\n\n${fmtAB(ab)}\n`,
+        `## Absolute timings (machine + load dependent - reference only, NOT a before/after delta)\n\n${fmt(stages)}\n\n` +
+        `## A/B: optimized vs bounds-checked reference (same run - the rigorous comparison)\n\n${fmtAB(ab)}\n`,
     );
     console.log(`\nsnapshot written -> ${mdPath}`);
   }

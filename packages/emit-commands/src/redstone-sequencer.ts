@@ -41,6 +41,18 @@ export interface RedstoneSequencerOptions {
   maxNotes?: number;
   /** Conductor/floor block under the spine + note-block bases (default smooth_stone). */
   trackBlock?: string;
+  /**
+   * Force the loop length in game ticks. Notes at/after the override tick are dropped
+   * BEFORE the cap, so the physical track only spans the notes that fit the loop and the
+   * re-pulse metronome fires exactly every override ticks. Use to lock the music clock to
+   * an animation's exact loop (frames x speedTicks), same contract as noteSequencer:
+   * unequal loop lengths re-phase on every wrap. The spine needs no padding - loop length
+   * is enforced by the #mtcount metronome, not by track length; the trimmed track always
+   * finishes (last onset < override) before the next pulse enters. Overrides of 2 game
+   * ticks or less cannot re-arm (the OFF edge fires at #mt 2) - such loops are shorter
+   * than any playable song anyway.
+   */
+  loopTicksOverride?: number;
 }
 
 export interface RedstoneSequencer {
@@ -80,7 +92,12 @@ export function redstoneSequencer(
   const origin = opts.musicOrigin ?? { x: 0, y: 64, z: 0 };
   const floor = opts.trackBlock ?? "minecraft:smooth_stone";
   const maxNotes = Math.max(0, Math.floor(opts.maxNotes ?? 800));
-  const sorted = [...notes].sort((a, b) => a.tick - b.tick);
+  const override =
+    opts.loopTicksOverride && opts.loopTicksOverride > 0 ? Math.floor(opts.loopTicksOverride) : undefined;
+  // trim to the loop BEFORE the cap so out-of-loop notes never eat the note budget
+  // (same order as noteSequencer)
+  const inLoop = override ? notes.filter((e) => e.tick < override) : notes;
+  const sorted = [...inLoop].sort((a, b) => a.tick - b.tick);
   const used = sorted.length > maxNotes ? sorted.slice(0, maxNotes) : sorted;
 
   const inputPos: Vec3 = { x: origin.x - 1, y: origin.y, z: origin.z };
@@ -144,7 +161,7 @@ export function redstoneSequencer(
   }
 
   const length = cx - origin.x;
-  const loopTicks = noteTimelineTicks(used) + Math.max(1, opts.loopTailTicks ?? 20);
+  const loopTicks = override ?? noteTimelineTicks(used) + Math.max(1, opts.loopTailTicks ?? 20);
 
   // music.mcfunction: a tiny metronome that re-arms the physical line each loop.
   // ON at #mt 0 starts the pulse front; OFF at #mt 2 trails it (self-reset); the

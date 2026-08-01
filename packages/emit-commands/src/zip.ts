@@ -12,18 +12,90 @@ const CRC_TABLE = (() => {
   return t;
 })();
 
-function crc32(data: Uint8Array): number {
+/**
+ * Reference CRC-32, kept verbatim from before the slice-by-8 optimization
+ * (byte-at-a-time over the classic 256-entry table). Exported only for the
+ * equivalence + timing gate in zip.test.ts. Do not optimize.
+ */
+export function crc32Reference(data: Uint8Array): number {
   let c = 0xffffffff;
   for (let i = 0; i < data.length; i++) c = (CRC_TABLE[(c ^ data[i]!) & 0xff]! ^ (c >>> 8)) >>> 0;
   return (c ^ 0xffffffff) >>> 0;
 }
 
+// Slice-by-8 tables: slice 0 is the classic table (same 0xedb88320 polynomial);
+// slice k advances slice k-1 by one zero byte, so eight table lookups process
+// eight input bytes per iteration with bit-identical results by construction.
+// Flat 256x8 Uint32Array, module-local (vite-node compiles imported bindings to
+// exports-getter lookups; a local constant stays a direct load in the hot loop).
+const CRC_TABLES = (() => {
+  const t = new Uint32Array(256 * 8);
+  t.set(CRC_TABLE, 0);
+  for (let s = 1; s < 8; s++) {
+    for (let n = 0; n < 256; n++) {
+      const prev = t[(s - 1) * 256 + n]!;
+      t[s * 256 + n] = (t[prev & 0xff]! ^ (prev >>> 8)) >>> 0;
+    }
+  }
+  return t;
+})();
+
+/** CRC-32 (slice-by-8). Bit-identical to {@link crc32Reference}, ~several x faster. */
+function crc32(data: Uint8Array): number {
+  let c = 0xffffffff;
+  const n = data.length;
+  const end8 = n - (n % 8);
+  let i = 0;
+  for (; i < end8; i += 8) {
+    const lo = (data[i]! | (data[i + 1]! << 8) | (data[i + 2]! << 16) | (data[i + 3]! << 24)) ^ c;
+    const hi = data[i + 4]! | (data[i + 5]! << 8) | (data[i + 6]! << 16) | (data[i + 7]! << 24);
+    c =
+      (CRC_TABLES[7 * 256 + (lo & 0xff)]! ^
+        CRC_TABLES[6 * 256 + ((lo >>> 8) & 0xff)]! ^
+        CRC_TABLES[5 * 256 + ((lo >>> 16) & 0xff)]! ^
+        CRC_TABLES[4 * 256 + (lo >>> 24)]! ^
+        CRC_TABLES[3 * 256 + (hi & 0xff)]! ^
+        CRC_TABLES[2 * 256 + ((hi >>> 8) & 0xff)]! ^
+        CRC_TABLES[1 * 256 + ((hi >>> 16) & 0xff)]! ^
+        CRC_TABLES[hi >>> 24]!) >>>
+      0;
+  }
+  for (; i < n; i++) c = (CRC_TABLES[(c ^ data[i]!) & 0xff]! ^ (c >>> 8)) >>> 0;
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** Optimized CRC-32 exported for the zip.test.ts equivalence/timing gate. */
+export const crc32Sliced = crc32;
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-/** Build a store-only zip from a path→content map. `content` may be a string or bytes. */
-export function zipStore(files: Map<string, string | Uint8Array> | Record<string, string | Uint8Array>): Uint8Array {
+/**
+ * Internal/test hook: lowered ceilings so the overflow guards can be exercised
+ * without building a 65k-file or 4 GiB archive. Public callers omit this and get
+ * the real zip format limits (uint16 entry count, uint32 sizes/offsets).
+ */
+export interface ZipStoreLimits {
+  maxEntries?: number;
+  maxBytes?: number;
+}
+
+/** Build a store-only zip from a path→content map. `content` may be a string or bytes.
+ *  Throws instead of silently truncating when the archive exceeds what the classic
+ *  (non-zip64) format can represent: >65535 entries used to wrap the EOCD uint16 count
+ *  and drop files on extraction (70000 files silently became 4464). */
+export function zipStore(
+  files: Map<string, string | Uint8Array> | Record<string, string | Uint8Array>,
+  limits: ZipStoreLimits = {},
+): Uint8Array {
+  const maxEntries = limits.maxEntries ?? 0xffff;
+  const maxBytes = limits.maxBytes ?? 0xffffffff;
   const list: Array<[string, string | Uint8Array]> = files instanceof Map ? [...files] : Object.entries(files);
+  if (list.length > maxEntries) {
+    throw new Error(
+      `datapack too large for zip: ${list.length} files (max ${maxEntries}); the zip end-of-central-directory entry count is 16-bit and this writer has no zip64 support - split the export or lower the frame count`,
+    );
+  }
   const local: Uint8Array[] = [];
   const central: Uint8Array[] = [];
   let offset = 0;
@@ -32,6 +104,11 @@ export function zipStore(files: Map<string, string | Uint8Array> | Record<string
   for (const [path, content] of list) {
     const name = enc.encode(path);
     const data = typeof content === "string" ? enc.encode(content) : content;
+    if (data.length > maxBytes) {
+      throw new Error(
+        `datapack too large for zip: entry "${path}" is ${data.length} bytes (max ${maxBytes} in a non-zip64 archive)`,
+      );
+    }
     const crc = crc32(data);
 
     const lh = new Uint8Array(30 + name.length);
@@ -64,6 +141,15 @@ export function zipStore(files: Map<string, string | Uint8Array> | Record<string
     cdSize += cd.length;
 
     offset += lh.length + data.length;
+  }
+
+  // Every stored local-header offset is < the final `offset`, and the EOCD stores
+  // both the central-directory start (== offset) and its size as uint32: one check
+  // here proves every 32-bit field in the archive fits.
+  if (offset > maxBytes || cdSize > maxBytes) {
+    throw new Error(
+      `datapack too large for zip: archive spans ${offset} bytes (max ${maxBytes} in a non-zip64 archive) - split the export or lower the frame count`,
+    );
   }
 
   const eocd = new Uint8Array(22);

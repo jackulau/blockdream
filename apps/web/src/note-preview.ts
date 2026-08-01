@@ -26,6 +26,9 @@ export class NotePreview {
   private ctx: AudioContext | null = null;
   private events: NoteEvent[] = [];
   private enabled = true;
+  /** Fired when the AudioContext is suspended by the autoplay policy (notes stay silent this
+   *  frame) - the host surfaces it instead of the old silent swallow. */
+  onAutoplayBlocked?: () => void;
 
   setEvents(events: NoteEvent[]): void {
     this.events = events;
@@ -46,8 +49,9 @@ export class NotePreview {
     if (ctx.state !== "running") {
       // suspended until a user gesture (autoplay policy): do NOT schedule - oscillators queued
       // into a suspended context all fire at once on resume (a blast of stale notes). Ask to
-      // resume and stay silent this frame; scheduling starts the first frame after it runs.
+      // resume, say so, and stay silent this frame; scheduling starts once it runs.
       void ctx.resume();
+      this.onAutoplayBlocked?.();
       return;
     }
     const now = ctx.currentTime;

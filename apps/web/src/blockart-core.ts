@@ -12,6 +12,7 @@ import {
 } from "@blockdream/color-core";
 import javaMapPalette from "@blockdream/palette/data/java-map-colors-1.21.9.json";
 import type { MapPalette } from "@blockdream/palette";
+import { getSolidBlockMapPalette } from "@blockdream/palette/solid";
 import { blockForBase, swatchDataUrl, localTextureUrl, hasLocalTextures, loadTextureManifest } from "./blocks";
 import { decodeGif, isGif } from "./gif";
 import { buildSchedule, frameAtElapsed, type FrameSchedule } from "./anim";
@@ -43,6 +44,54 @@ export function blockArtDropMessage(f: { name?: string; type?: string }): string
   if (kind === "video") return `${name} is a video · the 3D voxel builder (section 03) plays videos as block animations`;
   if (kind === "glb" || kind === "gltf" || kind === "obj") return `${name} is a 3D model · import it in the 3D voxel builder (section 03)`;
   return `couldn't import ${name} · drop an image (.png/.jpg/.webp/.gif)`;
+}
+
+/** Shared drag & drop wiring for a block-art zone: highlight while a drag is over it, then route
+ *  the dropped file extension-first (blockArtDropMessage) - images/GIFs load, everything else gets
+ *  a helpful message instead of the browser navigating away to the raw file. ONE helper wires both
+ *  the index §02 zone (showcase.ts) and the standalone tester (main.ts), byte-same behavior. */
+export function wireBlockArtDrop(
+  zone: HTMLElement,
+  stats: { textContent: string | null },
+  loadFile: (f: File) => Promise<void>,
+): void {
+  for (const e of ["dragenter", "dragover"]) {
+    zone.addEventListener(e, (ev) => {
+      ev.preventDefault();
+      zone.classList.add("drag");
+    });
+  }
+  for (const e of ["dragleave", "drop"]) {
+    zone.addEventListener(e, () => zone.classList.remove("drag"));
+  }
+  zone.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    const f = (ev as DragEvent).dataTransfer?.files?.[0];
+    if (!f) return;
+    // extension-first routing (classifyImportFile): an OS drag with an empty MIME type still
+    // loads by its name, and a non-image gets a helpful message instead of a silent no-op.
+    const msg = blockArtDropMessage(f);
+    if (msg) stats.textContent = msg;
+    else void loadFile(f); // GIF → animated, else static
+  });
+}
+
+/** Palette choices the block-art preview can quantize against: the 244-colour MAP palette
+ *  (what a map item / the default preview shows) or the placeable SOLID-block gamut (every
+ *  entry resolves to a real block - the palette the CLI's solid builds use). Prepared once
+ *  per choice, module-memoized (preparePalette builds OKLab tables - not per-render work). */
+export type BlockArtPaletteChoice = "map" | "block";
+const PREPARED_PALETTES = new Map<BlockArtPaletteChoice, PreparedPalette>();
+export function paletteForChoice(choice: BlockArtPaletteChoice): PreparedPalette {
+  let pal = PREPARED_PALETTES.get(choice);
+  if (!pal) {
+    pal =
+      choice === "block"
+        ? preparePalette(getSolidBlockMapPalette().palette)
+        : preparePalette(javaMapPalette as unknown as MapPalette);
+    PREPARED_PALETTES.set(choice, pal);
+  }
+  return pal;
 }
 
 /** Incremental bill-of-materials renderer. The markup per row is byte-identical to a full
@@ -119,6 +168,64 @@ export function createBomRenderer(bomEl: HTMLElement): (counts: Map<number, numb
   };
 }
 
+/** Flat, cache-friendly view of a prepared palette for the per-pixel paint loop: separate
+ *  r/g/b bytes + baseId per entry, built ONCE per palette (WeakMap-memoized by identity).
+ *  The paint loop runs per animated-GIF frame on the rAF thread (65k px × up to 50 fps); the
+ *  old loop's per-pixel `pal.entries[idx]!.color` two-level deref + counts-Map get/set per
+ *  pixel was the hot part. */
+interface FlatPalette {
+  r: Uint8Array;
+  g: Uint8Array;
+  b: Uint8Array;
+  baseId: Int32Array;
+  maxBase: number;
+}
+const FLAT_PALETTES = new WeakMap<PreparedPalette, FlatPalette>();
+function flatPalette(pal: PreparedPalette): FlatPalette {
+  let fp = FLAT_PALETTES.get(pal);
+  if (!fp) {
+    const n = pal.entries.length;
+    fp = { r: new Uint8Array(n), g: new Uint8Array(n), b: new Uint8Array(n), baseId: new Int32Array(n), maxBase: 0 };
+    for (let i = 0; i < n; i++) {
+      const c = pal.entries[i]!.color;
+      fp.r[i] = c.r;
+      fp.g[i] = c.g;
+      fp.b[i] = c.b;
+      fp.baseId[i] = c.baseId;
+      if (c.baseId > fp.maxBase) fp.maxBase = c.baseId;
+    }
+    FLAT_PALETTES.set(pal, fp);
+  }
+  return fp;
+}
+
+/** Paint a quantized frame into an RGBA buffer and tally per-base block counts. Byte-identical
+ *  to the naive per-pixel `pal.entries[...]` loop: same RGBA bytes, and the counts Map is
+ *  materialized AFTER the loop in the SAME first-seen insertion order (createBomRenderer's
+ *  stable count sort keeps tied rows in insertion order, so BOM markup stays byte-identical;
+ *  the stats line only reads counts.size). The loop itself reads flat typed arrays and tallies
+ *  into an Int32Array + a first-seen order list - no Map ops per pixel. */
+export function paintQuantized(q: QuantizedFrame, pal: PreparedPalette, out: Uint8ClampedArray): Map<number, number> {
+  const fp = flatPalette(pal);
+  const { r, g, b, baseId } = fp;
+  const idx = q.paletteIndex;
+  const n = q.width * q.height;
+  const tally = new Int32Array(fp.maxBase + 1);
+  const order: number[] = [];
+  for (let p = 0, o = 0; p < n; p++, o += 4) {
+    const i = idx[p]!;
+    out[o] = r[i]!;
+    out[o + 1] = g[i]!;
+    out[o + 2] = b[i]!;
+    out[o + 3] = 255;
+    const base = baseId[i]!;
+    if (tally[base]!++ === 0) order.push(base);
+  }
+  const counts = new Map<number, number>();
+  for (const base of order) counts.set(base, tally[base]!);
+  return counts;
+}
+
 type Source = HTMLImageElement | HTMLCanvasElement;
 const srcW = (s: Source) => (s instanceof HTMLImageElement ? s.naturalWidth : s.width);
 const srcH = (s: Source) => (s instanceof HTMLImageElement ? s.naturalHeight : s.height);
@@ -133,6 +240,8 @@ export interface BlockArtEls {
   out: HTMLCanvasElement;
   bom: HTMLElement;
   tooltip: HTMLElement;
+  /** Optional palette select ("map" | "block") - re-quantizes on change (standalone tester). */
+  palette?: HTMLSelectElement;
 }
 
 export interface BlockArtOpts {
@@ -146,11 +255,14 @@ export function createBlockArt(
   loadUrl: (url: string) => void;
   loadFile: (file: File) => Promise<void>;
   getFrame: () => QuantizedFrame | null;
+  /** Frames in the loaded clip: 0 = nothing loaded, 1 = still image, >1 = animated GIF. */
+  getFrameCount: () => number;
   /** Current SOURCE image as RGB at ≤maxW - lets the 3D builder re-quantize the original
    *  colors in its own palette instead of inheriting this path's dithered map-palette ids. */
   getSourceRgb: (maxW: number) => RgbImage | null;
 } {
-  const pal: PreparedPalette = preparePalette(javaMapPalette as unknown as MapPalette);
+  const paletteChoice = (): BlockArtPaletteChoice => (els.palette?.value === "block" ? "block" : "map");
+  let pal: PreparedPalette = paletteForChoice(paletteChoice());
   let lastImage: Source | null = null;
   let lastQ: QuantizedFrame | null = null;
   // animated-GIF playback (single-image path is unchanged when frames is empty)
@@ -208,16 +320,9 @@ export function createBlockArt(
     els.out.height = q.height;
     const ctx = els.out.getContext("2d")!;
     const imgData = ctx.createImageData(q.width, q.height);
-    const counts = new Map<number, number>();
-    for (let p = 0; p < q.width * q.height; p++) {
-      const c = pal.entries[q.paletteIndex[p]!]!.color;
-      const o = p * 4;
-      imgData.data[o] = c.r;
-      imgData.data[o + 1] = c.g;
-      imgData.data[o + 2] = c.b;
-      imgData.data[o + 3] = 255;
-      counts.set(c.baseId, (counts.get(c.baseId) ?? 0) + 1);
-    }
+    // flat-typed-array paint + post-loop counts materialization (byte-identical to the old
+    // per-pixel entries[]/Map loop - locked in blockart-render-perf.test.ts)
+    const counts = paintQuantized(q, pal, imgData.data);
     ctx.putImageData(imgData, 0, 0);
     els.out.style.width = `${Math.min(512, q.width * 4)}px`;
 
@@ -330,6 +435,12 @@ export function createBlockArt(
     render();
   });
   els.dither.addEventListener("change", render);
+  // palette select (standalone tester): switch the quantization palette and re-render. The
+  // hover tooltip + BOM read the live `pal`, so they track the switch automatically.
+  els.palette?.addEventListener("change", () => {
+    pal = paletteForChoice(paletteChoice());
+    render();
+  });
   els.gridVal.textContent = `${els.grid.value} px`;
 
   // always use real block textures when present (auto-falls back to generated swatches only if the
@@ -353,6 +464,7 @@ export function createBlockArt(
     loadUrl,
     loadFile,
     getFrame: () => lastQ,
+    getFrameCount: () => (frames.length ? frames.length : lastImage ? 1 : 0),
     getSourceRgb: (maxW: number) => {
       const src = currentSource();
       return src ? toRgbImage(src, Math.min(maxW, Number(els.grid.value) || maxW)) : null;

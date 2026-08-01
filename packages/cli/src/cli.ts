@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { resolveMcVersion } from "@blockdream/palette";
 import { joinDashValues } from "./argv";
 import { render, BAKEABLE_ANIMS, isFacing, type RenderOptions, type RenderTarget, type Edition, type Facing, type MusicMode } from "./render";
 import { previewPng } from "./preview";
@@ -13,13 +14,16 @@ blockdream preview <input> --out preview.png   (side-by-side source | block-art 
 Convert a GIF/video into Minecraft block-art.
 
 Options:
-  --target <t>       map | mcstructure | mcstructure3d | datapack | behaviorpack | mwframes | voxel3d | model3d | rgbscreen
+  --target <t>       map | mcstructure | mcstructure3d | datapack | behaviorpack | bedrock-script |
+                       mwframes | voxel3d | model3d | rgbscreen
                        (default: datapack; mwframes = Fabric map-wall mod pool;
                         mcstructure3d = TRUE 3D Bedrock structure from the voxel pipeline;
                         model3d = voxelize a real 3D MODEL .obj/.gltf/.glb into blocks;
+                        bedrock-script = Bedrock Script-API addon .mcpack; needs the
+                        "Beta APIs" experiment toggled ON in the world, then chat !mw start;
                         rgbscreen = TRUE-RGB screen of text_display pixels — exact 16.7M
                         colors in unmodded Java, full-bright, no palette/dither)
-  --edition <e>      java | bedrock                  (map + model3d targets; default: java)
+  --edition <e>      java | bedrock          (map + mwframes + model3d targets; default: java)
   --grid <WxH>       block grid size      (default: 128x128 for map, 64x64 otherwise;
                        for model3d the WIDTH is the cube voxel resolution)
   --fps <n>          sample frame rate    (default: source rate; in-game playback tops out
@@ -30,6 +34,8 @@ Options:
   --max-frames <n>   cap number of frames
   --dither <d>       floyd-steinberg | bayer | none
                        (default: bayer for video, floyd-steinberg for stills)
+  --palette <p>      map | block   (preview ONLY: compare against the 244-color map palette
+                       or the full solid-block build gamut; default: map)
   --temporal <n>     temporal-coherence threshold for video (e.g. 0.002)
   --gamut <lambda>   hue-rigidity for out-of-gamut colours (e.g. 0.8; keeps source hue)
   --speed <ticks>    ticks/frame for datapack/behaviorpack playback (default: matches --fps
@@ -144,9 +150,25 @@ export function runCli(argv: string[]): number {
   });
 
   const verb = positionals[0];
-  if (values.help || (verb !== "render" && verb !== "preview") || !positionals[1]) {
+  if (values.help) {
     process.stdout.write(USAGE);
-    return values.help ? 0 : 1;
+    return 0;
+  }
+  // Usage errors name the actual mistake on stderr before the USAGE dump - a bare wall of help
+  // text left the user to diff their invocation against it by eye (exit code unchanged: 1).
+  if (verb !== "render" && verb !== "preview") {
+    process.stderr.write(
+      verb === undefined
+        ? `missing command: expected "render" or "preview"\n`
+        : `unknown command "${verb}" (expected "render" or "preview")\n`,
+    );
+    process.stdout.write(USAGE);
+    return 1;
+  }
+  if (!positionals[1]) {
+    process.stderr.write(`missing <input> for ${verb} (e.g. blockdream ${verb} clip.gif)\n`);
+    process.stdout.write(USAGE);
+    return 1;
   }
 
   const input = positionals[1];
@@ -167,7 +189,9 @@ export function runCli(argv: string[]): number {
     return n;
   };
   const fps = numFlag("fps", values.fps, "a number > 0", (n) => n > 0);
-  const maxFrames = numFlag("max-frames", values["max-frames"], "an integer >= 0", (n) => Number.isInteger(n) && n >= 0);
+  // >= 1, not >= 0: extract.ts treats a 0 cap as falsy, so `--max-frames 0` silently meant
+  // NO cap at all (the exact opposite of what it says) instead of "zero frames".
+  const maxFrames = numFlag("max-frames", values["max-frames"], "an integer >= 1", (n) => Number.isInteger(n) && n >= 1);
   const temporal = numFlag("temporal", values.temporal, "a non-negative number", (n) => n >= 0);
   const speedTicks = numFlag("speed", values.speed, "an integer >= 1 (ticks per frame)", (n) => Number.isInteger(n) && n >= 1);
   const depth = numFlag("depth", values.depth, "an integer >= 1", (n) => Number.isInteger(n) && n >= 1);
@@ -177,6 +201,27 @@ export function runCli(argv: string[]): number {
   const gamut = numFlag("gamut", values.gamut, "a non-negative number", (n) => n >= 0);
   const animateFrames = numFlag("animate-frames", values["animate-frames"], "an integer >= 1", (n) => Number.isInteger(n) && n >= 1);
   if (badNumeric) return 2;
+
+  // Validations shared by BOTH verbs run BEFORE the preview branch. preview used to return
+  // early, so `preview x.png --dither bogus` silently rendered floyd-steinberg while the same
+  // flag made render exit 2 - the two verbs must agree on what a bad flag is.
+  const dither = values.dither as DitherMethod | undefined;
+  if (dither && !DITHERS.has(dither)) {
+    process.stderr.write(`unknown --dither ${dither}\n`);
+    return 2;
+  }
+  // validate, don't coerce: `values.palette === "block" ? "block" : "map"` mapped typos to map
+  const palette = values.palette as "map" | "block" | undefined;
+  if (palette !== undefined && palette !== "map" && palette !== "block") {
+    process.stderr.write(`unknown --palette ${values.palette} (valid: map | block)\n`);
+    return 2;
+  }
+  try {
+    resolveMcVersion(values.version); // unknown --version is a usage error for both verbs
+  } catch (e) {
+    process.stderr.write(`${(e as Error).message}\n`);
+    return 2;
+  }
 
   if (verb === "preview") {
     const out = values.out ?? "preview.png";
@@ -192,8 +237,9 @@ export function runCli(argv: string[]): number {
     try {
       const png = previewPng(input, {
         grid,
-        method: values.dither as DitherMethod | undefined,
-        palette: values.palette === "block" ? "block" : "map",
+        method: dither,
+        palette,
+        paletteVersion: values.version,
         gamutMap: gamut,
       });
       writeFileSync(out, png);
@@ -224,12 +270,6 @@ export function runCli(argv: string[]): number {
   } else {
     width = target === "map" ? 128 : 64;
     height = target === "map" ? 128 : 64;
-  }
-
-  const dither = values.dither as DitherMethod | undefined;
-  if (dither && !DITHERS.has(dither)) {
-    process.stderr.write(`unknown --dither ${dither}\n`);
-    return 2;
   }
 
   const animate = values.animate as BakeableAnimName | undefined;
@@ -295,6 +335,23 @@ export function runCli(argv: string[]): number {
   }
   if ((values.wall || values.led || values["cushion-mosaic"]) && target !== "voxel3d") {
     process.stderr.write(`note: --wall/--led/--cushion-mosaic apply only to --target voxel3d (ignored for ${target})\n`);
+  }
+  // --edition only branches the map-palette targets and the model3d exporter; everywhere else the
+  // edition is fixed by the target itself (datapack = Java, behaviorpack/mcstructure = Bedrock).
+  if (values.edition && target !== "map" && target !== "mwframes" && target !== "model3d") {
+    process.stderr.write(`note: --edition applies only to --target map|mwframes|model3d (ignored for ${target})\n`);
+  }
+  const wants3dShape =
+    values.depth !== undefined ||
+    values.smooth !== undefined ||
+    values.curve !== undefined ||
+    values.shading !== undefined ||
+    values.flat;
+  if (wants3dShape && target !== "voxel3d" && target !== "mcstructure3d" && target !== "model3d") {
+    process.stderr.write(`note: --depth/--smooth/--curve/--shading/--flat apply only to the 3D targets voxel3d|mcstructure3d|model3d (ignored for ${target})\n`);
+  }
+  if ((values["rgb-levels"] !== undefined || values["px-scale"] !== undefined) && target !== "rgbscreen") {
+    process.stderr.write(`note: --rgb-levels/--px-scale apply only to --target rgbscreen (ignored for ${target})\n`);
   }
 
   const maxNotes = values["max-notes"] !== undefined ? Number(values["max-notes"]) : undefined;

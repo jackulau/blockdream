@@ -3,6 +3,7 @@
 
 import { Viewer } from "./viewer";
 import { controlFromKeys } from "./driveAction";
+import { resetDisabled } from "./ui-feedback";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const rgbCanvas = $<HTMLCanvasElement>("rgb");
@@ -23,6 +24,9 @@ window.addEventListener("keyup", (e) => held.delete(e.key.toLowerCase()));
 function setStatus(t: string, cls: "ok" | "err" | "idle") {
   statusEl.textContent = t;
   statusEl.className = `status ${cls}`;
+  // Reset only does anything while connected (Viewer.reset() early-returns) - the button
+  // follows the same connect/disconnect transitions as the status line.
+  $<HTMLButtonElement>("reset").disabled = resetDisabled(cls);
 }
 
 function drawBev(lidar: number[]) {

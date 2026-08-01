@@ -3,8 +3,20 @@ import { mkdtempSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runFfmpeg, hasFfmpeg } from "@blockdream/video";
+import { generateVoxelDatapack } from "@blockdream/emit-commands";
+import { createVolume, setVoxel } from "@blockdream/voxel";
 import { render } from "../src/render";
 import { runCli } from "../src/cli";
+
+// goal 088 D3 capability probe: the honest note-count report consumes the generators' additive
+// musicNoteCount/musicLoopTicks result fields (lane E). Until those land, the CLI note degrades
+// to the old min(length, cap) arithmetic and the truncation-honesty test below is skipped.
+const probeVol = createVolume(1, 1, 1);
+setVoxel(probeVol, 0, 0, 0, 10);
+const probePack = generateVoxelDatapack([probeVol], () => "minecraft:stone", {
+  music: [{ tick: 0, note: 12, instrument: "harp", velocity: 1 }],
+});
+const emitterReportsNoteCount = (probePack as { musicNoteCount?: number }).musicNoteCount !== undefined;
 
 // End-to-end: a video WITH an audio track → render(voxel3d) emits a note-block music
 // area + a playsound sequencer alongside the 3D build; a video WITHOUT audio (or
@@ -17,6 +29,7 @@ let dir: string;
 let avClip: string; // video + 440 Hz audio
 let silentClip: string; // video, no audio
 let stillImg: string; // a single still frame — no audio STREAM at all (distinct from an audio-less video)
+let melodyClip: string; // video + STEPPED-pitch audio: onsets spread across the clip (0, 5, 10, 15 ticks)
 
 beforeAll(() => {
   if (!ff) return;
@@ -24,6 +37,7 @@ beforeAll(() => {
   avClip = join(dir, "av.mp4");
   silentClip = join(dir, "silent.mp4");
   stillImg = join(dir, "still.png");
+  melodyClip = join(dir, "melody.mp4");
 
   let r = runFfmpeg([
     "-v", "error",
@@ -46,6 +60,16 @@ beforeAll(() => {
     "-frames:v", "1", "-y", stillImg,
   ]);
   if (r.status !== 0) throw new Error("ffmpeg still gen failed: " + r.stderr);
+
+  // pitch steps every 0.25 s (220 -> 330 -> 495 -> 742 Hz, distinct note-block notes), so
+  // analyzeAudio emits onsets at ticks ~0/5/10/15 - a melody LONGER than a short animation loop
+  r = runFfmpeg([
+    "-v", "error",
+    "-f", "lavfi", "-i", "testsrc2=size=48x48:rate=8:duration=1",
+    "-f", "lavfi", "-i", "aevalsrc=sin(2*PI*t*220*exp(0.405465*floor(t*4))):d=1",
+    "-shortest", "-pix_fmt", "yuv420p", "-y", melodyClip,
+  ]);
+  if (r.status !== 0) throw new Error("ffmpeg melody gen failed: " + r.stderr);
 });
 
 function musicPath(out: string): string {
@@ -164,6 +188,42 @@ d("CLI flag plumbing", () => {
     // reached the emitter verbatim instead of being rejected or zeroed.
     expect(setup).toContain("setblock -20 70");
     expect(setup).toContain("minecraft:note_block[note=");
+  });
+});
+
+// goal 088 D3: the CLI note used to report min(music.length, cap) while the emitter trims the
+// melody to the ANIMATION loop (frames x speedTicks; repro: reported 150, emitted 2). The
+// headline number must be the EMITTED count, with an explicit trimmed-to-loop note.
+d("music note-count honesty (truncation to the animation loop)", () => {
+  it.runIf(emitterReportsNoteCount)(
+    "reports the ACTUAL emitted count and names the loop trim",
+    () => {
+      const out = join(dir, "trim");
+      // 3 frames x default speed 2 = a 6-tick loop; the melody spans ~15 ticks -> notes trimmed
+      const res = render({ input: melodyClip, out, target: "voxel3d", width: 24, height: 24, maxFrames: 3, depth: 6, music: "on" });
+      const musicFn = readFileSync(musicPath(out), "utf8");
+      const emitted = (musicFn.match(/ run playsound /g) ?? []).length;
+      expect(emitted).toBeGreaterThan(0);
+      const note = res.notes.find((n) => /note-block music:/.test(n))!;
+      const m = /note-block music: (\d+) notes/.exec(note)!;
+      expect(Number(m[1])).toBe(emitted); // headline = what the pack actually plays
+      const trim = /trimmed to the (\d+)-tick animation loop: (\d+) of (\d+) notes/.exec(note)!;
+      expect(trim).not.toBeNull();
+      expect(Number(trim[1])).toBe(6); // 3 frames x speed 2
+      expect(Number(trim[2])).toBe(emitted);
+      expect(Number(trim[3])).toBeGreaterThan(emitted); // some notes really were dropped
+    },
+  );
+
+  it("a melody that FITS the loop reports its full count with no trim note", () => {
+    const out = join(dir, "no-trim");
+    // single-onset 440 Hz clip: 1 note at tick 0, well inside any loop
+    const res = render({ input: avClip, out, target: "voxel3d", width: 24, height: 24, maxFrames: 3, depth: 6, music: "on" });
+    const musicFn = readFileSync(musicPath(out), "utf8");
+    const emitted = (musicFn.match(/ run playsound /g) ?? []).length;
+    const note = res.notes.find((n) => /note-block music:/.test(n))!;
+    expect(note).toContain(`note-block music: ${emitted} notes`);
+    expect(note).not.toContain("trimmed to");
   });
 });
 

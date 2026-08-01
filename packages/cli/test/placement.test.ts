@@ -239,3 +239,26 @@ describe("larger builds hold up: budgets + new controls compose at scale (D4)", 
     expect(countSolid(seq[0]!)).toBe(countSolid(v)); // identity frame loses nothing
   });
 });
+
+// goal 088 D9g: HOW_TO_LOAD.txt hardcoded "x=0 y=64 z=0" while --origin moved the real build,
+// sending users to clear-check (and force-CLEAR-expect) the wrong coordinates.
+describe("--origin threads into HOW_TO_LOAD.txt (D9g)", () => {
+  it("model3d datapack: the txt carries the real --origin coords, not the stale default", () => {
+    const out = join(dir, "howto-origin");
+    render({
+      input: writeObj("howto.obj"), out, target: "model3d",
+      width: 8, height: 8, origin: { x: 200, y: 70, z: -340 },
+    });
+    const txt = readFileSync(join(out, "HOW_TO_LOAD.txt"), "utf8");
+    // both the location line and the force-CLEARS warning name the actual origin
+    expect(txt.match(/x=200 y=70 z=-340/g)!.length).toBeGreaterThanOrEqual(2);
+    expect(txt).not.toContain("x=0 y=64 z=0");
+  });
+
+  it("no --origin keeps the documented 0,64,0 default in the txt", () => {
+    const out = join(dir, "howto-default");
+    render({ input: writeObj("howto2.obj"), out, target: "model3d", width: 8, height: 8 });
+    const txt = readFileSync(join(out, "HOW_TO_LOAD.txt"), "utf8");
+    expect(txt).toContain("x=0 y=64 z=0");
+  });
+});

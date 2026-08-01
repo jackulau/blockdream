@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { planGifExport, packingHudText, reportPngDownload, GIF_EXPORT_PIXEL_BUDGET } from "../src/export-plan";
-import { planExportBudget, EXPORT_FRAME_BUDGET } from "../src/datapack-export";
+import { planGifExport, gifFrameDelays, packingHudText, reportPngDownload, GIF_EXPORT_PIXEL_BUDGET } from "../src/export-plan";
+import { planExportBudget, planTickPlayback, EXPORT_FRAME_BUDGET } from "../src/datapack-export";
+import { clampFrameDurations, MIN_FRAME_MS } from "../src/anim";
+import { musicKeyboardHalf } from "../src/canvas-mod";
+import { noteSequencer } from "@blockdream/emit-commands";
+import type { NoteEvent } from "@blockdream/audio";
 
 // Export honesty (goal 087 D8): the download buttons must not claim success over a failed
 // encode, and heavy exports must be budgeted + announced BEFORE the synchronous work starts.
@@ -82,5 +86,75 @@ describe("reportPngDownload (success text only after the encode resolves)", () =
     expect(status.textContent).toBe(""); // not yet - no premature success claim
     await report;
     expect(status.textContent).toBe("PNG: 512×512 px");
+  });
+});
+
+// Goal 088 D9: GIF pacing must match the datapack's tick plan, an empty export must refuse,
+// and every consumer of decoded timing shares ONE duration sanitizer (clampFrameDurations).
+
+describe("planGifExport with zero frames (goal 088 D9d)", () => {
+  it("an empty export is refused, not a degenerate 'encoding 0 frames' success", () => {
+    const plan = planGifExport([]);
+    expect(plan.ok).toBe(false);
+    expect(plan.frames).toBe(0);
+    expect(plan.message).toContain("no frames");
+  });
+});
+
+describe("gifFrameDelays (goal 088 D9b: GIF pacing == in-game tick-plan pacing)", () => {
+  it("no timing uses the tick plan's uniform dwell (2 ticks = 100 ms), not the old 70 ms", () => {
+    const plan = planTickPlayback(3, null);
+    expect(plan.speedTicks).toBe(2);
+    expect(gifFrameDelays(3, null)).toEqual([100, 100, 100]);
+    expect(gifFrameDelays(3, null)[0]).toBe(plan.speedTicks * 50);
+  });
+
+  it("real per-frame timing survives, with the 100 ms tick-plan fallback filling gaps", () => {
+    expect(gifFrameDelays(3, [40, 0, undefined])).toEqual([40, 100, 100]);
+  });
+
+  it("sub-floor delays are clamped by the SAME MIN_FRAME_MS the viewer clock uses", () => {
+    expect(gifFrameDelays(2, [2, 60])).toEqual([MIN_FRAME_MS, 60]);
+  });
+});
+
+describe("clampFrameDurations (goal 088 D9e: one shared duration sanitizer)", () => {
+  it("floors real durations at MIN_FRAME_MS and blanks junk so each consumer's fallback applies", () => {
+    expect(clampFrameDurations([2, 60, 0, -5, undefined, null])).toEqual([
+      MIN_FRAME_MS, 60, undefined, undefined, undefined, undefined,
+    ]);
+  });
+
+  it("passes null through (no timing stays no timing)", () => {
+    expect(clampFrameDurations(null)).toBeNull();
+  });
+});
+
+describe("musicKeyboardHalf (goal 088 D3: center on the keyboard the pack ACTUALLY places)", () => {
+  const ev = (tick: number, note: number, instrument = "harp"): NoteEvent => ({
+    tick, note, instrument, velocity: 1,
+  });
+
+  it("counts distinct (instrument, note) PAIRS - the same note on two instruments is two cells", () => {
+    const notes = [ev(0, 5, "harp"), ev(1, 5, "bass"), ev(2, 5, "harp")];
+    // the old note-only Set guess said width 1 (half 0); the real keyboard is 2 cells wide
+    expect(musicKeyboardHalf(notes, 1, 2)).toEqual({ x: 0.5, z: 0 });
+  });
+
+  it("respects the animation loop trim - notes past frameCount x speedTicks do not widen the row", () => {
+    const notes = [ev(0, 1), ev(100, 2)]; // loop = 2 frames x 2 ticks = 4; tick 100 is trimmed
+    expect(musicKeyboardHalf(notes, 2, 2)).toEqual({ x: 0, z: 0 });
+    // a single still (frameCount 1) has no loop override, so both notes count
+    expect(musicKeyboardHalf(notes, 1, 2)).toEqual({ x: 0.5, z: 0 });
+  });
+
+  it("matches the sequencer's own keyboardNotes for the same loop context", () => {
+    const notes = [ev(0, 3), ev(1, 7), ev(2, 3, "bass"), ev(3, 12)];
+    const seq = noteSequencer(notes, { placeKeyboard: false, loopTicksOverride: 8 });
+    expect(musicKeyboardHalf(notes, 4, 2)).toEqual({ x: (seq.keyboardNotes - 1) / 2, z: 0 });
+  });
+
+  it("no notes -> zero extent (and no sequencer call blows up on empty input)", () => {
+    expect(musicKeyboardHalf([], 10, 2)).toEqual({ x: 0, z: 0 });
   });
 });
